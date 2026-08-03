@@ -1,0 +1,2812 @@
+<title>The Magic Square — a Peres–Mermin pseudo-telepathy game</title>
+<style>
+  :root {
+    --bg: #faf6ff;
+    --bg-panel: #ffffff;
+    --bg-panel-2: #f3edff;
+    --ink: #1b1330;
+    --ink-dim: #5b5178;
+    --line: rgba(27, 19, 48, 0.14);
+    --alice: #d1266b;
+    --alice-soft: rgba(209, 38, 107, 0.12);
+    --bob: #0b7d75;
+    --bob-soft: rgba(11, 125, 117, 0.12);
+    --quantum: #a8720a;
+    --quantum-soft: rgba(168, 114, 10, 0.14);
+    --mismatch: #b5391f;
+    --mismatch-soft: rgba(181, 57, 31, 0.12);
+    --shadow: 0 1px 2px rgba(27, 19, 48, 0.06), 0 12px 32px -16px rgba(27, 19, 48, 0.22);
+
+    --font-display: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --font-body: "Avenir Next", "Century Gothic", Futura, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #140c2c;
+      --bg-panel: #1d1442;
+      --bg-panel-2: #251a52;
+      --ink: #f4eeff;
+      --ink-dim: #b3a6d9;
+      --line: rgba(244, 238, 255, 0.14);
+      --alice: #ff6f9c;
+      --alice-soft: rgba(255, 111, 156, 0.16);
+      --bob: #4bd6c8;
+      --bob-soft: rgba(75, 214, 200, 0.14);
+      --quantum: #ffd23f;
+      --quantum-soft: rgba(255, 210, 63, 0.16);
+      --mismatch: #ff7a56;
+      --mismatch-soft: rgba(255, 122, 86, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 48px -20px rgba(0, 0, 0, 0.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #140c2c;
+    --bg-panel: #1d1442;
+    --bg-panel-2: #251a52;
+    --ink: #f4eeff;
+    --ink-dim: #b3a6d9;
+    --line: rgba(244, 238, 255, 0.14);
+    --alice: #ff6f9c;
+    --alice-soft: rgba(255, 111, 156, 0.16);
+    --bob: #4bd6c8;
+    --bob-soft: rgba(75, 214, 200, 0.14);
+    --quantum: #ffd23f;
+    --quantum-soft: rgba(255, 210, 63, 0.16);
+    --mismatch: #ff7a56;
+    --mismatch-soft: rgba(255, 122, 86, 0.14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 48px -20px rgba(0, 0, 0, 0.6);
+  }
+  :root[data-theme="light"] {
+    --bg: #faf6ff;
+    --bg-panel: #ffffff;
+    --bg-panel-2: #f3edff;
+    --ink: #1b1330;
+    --ink-dim: #5b5178;
+    --line: rgba(27, 19, 48, 0.14);
+    --alice: #d1266b;
+    --alice-soft: rgba(209, 38, 107, 0.12);
+    --bob: #0b7d75;
+    --bob-soft: rgba(11, 125, 117, 0.12);
+    --quantum: #a8720a;
+    --quantum-soft: rgba(168, 114, 10, 0.14);
+    --mismatch: #b5391f;
+    --mismatch-soft: rgba(181, 57, 31, 0.12);
+    --shadow: 0 1px 2px rgba(27, 19, 48, 0.06), 0 12px 32px -16px rgba(27, 19, 48, 0.22);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+  }
+
+  header.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+
+  .brand .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .brand h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(24px, 4vw, 32px);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .brand h1 em {
+    font-style: normal;
+    color: var(--alice);
+  }
+  .brand h1 .b { color: var(--bob); font-style: normal; }
+
+  .scoreboard {
+    display: flex;
+    gap: 22px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .scoreboard .stat { min-width: 64px; }
+  .scoreboard .stat .n {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .scoreboard .stat .l {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 2px;
+  }
+  .rules-link {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .rules-link:hover { border-color: var(--ink-dim); color: var(--ink); }
+
+  .stage {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: clamp(20px, 4vw, 40px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scene { display: none; }
+  .scene.active {
+    display: block;
+    animation: rise 0.35s ease both;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h2.scene-title {
+    font-family: var(--font-display);
+    font-size: clamp(21px, 3.2vw, 27px);
+    font-weight: 500;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  p.lede {
+    color: var(--ink-dim);
+    font-size: 15px;
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+
+  /* ---- start scene ---- */
+  .start-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 36px;
+    align-items: start;
+  }
+  @media (max-width: 640px) {
+    .start-grid { grid-template-columns: 1fr; }
+  }
+  .start-grid p {
+    font-family: var(--font-display);
+    font-size: 16.5px;
+    margin: 0 0 14px;
+  }
+  .start-grid strong.role-a { color: var(--alice); font-weight: 600; }
+  .start-grid strong.role-b { color: var(--bob); font-weight: 600; }
+
+  .stat-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 20px 0 24px;
+  }
+  .stat-tile {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    background: var(--bg-panel-2);
+  }
+  .stat-tile .cap {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .stat-tile .num {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-tile.classical .num { color: var(--mismatch); }
+  .stat-tile.quantum .num { color: var(--quantum); }
+  .stat-tile .sub { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+
+  .preview-panel {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 18px;
+    background:
+      linear-gradient(var(--bg-panel-2) 1px, transparent 1px) 0 0 / 100% 20px,
+      linear-gradient(90deg, var(--bg-panel-2) 1px, transparent 1px) 0 0 / 20px 100%,
+      var(--bg-panel);
+  }
+  .preview-panel .cap {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+  }
+  .msquare {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 220px;
+    margin: 0 auto;
+  }
+  .msquare .cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1.5px dashed var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    color: var(--ink-dim);
+  }
+  .msquare.preview .cell.r { border-color: var(--alice); border-style: solid; }
+  .msquare.preview .cell.c { border-color: var(--bob); border-style: solid; }
+  .msquare.preview .cell.rc {
+    border-color: var(--quantum);
+    background: var(--quantum-soft);
+    color: var(--quantum);
+    font-weight: 700;
+  }
+  .preview-legend {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin-top: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .preview-legend span { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  button.primary {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 15px;
+    color: #fff;
+    background: linear-gradient(90deg, var(--alice), var(--bob));
+    border: none;
+    border-radius: 9px;
+    padding: 13px 26px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -10px rgba(0,0,0,0.4);
+  }
+  button.primary:hover { filter: brightness(1.06); }
+  button.primary:active { transform: translateY(1px); }
+  button.primary:disabled {
+    background: var(--line);
+    color: var(--ink-dim);
+    cursor: not-allowed;
+    box-shadow: none;
+    filter: none;
+  }
+  button:focus-visible, .cellbtn:focus-visible, .rules-link:focus-visible,
+  .palette-tile:focus-visible, .qc-slot:focus-visible,
+  .qc-box:focus-visible, .qc-dot:focus-visible, .qc-target:focus-visible {
+    outline: 2px solid var(--quantum);
+    outline-offset: 2px;
+  }
+
+  /* ---- handoff scene ---- */
+  .handoff {
+    text-align: center;
+    padding: 34px 10px 10px;
+  }
+  .handoff .role-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  .handoff.for-alice .role-tag { background: var(--alice-soft); color: var(--alice); }
+  .handoff.for-bob .role-tag { background: var(--bob-soft); color: var(--bob); }
+  .handoff h2 { font-size: clamp(22px, 4vw, 30px); }
+  .handoff p.lede { margin-left: auto; margin-right: auto; }
+
+  /* ---- turn scenes ---- */
+  .turn-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .role-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+  }
+  .scene[data-role="alice"] .role-tag { background: var(--alice-soft); color: var(--alice); }
+  .scene[data-role="bob"] .role-tag { background: var(--bob-soft); color: var(--bob); }
+  .scene[data-role="charlie"] .role-tag { background: var(--quantum-soft); color: var(--quantum); }
+
+  .rule-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--bg-panel-2);
+    font-size: 14px;
+    color: var(--ink-dim);
+    margin: 16px 0 26px;
+  }
+  .rule-card b { color: var(--ink); }
+
+  .cell-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin: 8px 0 20px;
+  }
+  .cellbtn {
+    width: 84px;
+    height: 84px;
+    border-radius: 12px;
+    border: 2px solid var(--line);
+    background: var(--bg-panel);
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .cellbtn:active { transform: scale(0.96); }
+  .cellbtn .idx {
+    font-size: 10px;
+    color: var(--ink-dim);
+    letter-spacing: 0.06em;
+  }
+  .scene[data-role="alice"] .cellbtn.plus { color: var(--alice); border-color: var(--alice); }
+  .scene[data-role="alice"] .cellbtn.minus { color: var(--alice); border-color: var(--alice); background: var(--alice-soft); }
+  .scene[data-role="bob"] .cellbtn.plus { color: var(--bob); border-color: var(--bob); }
+  .scene[data-role="bob"] .cellbtn.minus { color: var(--bob); border-color: var(--bob); background: var(--bob-soft); }
+
+  .parity-readout {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-bottom: 22px;
+    min-height: 18px;
+  }
+  .parity-readout.ok { color: var(--bob); }
+  .parity-readout.bad { color: var(--mismatch); }
+  .scene[data-role="alice"] .parity-readout.ok { color: var(--alice); }
+
+  .turn-actions { display: flex; justify-content: center; }
+
+  /* ---- results scene ---- */
+  .results-grid-wrap { display: flex; justify-content: center; margin: 6px 0 22px; }
+  .msquare.result { max-width: 300px; gap: 8px; }
+  .msquare.result .cell {
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    font-size: 22px;
+    font-weight: 700;
+    position: relative;
+    background: var(--bg-panel);
+  }
+  .msquare.result .cell .tag {
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+  }
+  .msquare.result .cell.a { border-color: var(--alice); color: var(--alice); background: var(--alice-soft); }
+  .msquare.result .cell.b { border-color: var(--bob); color: var(--bob); background: var(--bob-soft); }
+  .msquare.result .cell.dim { color: var(--line); border-style: dashed; }
+  .msquare.result .cell.win {
+    border-color: var(--quantum);
+    background: var(--quantum-soft);
+    color: var(--quantum);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .msquare.result .cell.lose {
+    border-color: var(--mismatch);
+    background: var(--mismatch-soft);
+    color: var(--mismatch);
+    font-size: 15px;
+    gap: 2px;
+    flex-direction: column;
+  }
+  .msquare.result .cell.lose .split { display: flex; align-items: center; gap: 4px; }
+  .msquare.result .cell.lose .a-v { color: var(--alice); }
+  .msquare.result .cell.lose .b-v { color: var(--bob); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--quantum-soft); }
+    50% { box-shadow: 0 0 0 8px transparent; }
+  }
+
+  .verdict {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+  .verdict .badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 999px;
+  }
+  .verdict.win .badge { background: var(--quantum-soft); color: var(--quantum); }
+  .verdict.lose .badge { background: var(--mismatch-soft); color: var(--mismatch); }
+  .verdict p { color: var(--ink-dim); font-size: 14px; margin: 10px auto 0; max-width: 52ch; }
+
+  .result-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  button.secondary {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 12px 22px;
+    cursor: pointer;
+  }
+  button.secondary:hover { border-color: var(--ink-dim); }
+
+  footer.note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-top: 20px;
+  }
+
+  /* ---- mode tabs ---- */
+  .mode-tabs {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-panel-2);
+    margin-bottom: 20px;
+  }
+  .mode-tab {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink-dim);
+    background: none;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+  .mode-tab.active { background: var(--bg-panel); color: var(--ink); box-shadow: var(--shadow); }
+  .mode-tab[data-mode="quantum"].active { color: var(--quantum); }
+
+  .mode-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--bg-panel-2);
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+  .mode-pill.quantum { background: var(--quantum-soft); color: var(--quantum); }
+
+  .quantum-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--quantum);
+    background: var(--quantum-soft);
+    border-radius: 999px;
+    padding: 5px 12px;
+    margin: 0 auto 14px;
+    width: max-content;
+  }
+
+  .measure-readout {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 18px 0;
+    min-height: 40px;
+  }
+  .measure-chip {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: var(--bg-panel-2);
+    text-align: center;
+  }
+  .measure-chip .k { display: block; font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .measure-chip .v { display: block; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .scene[data-role="alice"] .measure-chip.result .v { color: var(--alice); }
+  .scene[data-role="bob"] .measure-chip.result .v { color: var(--bob); }
+
+  /* ---- circuit canvas (pixel-positioned, used for static + editor diagrams) ---- */
+  .circuit-block { margin: 18px 0 22px; }
+  .circuit-block .circuit-caption {
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-top: 10px;
+    max-width: 56ch;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+  }
+  .qc-canvas {
+    position: relative;
+    margin: 0 auto;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  .qc-wire-label {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+  .qc-wire-line {
+    position: absolute;
+    height: 2px;
+    background: var(--line);
+    z-index: 0;
+  }
+  .qc-connector {
+    position: absolute;
+    width: 2px;
+    background: var(--ink-dim);
+    z-index: 1;
+  }
+  .qc-connector.qc-alice { background: var(--alice); }
+  .qc-connector.qc-bob { background: var(--bob); }
+  .qc-connector.qc-charlie { background: var(--quantum); }
+  .qc-connector.qc-ghost { background: var(--ink-dim); opacity: 0.35; }
+
+  .qc-box, .qc-dot, .qc-target, .qc-swapx {
+    position: absolute;
+    z-index: 3;
+    transform: translate(-50%, -50%);
+  }
+  .qc-swapx {
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; color: var(--ink);
+  }
+  .qc-swapx.qc-alice { color: var(--alice); }
+  .qc-swapx.qc-bob { color: var(--bob); }
+  .qc-swapx.qc-charlie { color: var(--quantum); }
+  .qc-swapx.qc-incomplete { color: var(--mismatch); animation: warn-pulse 1s ease-in-out infinite; }
+  .qc-swapx.qc-ghost { opacity: 0.32; }
+  .qc-box {
+    width: 38px; height: 38px;
+    border-radius: 7px;
+    border: 2px solid var(--ink);
+    background: var(--bg-panel);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 11px;
+    padding: 0 1px;
+    white-space: nowrap;
+  }
+  .qc-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--ink);
+  }
+  .qc-target {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: var(--bg-panel);
+  }
+  .qc-target::before, .qc-target::after {
+    content: ""; position: absolute; top: 50%; left: 50%; background: var(--ink);
+  }
+  .qc-target::before { width: 13px; height: 2px; transform: translate(-50%, -50%); }
+  .qc-target::after { width: 2px; height: 13px; transform: translate(-50%, -50%); }
+
+  .qc-box.qc-alice, .qc-target.qc-alice { border-color: var(--alice); color: var(--alice); }
+  .qc-dot.qc-alice { background: var(--alice); }
+  .qc-target.qc-alice::before, .qc-target.qc-alice::after { background: var(--alice); }
+  .qc-box.qc-bob, .qc-target.qc-bob { border-color: var(--bob); color: var(--bob); }
+  .qc-dot.qc-bob { background: var(--bob); }
+  .qc-target.qc-bob::before, .qc-target.qc-bob::after { background: var(--bob); }
+  .qc-box.qc-charlie, .qc-target.qc-charlie { border-color: var(--quantum); color: var(--quantum); }
+  .qc-dot.qc-charlie { background: var(--quantum); }
+  .qc-target.qc-charlie::before, .qc-target.qc-charlie::after { background: var(--quantum); }
+
+  .qc-box.qc-incomplete, .qc-target.qc-incomplete {
+    border-color: var(--mismatch); color: var(--mismatch);
+    animation: warn-pulse 1s ease-in-out infinite;
+  }
+  .qc-dot.qc-incomplete { background: var(--mismatch); animation: warn-pulse 1s ease-in-out infinite; }
+  .qc-target.qc-incomplete::before, .qc-target.qc-incomplete::after { background: var(--mismatch); }
+  @keyframes warn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .qc-ghost { opacity: 0.32; pointer-events: none; }
+  .qc-box.qc-ghost { background: transparent; border-style: dashed; }
+  .qc-target.qc-ghost { background: transparent; border-style: dashed; }
+
+  .qc-slot {
+    position: absolute;
+    z-index: 2;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .qc-slot:hover { background: var(--bg-panel-2); }
+
+  /* ---- gate palette ---- */
+  .gate-palette {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 16px 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-panel-2);
+  }
+  .palette-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 9px;
+    border-radius: 8px;
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+  .palette-tile:hover { background: var(--bg-panel); }
+  .palette-tile.armed { background: var(--bg-panel); box-shadow: 0 0 0 2px var(--quantum); }
+  .palette-glyph { position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; }
+  .palette-glyph .qc-box, .palette-glyph .qc-dot, .palette-glyph .qc-target, .palette-glyph .qc-swapx { position: static; transform: none; }
+  .palette-label {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+    color: var(--ink-dim); text-transform: uppercase;
+  }
+
+  .param-panel:empty { display: none; }
+  .param-panel {
+    display: flex; flex-direction: column; gap: 8px;
+    margin: -6px 0 16px; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg-panel-2);
+  }
+  .param-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .param-label {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+    color: var(--ink-dim); text-transform: uppercase; min-width: 64px;
+  }
+  .param-axis { display: flex; gap: 4px; }
+  .param-axis-btn {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    width: 24px; height: 24px; border-radius: 5px;
+    border: 1px solid var(--line); background: var(--bg-panel); color: var(--ink-dim);
+    cursor: pointer;
+  }
+  .param-axis-btn.active { border-color: var(--quantum); color: var(--quantum); }
+  .param-slider { flex: 1; min-width: 100px; }
+  .param-readout {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink); min-width: 44px; text-align: right;
+  }
+
+  .editor-actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 12px; }
+  .ghost-btn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink-dim);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .ghost-btn:hover { border-color: var(--ink-dim); color: var(--ink); }
+  .ghost-btn.active { border-color: var(--quantum); color: var(--quantum); }
+
+  .circuit-status {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 8px;
+    margin-bottom: 14px;
+    border-radius: 8px;
+  }
+  .circuit-status.ok { color: var(--bob); background: var(--bob-soft); }
+  .scene[data-role="alice"] .circuit-status.ok { color: var(--alice); background: var(--alice-soft); }
+  .scene[data-role="charlie"] .circuit-status.ok { color: var(--quantum); background: var(--quantum-soft); }
+  .circuit-status.bad { color: var(--ink-dim); background: var(--bg-panel-2); }
+  .circuit-status.warn { color: var(--mismatch); background: var(--mismatch-soft); }
+
+  .basis-note {
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: center;
+    margin: 0 0 16px;
+  }
+
+  .live-preview { max-width: 440px; margin: 0 auto 20px; }
+  .live-preview .cap {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .prob-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+  .prob-bits { width: 26px; color: var(--ink-dim); }
+  .prob-bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--bg-panel-2);
+    overflow: hidden;
+  }
+  .prob-fill {
+    height: 100%;
+    background: var(--quantum);
+    transition: width 0.2s ease;
+  }
+  .scene[data-role="alice"] .prob-fill { background: var(--alice); }
+  .scene[data-role="bob"] .prob-fill { background: var(--bob); }
+  .prob-pct { min-width: 130px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .prob-pct b { color: var(--quantum); }
+  .scene[data-role="alice"] .prob-pct b { color: var(--alice); }
+  .scene[data-role="bob"] .prob-pct b { color: var(--bob); }
+
+  .drag-ghost { opacity: 0.85; }
+
+  .live-preview .ghost-btn { display: block; margin: 0 auto 12px; }
+
+  /* ---- Charlie's qubit routing ---- */
+  .routing-wrap { max-width: 480px; margin: 0 auto; }
+  .qubit-pool {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    margin: 4px 0 20px; min-height: 58px;
+  }
+  .qubit-token {
+    width: 52px; height: 52px; border-radius: 10px;
+    border: 2px solid var(--quantum); color: var(--quantum);
+    background: var(--bg-panel);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 13px;
+    cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  .qubit-token.armed { box-shadow: 0 0 0 2px var(--quantum); }
+  .qubit-token.ghost { opacity: 0.35; border-style: dashed; pointer-events: none; }
+  .routing-zones { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .routing-zone {
+    border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    min-width: 150px;
+  }
+  .routing-zone .zone-label {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .routing-zone.alice-zone .zone-label { color: var(--alice); }
+  .routing-zone.bob-zone .zone-label { color: var(--bob); }
+  .routing-zone.alice-zone { border-color: var(--alice-soft); }
+  .routing-zone.bob-zone { border-color: var(--bob-soft); }
+  .zone-slots { display: flex; gap: 10px; }
+  .zone-slot {
+    width: 60px; height: 68px; border-radius: 10px; border: 1.5px dashed var(--line);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    cursor: pointer;
+  }
+  .zone-slot .slot-tag {
+    font-family: var(--font-mono); font-size: 9px; color: var(--ink-dim); text-transform: uppercase;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Peres–Mermin game</span>
+      <h1>The <em>Magic</em> <span class="b">Square</span></h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <span class="mode-pill" id="mode-pill">Classical</span>
+      <div class="scoreboard">
+        <div class="stat"><span class="n" id="sb-round">0</span><span class="l">Round</span></div>
+        <div class="stat"><span class="n" id="sb-wins">0</span><span class="l">Wins</span></div>
+        <div class="stat"><span class="n" id="sb-rate">—</span><span class="l">Win rate</span></div>
+      </div>
+      <button class="rules-link" id="rules-btn" type="button">Rules</button>
+    </div>
+  </header>
+
+  <div class="stage">
+
+    <!-- START -->
+    <section class="scene active" id="scene-start">
+      <div class="start-grid">
+        <div>
+          <div class="mode-tabs" id="mode-tabs">
+            <button class="mode-tab active" data-mode="classical" type="button">Classical</button>
+            <button class="mode-tab" data-mode="quantum" type="button">Quantum</button>
+          </div>
+
+          <div id="mode-panel-classical">
+            <h2 class="scene-title">Two players. No talking. A square that shouldn't be fillable.</h2>
+            <p>Charlie the referee locks <strong class="role-a">Alice</strong> and <strong class="role-b">Bob</strong> in separate rooms. He hands Alice one row of a 3×3 grid and Bob one column. Each fills their strip with +1s and −1s under a fixed rule, then the grid is revealed — and the two of them only win if they happened to write the <em>same</em> number in the cell where their row and column cross.</p>
+            <p>No hidden note, no signal, no peeking — just the numbers they choose. Play a few rounds honestly and see how close to certainty two separated people can actually get.</p>
+
+            <p><b>The strategy:</b> before they're separated, Alice and Bob memorize the same fixed 3×3 table of +1s and −1s, built to satisfy the parity rule — each row's three numbers multiply to +1, each column's to −1. Whatever row Charlie hands Alice, she just reads it off the table; whatever column he hands Bob, same for him. No improvising, no signal needed once they've split up — it's all decided in advance. The catch: multiply all nine parity constraints together and you get a contradiction, so <em>no</em> fixed table can satisfy every row and every column at once. Whichever table they memorize, there's always at least one row/column pairing where it breaks — that's the one crack in the notepad no amount of clever pre-agreement can close.</p>
+
+            <div class="stat-pair">
+              <div class="stat-tile classical">
+                <div class="cap">Best classical strategy</div>
+                <div class="num">8/9</div>
+                <div class="sub">≈88.9% — one cell always betrays you</div>
+              </div>
+              <div class="stat-tile quantum">
+                <div class="cap">With entanglement</div>
+                <div class="num">9/9</div>
+                <div class="sub">100% — no signal required</div>
+              </div>
+            </div>
+
+            <p style="font-size:14px; color:var(--ink-dim);">Here you play it straight, as two people scribbling numbers with no communication — the classical version. Physicists have shown that no such pre-agreed strategy can beat 8 wins out of 9 in the long run; the only way past that ceiling is to replace the notepad with an entangled quantum state, which real experiments (including on quantum computers, in 2022) have confirmed actually works.</p>
+          </div>
+
+          <div id="mode-panel-quantum" style="display:none;">
+            <h2 class="scene-title">Same rules. Two entangled qubits instead of a notepad.</h2>
+            <p>Charlie now also hands <strong class="role-a">Alice</strong> and <strong class="role-b">Bob</strong> one qubit each from two entangled pairs he just prepared. Instead of freely picking numbers, each of them <em>builds</em> a short quantum circuit — dragging gates onto their own two qubits — chosen to match their assigned row or column, then reads off what the measurement says.</p>
+            <p>They still can't talk, and Charlie still assigns rows and columns at random. Build the wrong circuit and the numbers are meaningless; build the right one and the win is guaranteed.</p>
+
+            <p><b>The strategy:</b> before they're separated, Alice and Bob agree on nine short circuits each — one per possible row, one per possible column — each one measuring a different pair of quantum observables instead of reading numbers off a table. Whatever row Charlie hands Alice, she builds that row's circuit on her half of the entanglement; whatever column he hands Bob, same for him with his half. Neither knows the other's assignment, and no signal passes between them after the qubits are split — the correlation is already built into the entangled pairs Charlie prepared. Two people who've never compared notes since separating, producing numbers that always agree exactly: it looks like a psychic act. It isn't telepathy — it's linear algebra, and it's exactly the trick the Peres–Mermin square is built to prove no classical notepad can fake.</p>
+
+            <div class="stat-pair">
+              <div class="stat-tile classical">
+                <div class="cap">No entanglement</div>
+                <div class="num">8/9</div>
+                <div class="sub">the ceiling for any pre-agreed strategy</div>
+              </div>
+              <div class="stat-tile quantum">
+                <div class="cap">This mode</div>
+                <div class="num">9/9</div>
+                <div class="sub">guaranteed, once your circuit is correct</div>
+              </div>
+            </div>
+
+            <p style="font-size:14px; color:var(--ink-dim);">Every gate you place runs on a real, noiseless statevector simulation — actual complex amplitudes, unitary matrices, and Born-rule measurement — not a scripted outcome. Use Hint to see the correct circuit as a dashed overlay, or Skip to have it filled in for you.</p>
+          </div>
+
+          <button class="primary" id="start-btn" type="button">Start Game</button>
+        </div>
+
+        <div class="preview-panel">
+          <div class="cap">How the reveal looks</div>
+          <div class="msquare preview" id="preview-square"></div>
+          <div class="preview-legend">
+            <span><i class="swatch" style="background:var(--alice)"></i>Alice's row</span>
+            <span><i class="swatch" style="background:var(--bob)"></i>Bob's column</span>
+            <span><i class="swatch" style="background:var(--quantum)"></i>the cell that decides it</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="scene" id="scene-handoff">
+      <div class="handoff" id="handoff-inner">
+        <span class="role-tag" id="handoff-tag">ROLE</span>
+        <h2 class="scene-title" id="handoff-title">Pass the device</h2>
+        <p class="lede" id="handoff-lede">Get ready.</p>
+        <button class="primary" id="handoff-btn" type="button">Continue</button>
+      </div>
+    </section>
+
+    <!-- ALICE TURN (classical) -->
+    <section class="scene" id="scene-alice" data-role="alice">
+      <div class="turn-head">
+        <span class="role-tag">Alice · Room 1</span>
+      </div>
+      <h2 class="scene-title" id="alice-title">Fill Row —</h2>
+      <p class="lede">Bob can't see this screen. Choose +1 or −1 for each of your three cells.</p>
+      <div class="rule-card"><b>Alice's rule:</b> your row must contain an <b>even</b> number of minus signs — the three values must multiply to <b>+1</b>.</div>
+      <div class="cell-row" id="alice-cells"></div>
+      <div class="parity-readout" id="alice-readout"></div>
+      <div class="turn-actions">
+        <button class="primary" id="alice-submit" type="button">Submit &amp; Hide →</button>
+      </div>
+    </section>
+
+    <!-- BOB TURN (classical) -->
+    <section class="scene" id="scene-bob" data-role="bob">
+      <div class="turn-head">
+        <span class="role-tag">Bob · Room 2</span>
+      </div>
+      <h2 class="scene-title" id="bob-title">Fill Column —</h2>
+      <p class="lede">Alice can't see this screen. Choose +1 or −1 for each of your three cells.</p>
+      <div class="rule-card"><b>Bob's rule:</b> your column must contain an <b>odd</b> number of minus signs — the three values must multiply to <b>−1</b>.</div>
+      <div class="cell-row" id="bob-cells"></div>
+      <div class="parity-readout" id="bob-readout"></div>
+      <div class="turn-actions">
+        <button class="primary" id="bob-submit" type="button">Submit &amp; Reveal →</button>
+      </div>
+    </section>
+
+    <!-- CHARLIE BUILDS THE SETUP -->
+    <section class="scene" id="scene-charlie" data-role="charlie">
+      <div class="turn-head"><span class="role-tag">Charlie · Referee</span></div>
+      <h2 class="scene-title">Charlie prepares and distributes the qubits</h2>
+      <p class="lede">Before Alice and Bob can play, Charlie has to create the entanglement they'll share — and decide exactly who gets which qubit.</p>
+
+      <div id="charlie-step1">
+        <div class="rule-card"><b>What Charlie needs:</b> <span id="charlie-context"></span></div>
+        <p class="basis-note">This step only prepares the shared state — nothing is measured yet.</p>
+        <div class="qc-canvas" id="charlie-editor"></div>
+        <div class="gate-palette" id="charlie-palette"></div>
+        <div class="param-panel" id="charlie-params"></div>
+        <div class="editor-actions">
+          <button class="ghost-btn" id="charlie-hint-btn" type="button">Hint</button>
+          <button class="ghost-btn" id="charlie-skip-btn" type="button">Skip</button>
+        </div>
+        <div class="circuit-status" id="charlie-status"></div>
+        <div class="turn-actions">
+          <button class="primary" id="charlie-apply-btn" type="button" disabled>Apply Circuit</button>
+        </div>
+      </div>
+
+      <div id="charlie-step2" style="display:none;">
+        <div class="circuit-block">
+          <div class="qc-canvas" id="charlie-recap-circuit"></div>
+          <p class="circuit-caption">The entangling circuit Charlie just applied.</p>
+        </div>
+        <div class="rule-card"><b>Now: route the qubits.</b> <span id="charlie-routing-context"></span></div>
+        <div class="routing-wrap">
+          <div class="qubit-pool" id="charlie-pool"></div>
+          <div class="routing-zones">
+            <div class="routing-zone alice-zone">
+              <div class="zone-label">Alice</div>
+              <div class="zone-slots">
+                <div class="zone-slot" id="charlie-slot-A0"></div>
+                <div class="zone-slot" id="charlie-slot-A1"></div>
+              </div>
+            </div>
+            <div class="routing-zone bob-zone">
+              <div class="zone-label">Bob</div>
+              <div class="zone-slots">
+                <div class="zone-slot" id="charlie-slot-B0"></div>
+                <div class="zone-slot" id="charlie-slot-B1"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button class="ghost-btn" id="charlie-routing-hint-btn" type="button">Hint</button>
+          <button class="ghost-btn" id="charlie-routing-skip-btn" type="button">Skip</button>
+        </div>
+        <div class="circuit-status" id="charlie-routing-status"></div>
+        <div class="turn-actions">
+          <button class="primary" id="charlie-send-btn" type="button" disabled>Send the Qubits →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALICE QUANTUM TURN -->
+    <section class="scene" id="scene-alice-quantum" data-role="alice">
+      <div class="turn-head">
+        <span class="role-tag">Alice · Room 1</span>
+      </div>
+      <h2 class="scene-title" id="alice-q-title">Row — · build the circuit</h2>
+      <p class="lede">Bob can't see this screen. Drag gates onto your two qubits (or tap a gate, then tap a slot) to match what this row needs.</p>
+      <div class="rule-card" id="alice-q-context"></div>
+      <p class="basis-note">All measurements read out in the Z (computational) basis — your gates rotate the qubits so a Z-basis outcome here means the target basis above.</p>
+
+      <div id="alice-editor-wrap">
+        <div class="qc-canvas" id="alice-editor"></div>
+        <div class="gate-palette" id="alice-palette"></div>
+        <div class="param-panel" id="alice-params"></div>
+        <div class="editor-actions">
+          <button class="ghost-btn" id="alice-hint-btn" type="button">Hint</button>
+          <button class="ghost-btn" id="alice-skip-btn" type="button">Skip</button>
+        </div>
+        <div class="circuit-status" id="alice-status"></div>
+        <div class="live-preview">
+          <div class="cap">See what your current circuit gives (doesn't affect the real qubits)</div>
+          <button class="ghost-btn" id="alice-preview-btn" type="button">Preview Measurement</button>
+          <div id="alice-preview"></div>
+        </div>
+      </div>
+
+      <div class="turn-actions" id="alice-run-actions">
+        <button class="primary" id="alice-run-btn" type="button" disabled>Run Circuit &amp; Measure</button>
+      </div>
+      <div class="measure-readout" id="alice-q-readout"></div>
+      <div class="turn-actions" id="alice-q-submit-actions" style="display:none;">
+        <button class="primary" id="alice-q-submit" type="button">Submit &amp; Hide →</button>
+      </div>
+    </section>
+
+    <!-- BOB QUANTUM TURN -->
+    <section class="scene" id="scene-bob-quantum" data-role="bob">
+      <div class="turn-head">
+        <span class="role-tag">Bob · Room 2</span>
+      </div>
+      <h2 class="scene-title" id="bob-q-title">Column — · build the circuit</h2>
+      <p class="lede">Alice can't see this screen. Drag gates onto your two qubits (or tap a gate, then tap a slot) to match what this column needs.</p>
+      <div class="rule-card" id="bob-q-context"></div>
+      <p class="basis-note">All measurements read out in the Z (computational) basis — your gates rotate the qubits so a Z-basis outcome here means the target basis above.</p>
+
+      <div id="bob-editor-wrap">
+        <div class="qc-canvas" id="bob-editor"></div>
+        <div class="gate-palette" id="bob-palette"></div>
+        <div class="param-panel" id="bob-params"></div>
+        <div class="editor-actions">
+          <button class="ghost-btn" id="bob-hint-btn" type="button">Hint</button>
+          <button class="ghost-btn" id="bob-skip-btn" type="button">Skip</button>
+        </div>
+        <div class="circuit-status" id="bob-status"></div>
+        <div class="live-preview">
+          <div class="cap">See what your current circuit gives (doesn't affect the real qubits)</div>
+          <button class="ghost-btn" id="bob-preview-btn" type="button">Preview Measurement</button>
+          <div id="bob-preview"></div>
+        </div>
+      </div>
+
+      <div class="turn-actions" id="bob-run-actions">
+        <button class="primary" id="bob-run-btn" type="button" disabled>Run Circuit &amp; Measure</button>
+      </div>
+      <div class="measure-readout" id="bob-q-readout"></div>
+      <div class="turn-actions" id="bob-q-submit-actions" style="display:none;">
+        <button class="primary" id="bob-q-submit" type="button">Submit &amp; Reveal →</button>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="scene" id="scene-results">
+      <div class="quantum-ribbon" id="quantum-ribbon" style="display:none;">Quantum strategy · outcome guaranteed</div>
+      <h2 class="scene-title" style="text-align:center;">The reveal</h2>
+      <p class="lede" style="text-align:center; margin-left:auto; margin-right:auto;" id="results-sub">Charlie compares the intersecting cell.</p>
+      <div class="results-grid-wrap"><div class="msquare result" id="results-square"></div></div>
+      <div class="verdict" id="verdict">
+        <span class="badge" id="verdict-badge">—</span>
+        <p id="verdict-text"></p>
+      </div>
+      <div class="result-actions">
+        <button class="primary" id="play-again-btn" type="button">Play Again</button>
+        <button class="secondary" id="back-rules-btn" type="button">Read the rules again</button>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="note">Peres–Mermin magic square · play the classical strategy or build the real quantum circuits that beat it</footer>
+</div>
+
+<script>
+(function () {
+  var state = {
+    mode: "classical",
+    classical: { round: 0, wins: 0 },
+    quantum: { round: 0, wins: 0 },
+    aliceRow: null,
+    bobCol: null,
+    aliceVals: [1, 1, 1],
+    bobVals: [1, 1, 1],
+    pendingRole: null
+  };
+
+  var MINUS = "−";
+
+  function fmt(v) { return v === 1 ? "+1" : (MINUS + "1"); }
+
+  function product(vals) { return vals[0] * vals[1] * vals[2]; }
+  function minusCount(vals) { return vals.filter(function (v) { return v === -1; }).length; }
+
+  function showScene(id) {
+    document.querySelectorAll(".scene").forEach(function (s) { s.classList.remove("active"); });
+    document.getElementById(id).classList.add("active");
+  }
+
+  function updateScoreboard() {
+    var bucket = state[state.mode];
+    document.getElementById("sb-round").textContent = bucket.round;
+    document.getElementById("sb-wins").textContent = bucket.wins;
+    var rate = bucket.round === 0 ? "—" : Math.round((bucket.wins / bucket.round) * 100) + "%";
+    document.getElementById("sb-rate").textContent = rate;
+    var pill = document.getElementById("mode-pill");
+    pill.textContent = state.mode === "quantum" ? "Quantum" : "Classical";
+    pill.className = "mode-pill" + (state.mode === "quantum" ? " quantum" : "");
+  }
+
+  // =========================================================
+  // Mode tabs (start screen)
+  // =========================================================
+  document.querySelectorAll(".mode-tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".mode-tab").forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      var m = tab.getAttribute("data-mode");
+      document.getElementById("mode-panel-classical").style.display = m === "classical" ? "" : "none";
+      document.getElementById("mode-panel-quantum").style.display = m === "quantum" ? "" : "none";
+      state.startMode = m;
+    });
+  });
+  state.startMode = "classical";
+
+  // ---- preview square on start screen ----
+  function renderPreview() {
+    var el = document.getElementById("preview-square");
+    el.innerHTML = "";
+    var pr = 1, pc = 1;
+    for (var r = 0; r < 3; r++) {
+      for (var c = 0; c < 3; c++) {
+        var div = document.createElement("div");
+        div.className = "cell";
+        if (r === pr && c === pc) div.className += " rc";
+        else if (r === pr) div.className += " r";
+        else if (c === pc) div.className += " c";
+        el.appendChild(div);
+      }
+    }
+  }
+  renderPreview();
+
+  // ---- new round setup (classical) ----
+  function newRound() {
+    state.aliceRow = Math.floor(Math.random() * 3);
+    state.bobCol = Math.floor(Math.random() * 3);
+    state.aliceVals = [1, 1, 1];
+    state.bobVals = [1, 1, 1];
+  }
+
+  // ---- handoff scene ----
+  function goHandoff(role) {
+    state.pendingRole = role;
+    var inner = document.getElementById("handoff-inner");
+    var tag = document.getElementById("handoff-tag");
+    var title = document.getElementById("handoff-title");
+    var lede = document.getElementById("handoff-lede");
+    var btn = document.getElementById("handoff-btn");
+    var quantum = state.mode === "quantum";
+
+    inner.className = "handoff for-" + role;
+    if (role === "alice") {
+      tag.textContent = "Next up · Alice";
+      title.textContent = "Alice, take the device.";
+      lede.textContent = quantum
+        ? "Bob, look away. Alice now has qubits A0 and A1 — no peeking at her circuit."
+        : "Bob, look away — no peeking at Alice's row.";
+      btn.textContent = "I'm Alice, continue";
+    } else {
+      tag.textContent = "Next up · Bob";
+      title.textContent = "Bob, take the device.";
+      lede.textContent = quantum
+        ? "Alice, look away. Bob now has qubits B0 and B1 — no peeking at his circuit."
+        : "Alice, look away — no peeking at Bob's column.";
+      btn.textContent = "I'm Bob, continue";
+    }
+    showScene("scene-handoff");
+  }
+
+  document.getElementById("handoff-btn").addEventListener("click", function () {
+    if (state.mode === "quantum") {
+      if (state.pendingRole === "alice") renderAliceQuantumTurn();
+      else renderBobQuantumTurn();
+    } else {
+      if (state.pendingRole === "alice") renderAliceTurn();
+      else renderBobTurn();
+    }
+  });
+
+  // ---- alice turn (classical) ----
+  function renderAliceTurn() {
+    document.getElementById("alice-title").textContent = "Fill Row " + state.aliceRow;
+    var wrap = document.getElementById("alice-cells");
+    wrap.innerHTML = "";
+    for (var i = 0; i < 3; i++) {
+      wrap.appendChild(makeCellButton(i, state.aliceVals, updateAliceReadout));
+    }
+    updateAliceReadout();
+    showScene("scene-alice");
+  }
+
+  function updateAliceReadout() {
+    var p = product(state.aliceVals);
+    var m = minusCount(state.aliceVals);
+    var el = document.getElementById("alice-readout");
+    var ok = p === 1;
+    el.textContent = m + " minus sign" + (m === 1 ? "" : "s") + " · product = " + fmt(p) + (ok ? "  ✓ valid" : "  needs even minuses");
+    el.className = "parity-readout " + (ok ? "ok" : "bad");
+    document.getElementById("alice-submit").disabled = !ok;
+  }
+
+  document.getElementById("alice-submit").addEventListener("click", function () {
+    goHandoff("bob");
+  });
+
+  // ---- bob turn (classical) ----
+  function renderBobTurn() {
+    document.getElementById("bob-title").textContent = "Fill Column " + state.bobCol;
+    var wrap = document.getElementById("bob-cells");
+    wrap.innerHTML = "";
+    for (var i = 0; i < 3; i++) {
+      wrap.appendChild(makeCellButton(i, state.bobVals, updateBobReadout));
+    }
+    updateBobReadout();
+    showScene("scene-bob");
+  }
+
+  function updateBobReadout() {
+    var p = product(state.bobVals);
+    var m = minusCount(state.bobVals);
+    var el = document.getElementById("bob-readout");
+    var ok = p === -1;
+    el.textContent = m + " minus sign" + (m === 1 ? "" : "s") + " · product = " + fmt(p) + (ok ? "  ✓ valid" : "  needs odd minuses");
+    el.className = "parity-readout " + (ok ? "ok" : "bad");
+    document.getElementById("bob-submit").disabled = !ok;
+  }
+
+  document.getElementById("bob-submit").addEventListener("click", function () {
+    revealResults();
+  });
+
+  function makeCellButton(index, arr, onChange) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    function render() {
+      btn.className = "cellbtn " + (arr[index] === 1 ? "plus" : "minus");
+      btn.innerHTML = fmt(arr[index]) + '<span class="idx">CELL ' + index + "</span>";
+    }
+    btn.addEventListener("click", function () {
+      arr[index] = arr[index] === 1 ? -1 : 1;
+      render();
+      onChange();
+    });
+    render();
+    return btn;
+  }
+
+  // ---- results ----
+  function revealResults() {
+    var r = state.aliceRow, c = state.bobCol;
+    var aliceIntersect = state.aliceVals[c];
+    var bobIntersect = state.bobVals[r];
+    var win = aliceIntersect === bobIntersect;
+    var quantum = state.mode === "quantum";
+
+    var bucket = state[state.mode];
+    bucket.round += 1;
+    if (win) bucket.wins += 1;
+    updateScoreboard();
+
+    document.getElementById("quantum-ribbon").style.display = quantum ? "" : "none";
+
+    var grid = document.getElementById("results-square");
+    grid.innerHTML = "";
+    for (var rr = 0; rr < 3; rr++) {
+      for (var cc = 0; cc < 3; cc++) {
+        var cell = document.createElement("div");
+        cell.className = "cell";
+        if (rr === r && cc === c) {
+          if (win) {
+            cell.className += " win";
+            cell.innerHTML = '<span class="tag">A = B</span>' + fmt(aliceIntersect);
+          } else {
+            cell.className += " lose";
+            cell.innerHTML =
+              '<span class="tag">clash</span>' +
+              '<span class="split"><span class="a-v">' + fmt(aliceIntersect) + '</span><span>' + MINUS + "≠" + '</span><span class="b-v">' + fmt(bobIntersect) + "</span></span>";
+          }
+        } else if (rr === r) {
+          cell.className += " a";
+          cell.textContent = fmt(state.aliceVals[cc]);
+        } else if (cc === c) {
+          cell.className += " b";
+          cell.textContent = fmt(state.bobVals[rr]);
+        } else {
+          cell.className += " dim";
+          cell.textContent = "·";
+        }
+        grid.appendChild(cell);
+      }
+    }
+
+    var verdict = document.getElementById("verdict");
+    var badge = document.getElementById("verdict-badge");
+    var text = document.getElementById("verdict-text");
+    var sub = document.getElementById("results-sub");
+    sub.textContent = "Alice had Row " + r + ", Bob had Column " + c + " — cell (" + r + ", " + c + ") decides it.";
+
+    if (win) {
+      verdict.className = "verdict win";
+      badge.textContent = "Win";
+      text.textContent = quantum
+        ? "Alice and Bob both measured " + fmt(aliceIntersect) + " at the shared cell — guaranteed once both circuits matched, not coincidence."
+        : "Alice and Bob both wrote " + fmt(aliceIntersect) + " in the shared cell, with zero communication.";
+    } else {
+      verdict.className = "verdict lose";
+      badge.textContent = "Classical mismatch";
+      text.textContent = "Alice wrote " + fmt(aliceIntersect) + ", Bob wrote " + fmt(bobIntersect) + " — this is the contradictory cell every classical strategy eventually hits.";
+    }
+
+    var rate = bucket.wins / bucket.round;
+    if (quantum) {
+      if (bucket.round >= 2) {
+        text.textContent += " " + bucket.wins + "/" + bucket.round + " quantum rounds won so far — no classical notepad strategy can sustain that past 8/9.";
+      }
+    } else if (bucket.round >= 9 && rate > 8 / 9 + 1e-9) {
+      text.textContent += " Sustaining " + Math.round(rate * 100) + "% over " + bucket.round + " rounds is past the 8/9 classical ceiling — worth double-checking nobody peeked.";
+    } else if (bucket.round >= 4) {
+      text.textContent += " Running win rate: " + Math.round(rate * 100) + "% (classical ceiling is 88.9%).";
+    }
+
+    showScene("scene-results");
+  }
+
+  document.getElementById("play-again-btn").addEventListener("click", function () {
+    if (state.mode === "quantum") {
+      newQuantumRound();
+      renderCharlieTurn();
+    } else {
+      newRound();
+      goHandoff("alice");
+    }
+  });
+
+  document.getElementById("back-rules-btn").addEventListener("click", function () {
+    showScene("scene-start");
+  });
+  document.getElementById("rules-btn").addEventListener("click", function () {
+    showScene("scene-start");
+  });
+
+  document.getElementById("start-btn").addEventListener("click", function () {
+    state.mode = state.startMode;
+    updateScoreboard();
+    if (state.mode === "quantum") {
+      newQuantumRound();
+      renderCharlieTurn();
+    } else {
+      newRound();
+      goHandoff("alice");
+    }
+  });
+
+  // =========================================================
+  // QEngine — noiseless statevector simulator, standalone & reusable.
+  // Float64Array-based, generalized to n qubits (Quirk-style
+  // amplitude-pair gate application, no dense matrices). Call
+  // QEngine.* from any future game on this page.
+  // =========================================================
+  var QEngine = (function () {
+    function bitOf(i, q, n) { return (i >> (n - 1 - q)) & 1; }
+    function withBit(i, q, val, n) {
+      var mask = 1 << (n - 1 - q);
+      return val ? (i | mask) : (i & ~mask);
+    }
+    function makeState(n) {
+      var dim = 1 << n;
+      var re = new Float64Array(dim), im = new Float64Array(dim);
+      re[0] = 1;
+      return { n: n, dim: dim, re: re, im: im };
+    }
+    function cloneState(s) {
+      return { n: s.n, dim: s.dim, re: s.re.slice(), im: s.im.slice() };
+    }
+    function applySingleQubitGate(s, M, q) {
+      var n = s.n, dim = s.dim;
+      var newRe = new Float64Array(dim), newIm = new Float64Array(dim);
+      var seen = new Uint8Array(dim);
+      for (var i = 0; i < dim; i++) {
+        if (seen[i]) continue;
+        var i0 = withBit(i, q, 0, n), i1 = withBit(i, q, 1, n);
+        seen[i0] = 1; seen[i1] = 1;
+        var re0 = s.re[i0], im0 = s.im[i0], re1 = s.re[i1], im1 = s.im[i1];
+        newRe[i0] = M.a[0] * re0 - M.a[1] * im0 + M.b[0] * re1 - M.b[1] * im1;
+        newIm[i0] = M.a[0] * im0 + M.a[1] * re0 + M.b[0] * im1 + M.b[1] * re1;
+        newRe[i1] = M.c[0] * re0 - M.c[1] * im0 + M.d[0] * re1 - M.d[1] * im1;
+        newIm[i1] = M.c[0] * im0 + M.c[1] * re0 + M.d[0] * im1 + M.d[1] * re1;
+      }
+      s.re = newRe; s.im = newIm;
+    }
+    function applyCNOT(s, c, t) {
+      var n = s.n, dim = s.dim;
+      var newRe = new Float64Array(dim), newIm = new Float64Array(dim);
+      for (var i = 0; i < dim; i++) {
+        var j = i;
+        if (bitOf(i, c, n) === 1) j = withBit(i, t, 1 - bitOf(i, t, n), n);
+        newRe[j] = s.re[i]; newIm[j] = s.im[i];
+      }
+      s.re = newRe; s.im = newIm;
+    }
+    function applyCZ(s, q1, q2) {
+      var n = s.n, dim = s.dim;
+      for (var i = 0; i < dim; i++) {
+        if (bitOf(i, q1, n) === 1 && bitOf(i, q2, n) === 1) { s.re[i] = -s.re[i]; s.im[i] = -s.im[i]; }
+      }
+    }
+    // Apply an arbitrary single-qubit unitary M to `target`, conditioned on
+    // ALL wires in `controls` being |1>. Generalizes CNOT (M=X, 1 control),
+    // CZ (M=Z), and multi-control gates like Toffoli (2 controls) to any
+    // gate — this is what lets any palette gate act as a control's target,
+    // and lets +Control modifiers stack.
+    function applyControlledGate(s, M, controls, target) {
+      var n = s.n, dim = s.dim;
+      var newRe = s.re.slice(), newIm = s.im.slice();
+      var seen = new Uint8Array(dim);
+      for (var i = 0; i < dim; i++) {
+        if (seen[i]) continue;
+        var i0 = withBit(i, target, 0, n), i1 = withBit(i, target, 1, n);
+        seen[i0] = 1; seen[i1] = 1;
+        var allOn = true;
+        for (var ci = 0; ci < controls.length; ci++) if (bitOf(i0, controls[ci], n) !== 1) { allOn = false; break; }
+        if (!allOn) continue;
+        var re0 = s.re[i0], im0 = s.im[i0], re1 = s.re[i1], im1 = s.im[i1];
+        newRe[i0] = M.a[0] * re0 - M.a[1] * im0 + M.b[0] * re1 - M.b[1] * im1;
+        newIm[i0] = M.a[0] * im0 + M.a[1] * re0 + M.b[0] * im1 + M.b[1] * re1;
+        newRe[i1] = M.c[0] * re0 - M.c[1] * im0 + M.d[0] * re1 - M.d[1] * im1;
+        newIm[i1] = M.c[0] * im0 + M.c[1] * re0 + M.d[0] * im1 + M.d[1] * re1;
+      }
+      s.re = newRe; s.im = newIm;
+    }
+    // Swap two qubits' amplitudes outright (SWAP gate).
+    function applySwap(s, q1, q2) {
+      var n = s.n, dim = s.dim;
+      var newRe = new Float64Array(dim), newIm = new Float64Array(dim);
+      for (var i = 0; i < dim; i++) {
+        var b1 = bitOf(i, q1, n), b2 = bitOf(i, q2, n);
+        var j = i;
+        if (b1 !== b2) j = withBit(withBit(i, q1, b2, n), q2, b1, n);
+        newRe[j] = s.re[i]; newIm[j] = s.im[i];
+      }
+      s.re = newRe; s.im = newIm;
+    }
+    // SWAP conditioned on all `controls` being |1> (Fredkin gate when 1 control).
+    function applyControlledSwap(s, controls, q1, q2) {
+      var n = s.n, dim = s.dim;
+      var newRe = new Float64Array(dim), newIm = new Float64Array(dim);
+      for (var i = 0; i < dim; i++) {
+        var allOn = true;
+        for (var ci = 0; ci < controls.length; ci++) if (bitOf(i, controls[ci], n) !== 1) { allOn = false; break; }
+        var j = i;
+        if (allOn) {
+          var b1 = bitOf(i, q1, n), b2 = bitOf(i, q2, n);
+          if (b1 !== b2) j = withBit(withBit(i, q1, b2, n), q2, b1, n);
+        }
+        newRe[j] = s.re[i]; newIm[j] = s.im[i];
+      }
+      s.re = newRe; s.im = newIm;
+    }
+    // Conjugate-transpose of a 2x2 unitary — powers the Adjoint(†) modifier
+    // without needing a hardcoded inverse matrix for every gate.
+    function adjointMatrix(M) {
+      function conj(z) { return [z[0], -z[1]]; }
+      return { a: conj(M.a), b: conj(M.c), c: conj(M.b), d: conj(M.d) };
+    }
+    // Bloch-sphere rotations (standard convention, theta/2 in the exponent).
+    function rx(theta) {
+      var c = Math.cos(theta / 2), s2 = Math.sin(theta / 2);
+      return { a: [c, 0], b: [0, -s2], c: [0, -s2], d: [c, 0] };
+    }
+    function ry(theta) {
+      var c = Math.cos(theta / 2), s2 = Math.sin(theta / 2);
+      return { a: [c, 0], b: [-s2, 0], c: [s2, 0], d: [c, 0] };
+    }
+    function rz(theta) {
+      return { a: [Math.cos(-theta / 2), Math.sin(-theta / 2)], b: [0, 0], c: [0, 0], d: [Math.cos(theta / 2), Math.sin(theta / 2)] };
+    }
+    // QFT-style phase gate: diag(1, e^{i*theta}) — no /2, so Phase(pi/2)=S exactly.
+    function phaseGate(theta) {
+      return { a: [1, 0], b: [0, 0], c: [0, 0], d: [Math.cos(theta), Math.sin(theta)] };
+    }
+    function resolveMatrix(gate, adjoint, theta, axis) {
+      var M;
+      if (gate === "R") M = axis === "X" ? rx(theta) : axis === "Y" ? ry(theta) : rz(theta);
+      else if (gate === "CP") M = phaseGate(theta);
+      else M = GATE_MATRICES[gate];
+      return adjoint ? adjointMatrix(M) : M;
+    }
+    // |<s1|s2>|^2 — fidelity between two equal-dimension pure states. Used
+    // to accept any circuit whose output state matches the canonical
+    // circuit's, not just gate-for-gate identical ones (global phase is
+    // physically unobservable, so it's correctly ignored here).
+    function overlap(s1, s2) {
+      var reSum = 0, imSum = 0;
+      for (var i = 0; i < s1.dim; i++) {
+        reSum += s1.re[i] * s2.re[i] + s1.im[i] * s2.im[i];
+        imSum += s1.re[i] * s2.im[i] - s1.im[i] * s2.re[i];
+      }
+      return reSum * reSum + imSum * imSum;
+    }
+    function marginalProbs(s, qubits) {
+      var n = s.n, dim = s.dim, k = qubits.length, outDim = 1 << k;
+      var probs = new Float64Array(outDim);
+      for (var i = 0; i < dim; i++) {
+        var idx = 0;
+        for (var b = 0; b < k; b++) idx = (idx << 1) | bitOf(i, qubits[b], n);
+        probs[idx] += s.re[i] * s.re[i] + s.im[i] * s.im[i];
+      }
+      return probs;
+    }
+    function sampleIndex(probs) {
+      var r = Math.random(), acc = 0;
+      for (var i = 0; i < probs.length; i++) { acc += probs[i]; if (r < acc) return i; }
+      return probs.length - 1;
+    }
+    function collapseTo(s, qubits, bits) {
+      var n = s.n, dim = s.dim, p = 0;
+      for (var i = 0; i < dim; i++) {
+        var match = true;
+        for (var b = 0; b < qubits.length; b++) if (bitOf(i, qubits[b], n) !== bits[b]) { match = false; break; }
+        if (match) p += s.re[i] * s.re[i] + s.im[i] * s.im[i];
+      }
+      var norm = 1 / Math.sqrt(p);
+      for (var j = 0; j < dim; j++) {
+        var match2 = true;
+        for (var b2 = 0; b2 < qubits.length; b2++) if (bitOf(j, qubits[b2], n) !== bits[b2]) { match2 = false; break; }
+        if (match2) { s.re[j] *= norm; s.im[j] *= norm; } else { s.re[j] = 0; s.im[j] = 0; }
+      }
+    }
+    function partialMeasureAndCollapse(s, qubits) {
+      var probs = marginalProbs(s, qubits);
+      var idx = sampleIndex(probs);
+      var bits = [];
+      for (var b = 0; b < qubits.length; b++) bits.push((idx >> (qubits.length - 1 - b)) & 1);
+      collapseTo(s, qubits, bits);
+      return bits;
+    }
+
+    var SQRT1_2 = 1 / Math.sqrt(2);
+    var GATE_MATRICES = {
+      H: { a: [SQRT1_2, 0], b: [SQRT1_2, 0], c: [SQRT1_2, 0], d: [-SQRT1_2, 0] },
+      X: { a: [0, 0], b: [1, 0], c: [1, 0], d: [0, 0] },
+      Y: { a: [0, 0], b: [0, -1], c: [0, 1], d: [0, 0] },
+      Z: { a: [1, 0], b: [0, 0], c: [0, 0], d: [-1, 0] },
+      S: { a: [1, 0], b: [0, 0], c: [0, 0], d: [0, 1] },
+      Sdg: { a: [1, 0], b: [0, 0], c: [0, 0], d: [0, -1] },
+      T: { a: [1, 0], b: [0, 0], c: [0, 0], d: [SQRT1_2, SQRT1_2] },
+      Tdg: { a: [1, 0], b: [0, 0], c: [0, 0], d: [SQRT1_2, -SQRT1_2] },
+      // "Quarter turns" — square roots of X and Y and their inverses.
+      SX: { a: [0.5, 0.5], b: [0.5, -0.5], c: [0.5, -0.5], d: [0.5, 0.5] },
+      SXdg: { a: [0.5, -0.5], b: [0.5, 0.5], c: [0.5, 0.5], d: [0.5, -0.5] },
+      SY: { a: [0.5, 0.5], b: [-0.5, -0.5], c: [0.5, 0.5], d: [0.5, 0.5] },
+      SYdg: { a: [0.5, -0.5], b: [0.5, -0.5], c: [-0.5, 0.5], d: [0.5, -0.5] }
+    };
+
+    // Apply a resolved gate through a qubitMap (local wire -> global qubit).
+    // g.role: 'single' (plain 1-qubit gate), 'controlled' (1+ controls acting
+    // on a single-qubit gate at target — CNOT/CZ/CP/Toffoli all reduce to
+    // this), 'swap', 'cswap' (Fredkin-style controlled swap), or 'measure'
+    // (no unitary effect here — mid-circuit measurement/feed-forward is a
+    // documented future extension, not wired up yet).
+    function applyGate(s, g, qubitMap) {
+      if (g.role === "controlled") {
+        var M = resolveMatrix(g.gate, g.adjoint, g.theta, g.axis);
+        var controls = g.controls.map(function (w) { return qubitMap[w]; });
+        applyControlledGate(s, M, controls, qubitMap[g.target]);
+      } else if (g.role === "single") {
+        var M2 = resolveMatrix(g.gate, g.adjoint, g.theta, g.axis);
+        applySingleQubitGate(s, M2, qubitMap[g.wire]);
+      } else if (g.role === "swap") {
+        applySwap(s, qubitMap[g.wireA], qubitMap[g.wireB]);
+      } else if (g.role === "cswap") {
+        var controls2 = g.controls.map(function (w) { return qubitMap[w]; });
+        applyControlledSwap(s, controls2, qubitMap[g.wireA], qubitMap[g.wireB]);
+      }
+    }
+
+    return {
+      makeState: makeState, cloneState: cloneState,
+      applySingleQubitGate: applySingleQubitGate, applyCNOT: applyCNOT, applyCZ: applyCZ,
+      applyControlledGate: applyControlledGate, applySwap: applySwap, applyControlledSwap: applyControlledSwap,
+      adjointMatrix: adjointMatrix, rx: rx, ry: ry, rz: rz, phase: phaseGate, resolveMatrix: resolveMatrix,
+      marginalProbs: marginalProbs, overlap: overlap, sampleIndex: sampleIndex, collapseTo: collapseTo,
+      partialMeasureAndCollapse: partialMeasureAndCollapse, applyGate: applyGate,
+      GATE_MATRICES: GATE_MATRICES
+    };
+  })();
+
+  // =========================================================
+  // CircuitCanvas — pixel-positioned circuit diagram rendering,
+  // standalone & reusable. Explicit pixel math (not CSS-grid
+  // absolute positioning, which misplaced connector lines across
+  // browsers). Works for any wireLabels/gateSteps.
+  // =========================================================
+  var CircuitCanvas = (function () {
+    function initCanvas(container, nWires, nCols, rowH, colW, labelW, wireLabels) {
+      var width = labelW + nCols * colW;
+      var height = nWires * rowH;
+      container.style.position = "relative";
+      container.style.width = width + "px";
+      container.style.height = height + "px";
+      container.innerHTML = "";
+      for (var w = 0; w < nWires; w++) {
+        var lbl = document.createElement("div");
+        lbl.className = "qc-wire-label";
+        lbl.style.left = "0px";
+        lbl.style.top = (w * rowH) + "px";
+        lbl.style.width = labelW + "px";
+        lbl.style.height = rowH + "px";
+        lbl.textContent = wireLabels[w];
+        container.appendChild(lbl);
+
+        var line = document.createElement("div");
+        line.className = "qc-wire-line";
+        line.style.left = labelW + "px";
+        line.style.top = (w * rowH + rowH / 2) + "px";
+        line.style.width = (nCols * colW) + "px";
+        container.appendChild(line);
+      }
+      return {
+        width: width, height: height, rowH: rowH, colW: colW, labelW: labelW,
+        posFor: function (col, wire) { return { x: labelW + col * colW + colW / 2, y: wire * rowH + rowH / 2 }; }
+      };
+    }
+
+    // Internal type keys (used for matching/logic) aren't always the
+    // nicest thing to print in a small box — map the standard set to
+    // their short display glyphs; anything unrecognized just prints
+    // its own key, so custom gate types from other games still work.
+    var GLYPH_TEXT = { Sdg: "S†", Tdg: "T†", SX: "√X", SXdg: "√X†", SY: "√Y", SYdg: "√Y†" };
+    // kind: 'ctrl' (control dot), 'target' (⊕ ring), 'swap' (× mark, no box),
+    // or anything else (boxed text — defaults to GLYPH_TEXT[kind]||kind,
+    // override with an explicit `text`).
+    function makeGateGlyph(kind, extraClass, text) {
+      var el = document.createElement("div");
+      if (kind === "ctrl") el.className = "qc-dot" + (extraClass ? " " + extraClass : "");
+      else if (kind === "target") el.className = "qc-target" + (extraClass ? " " + extraClass : "");
+      else if (kind === "swap") {
+        el.className = "qc-swapx" + (extraClass ? " " + extraClass : "");
+        el.textContent = "×";
+      } else {
+        el.className = "qc-box" + (extraClass ? " " + extraClass : "");
+        el.textContent = text != null ? text : (GLYPH_TEXT[kind] || kind);
+      }
+      return el;
+    }
+    function placeAtPixel(el, x, y) { el.style.left = x + "px"; el.style.top = y + "px"; }
+    function makeConnector(x, yTop, yBot, extraClass) {
+      var el = document.createElement("div");
+      el.className = "qc-connector" + (extraClass ? " " + extraClass : "");
+      el.style.left = x + "px";
+      el.style.top = yTop + "px";
+      el.style.height = (yBot - yTop) + "px";
+      el.style.transform = "translateX(-1px)";
+      return el;
+    }
+
+    function gateLabel(g) {
+      var base = g.gate === "R" ? "R" + (g.axis || "Z").toLowerCase() : g.gate === "CP" ? "P" : g.gate;
+      return base + (g.adjoint ? "†" : "");
+    }
+    // gateSteps use the same shape as CircuitEditor's resolved gates:
+    // {role:'single', gate, wire, col}, {role:'controlled', controls:[...],
+    // target, gate, adjoint, col} (any number of controls — 2+ renders as a
+    // Toffoli-style multi-dot gate; gate:'X' with no adjoint renders as the
+    // classic ⊕ target ring), {role:'swap'|'cswap', controls, wireA, wireB, col}.
+    function renderStatic(containerId, wireLabels, gateSteps) {
+      var container = document.getElementById(containerId);
+      var cols = gateSteps.map(function (g) { return g.col; });
+      var nCols = Math.max.apply(null, cols.concat([-1])) + 2;
+      var canvas = initCanvas(container, wireLabels.length, Math.max(nCols, 1), 44, 52, 40, wireLabels);
+      gateSteps.forEach(function (g) {
+        var colIdx = g.col;
+        if (g.role === "controlled") {
+          var wires = g.controls.concat([g.target]);
+          var top = Math.min.apply(null, wires), bot = Math.max.apply(null, wires);
+          var pTop = canvas.posFor(colIdx, top), pBot = canvas.posFor(colIdx, bot);
+          container.appendChild(makeConnector(pTop.x, pTop.y, pBot.y));
+          g.controls.forEach(function (cw) {
+            var pCtrl = canvas.posFor(colIdx, cw);
+            var dot = makeGateGlyph("ctrl"); placeAtPixel(dot, pCtrl.x, pCtrl.y); container.appendChild(dot);
+          });
+          var pTgt = canvas.posFor(colIdx, g.target);
+          var isX = g.gate === "X" && !g.adjoint;
+          var tgtGlyph = makeGateGlyph(isX ? "target" : "box", null, isX ? null : gateLabel(g));
+          placeAtPixel(tgtGlyph, pTgt.x, pTgt.y); container.appendChild(tgtGlyph);
+        } else if (g.role === "swap" || g.role === "cswap") {
+          var swWires = (g.controls || []).concat([g.wireA, g.wireB]);
+          var swTop = Math.min.apply(null, swWires), swBot = Math.max.apply(null, swWires);
+          var pSwTop = canvas.posFor(colIdx, swTop), pSwBot = canvas.posFor(colIdx, swBot);
+          container.appendChild(makeConnector(pSwTop.x, pSwTop.y, pSwBot.y));
+          (g.controls || []).forEach(function (cw) {
+            var pCtrl2 = canvas.posFor(colIdx, cw);
+            var dot2 = makeGateGlyph("ctrl"); placeAtPixel(dot2, pCtrl2.x, pCtrl2.y); container.appendChild(dot2);
+          });
+          [g.wireA, g.wireB].forEach(function (ww) {
+            var pW = canvas.posFor(colIdx, ww);
+            var x = makeGateGlyph("swap"); placeAtPixel(x, pW.x, pW.y); container.appendChild(x);
+          });
+        } else {
+          var p = canvas.posFor(colIdx, g.wire);
+          var box = makeGateGlyph("box", null, gateLabel(g)); placeAtPixel(box, p.x, p.y); container.appendChild(box);
+        }
+      });
+      return canvas;
+    }
+
+    return { init: initCanvas, makeGateGlyph: makeGateGlyph, placeAtPixel: placeAtPixel, makeConnector: makeConnector, renderStatic: renderStatic };
+  })();
+
+  // =========================================================
+  // CircuitEditor — drag-and-drop / tap-to-place gate builder,
+  // standalone & reusable. Game code supplies wireLabels,
+  // canonical target, gate palette, colorClass, and an onChange
+  // callback; CircuitEditor knows nothing about "Alice"/"Bob"/
+  // magic squares specifically.
+  // =========================================================
+  var CircuitEditor = (function () {
+    function key(col, wire) { return col + "," + wire; }
+    // Cells now hold rich objects, not plain strings:
+    //   {role:'ctrl'}
+    //   {role:'gate', gate, adjoint, theta?, axis?}   (single-qubit gate tile)
+    //   {role:'swap'}
+    //   {role:'measure'}
+    // A column's stacked 'ctrl' cells plus its lone 'gate' cell fuse into
+    // one controlled-<gate> operation (CNOT is ctrl+X, CZ is ctrl+Z, two
+    // ctrls on X is a Toffoli, ...); two 'swap' cells (plus any ctrls)
+    // fuse into a swap/Fredkin. There's no separate "target" tile — any
+    // gate tile can be a control's target.
+    function gateSignature(g) {
+      if (g.role === "controlled") return "C[" + g.controls.slice().sort(function (a, b) { return a - b; }).join(",") + "]>" + g.target + ":" + g.gate + (g.adjoint ? "†" : "");
+      if (g.role === "single") return g.gate + (g.adjoint ? "†" : "") + ":" + g.wire;
+      if (g.role === "swap") return "SWAP:" + Math.min(g.wireA, g.wireB) + "-" + Math.max(g.wireA, g.wireB);
+      if (g.role === "cswap") return "CSWAP[" + g.controls.slice().sort(function (a, b) { return a - b; }).join(",") + "]:" + Math.min(g.wireA, g.wireB) + "-" + Math.max(g.wireA, g.wireB);
+      return "M:" + g.wire;
+    }
+    function gateWires(g) {
+      if (g.role === "controlled") return g.controls.concat([g.target]);
+      if (g.role === "single") return [g.wire];
+      if (g.role === "swap") return [g.wireA, g.wireB];
+      if (g.role === "cswap") return g.controls.concat([g.wireA, g.wireB]);
+      return [g.wire];
+    }
+    // Per-column counts used to keep the fused-cell rules unambiguous.
+    function columnCounts(ed, col) {
+      var ctrl = 0, gate = 0, swap = 0, measure = 0;
+      for (var w = 0; w < ed.nWires; w++) {
+        var c = ed.cells[key(col, w)];
+        if (!c) continue;
+        if (c.role === "ctrl") ctrl++;
+        else if (c.role === "gate") gate++;
+        else if (c.role === "swap") swap++;
+        else if (c.role === "measure") measure++;
+      }
+      return { ctrl: ctrl, gate: gate, swap: swap, measure: measure };
+    }
+    function resolve(ed) {
+      var byCol = {};
+      Object.keys(ed.cells).forEach(function (k) {
+        var parts = k.split(","), col = +parts[0], wire = +parts[1];
+        (byCol[col] = byCol[col] || []).push({ wire: wire, cell: ed.cells[k] });
+      });
+      var gates = [], incomplete = [];
+      Object.keys(byCol).forEach(function (colStr) {
+        var col = +colStr;
+        var items = byCol[col];
+        var ctrlItems = items.filter(function (it) { return it.cell.role === "ctrl"; });
+        var gateItems = items.filter(function (it) { return it.cell.role === "gate"; });
+        var swapItems = items.filter(function (it) { return it.cell.role === "swap"; });
+        var measureItems = items.filter(function (it) { return it.cell.role === "measure"; });
+        var controls = ctrlItems.map(function (it) { return it.wire; });
+        if (measureItems.length > 0) {
+          if (measureItems.length === items.length) {
+            measureItems.forEach(function (it) { gates.push({ role: "measure", wire: it.wire, col: col }); });
+          } else {
+            items.forEach(function (it) { incomplete.push({ wire: it.wire, col: col }); });
+          }
+        } else if (swapItems.length === 2 && gateItems.length === 0) {
+          gates.push({
+            role: controls.length ? "cswap" : "swap",
+            controls: controls, wireA: swapItems[0].wire, wireB: swapItems[1].wire, col: col
+          });
+        } else if (swapItems.length === 0 && controls.length === 0) {
+          // No control present: every gate tile in the column is its own
+          // independent single-qubit operation — any number may coexist.
+          gateItems.forEach(function (it) {
+            var gc = it.cell;
+            gates.push({ role: "single", target: it.wire, wire: it.wire, gate: gc.gate, adjoint: !!gc.adjoint, theta: gc.theta, axis: gc.axis, col: col });
+          });
+        } else if (swapItems.length === 0 && controls.length > 0 && gateItems.length === 1) {
+          var gc2 = gateItems[0].cell;
+          gates.push({
+            role: "controlled", controls: controls, target: gateItems[0].wire, wire: gateItems[0].wire,
+            gate: gc2.gate, adjoint: !!gc2.adjoint, theta: gc2.theta, axis: gc2.axis, col: col
+          });
+        } else {
+          items.forEach(function (it) { incomplete.push({ wire: it.wire, col: col }); });
+        }
+      });
+      return { gates: gates, incomplete: incomplete };
+    }
+    function structuralMatch(ed, r) {
+      var canon = ed.canonical;
+      if (r.gates.length !== canon.length) return false;
+      var canonSigs = canon.map(gateSignature).slice().sort();
+      var playerSigs = r.gates.map(gateSignature).slice().sort();
+      for (var i = 0; i < canonSigs.length; i++) if (canonSigs[i] !== playerSigs[i]) return false;
+      var playerColBySig = {};
+      r.gates.forEach(function (g) { playerColBySig[gateSignature(g)] = g.col; });
+      for (var i2 = 0; i2 < canon.length; i2++) {
+        for (var j2 = 0; j2 < canon.length; j2++) {
+          if (i2 === j2) continue;
+          var gi = canon[i2], gj = canon[j2];
+          if (gi.rank < gj.rank) {
+            var wiresI = gateWires(gi), wiresJ = gateWires(gj);
+            var shares = wiresI.some(function (w) { return wiresJ.indexOf(w) !== -1; });
+            if (shares) {
+              var colI = playerColBySig[gateSignature(gi)], colJ = playerColBySig[gateSignature(gj)];
+              if (!(colI < colJ)) return false;
+            }
+          }
+        }
+      }
+      return true;
+    }
+    // Physics fallback for circuits that aren't a gate-for-gate copy of the
+    // canonical one but are still correct: apply both the player's resolved
+    // circuit and the canonical circuit to the same input state (the live
+    // shared state at the start of this player's turn) and accept if the
+    // two output states have fidelity ~1 — i.e. they agree up to an
+    // unobservable global phase, which is exactly "physically equivalent."
+    function stateEquivalent(ed, r) {
+      if (!ed.equivState) return false;
+      var base = ed.equivState.getState();
+      var qubits = ed.equivState.qubits();
+      if (!base || !qubits) return false;
+      var playerState = QEngine.cloneState(base);
+      r.gates.slice().sort(function (a, b) { return a.col - b.col; })
+        .forEach(function (g) { QEngine.applyGate(playerState, g, qubits); });
+      var canonState = QEngine.cloneState(base);
+      ed.canonical.slice().sort(function (a, b) { return a.rank - b.rank; })
+        .forEach(function (g) { QEngine.applyGate(canonState, g, qubits); });
+      return QEngine.overlap(canonState, playerState) >= 1 - 1e-6;
+    }
+    function matchesCanonical(ed) {
+      var r = resolve(ed);
+      if (r.incomplete.length > 0) return false;
+      if (structuralMatch(ed, r)) return true;
+      return stateEquivalent(ed, r);
+    }
+    // Greedily assigns each canonical gate the earliest column that
+    // (a) respects rank order on any wire it shares with an earlier
+    // gate, and (b) doesn't collide with any wire already occupied in
+    // that column — two independent gates at the same rank (e.g.
+    // Charlie's two CNOTs) must land in different columns if any of
+    // their wires would otherwise clash, but plain single-qubit gates
+    // on distinct wires with no ctrl present may share a column.
+    function autoFillCanonical(ed) {
+      ed.cells = {};
+      var wireNextCol = {};
+      ed.canonical.slice().sort(function (a, b) { return a.rank - b.rank; }).forEach(function (g) {
+        var wires = gateWires(g);
+        var col = 0;
+        wires.forEach(function (w) { col = Math.max(col, wireNextCol[w] || 0); });
+        if (g.role === "controlled") {
+          while (true) {
+            var occupied = wires.some(function (w) { return !!ed.cells[key(col, w)]; });
+            var counts = columnCounts(ed, col);
+            if (!occupied && counts.gate === 0) break;
+            col++;
+          }
+          g.controls.forEach(function (cw) { ed.cells[key(col, cw)] = { role: "ctrl" }; });
+          ed.cells[key(col, g.target)] = { role: "gate", gate: g.gate, adjoint: !!g.adjoint, theta: g.theta, axis: g.axis };
+        } else {
+          while (ed.cells[key(col, wires[0])]) col++;
+          ed.cells[key(col, wires[0])] = { role: "gate", gate: g.gate, adjoint: !!g.adjoint, theta: g.theta, axis: g.axis };
+        }
+        wires.forEach(function (w) { wireNextCol[w] = col + 1; });
+      });
+    }
+    function setArmed(ed, kind, tileEl) {
+      if (ed.armedTileEl) ed.armedTileEl.classList.remove("armed");
+      ed.armedKind = kind;
+      ed.armedTileEl = kind ? tileEl : null;
+      if (tileEl && kind) tileEl.classList.add("armed");
+    }
+    function hitTestSlot(ed, clientX, clientY) {
+      var rect = ed.container.getBoundingClientRect();
+      var x = clientX - rect.left, y = clientY - rect.top;
+      if (x < ed.canvas.labelW || x > ed.canvas.width || y < 0 || y > ed.canvas.height) return null;
+      var col = Math.floor((x - ed.canvas.labelW) / ed.canvas.colW);
+      var wire = Math.floor(y / ed.canvas.rowH);
+      if (col < 0 || col >= ed.nCols || wire < 0 || wire >= ed.nWires) return null;
+      return { col: col, wire: wire };
+    }
+    // kind is a palette kind: a gate letter (H/X/Y/Z/S/T/R/CP), "ctrl",
+    // "SWAP", "measure", or "ADJOINT" (a toggle applied to an existing gate
+    // cell, not a new cell).
+    function canPlace(ed, col, wire, kind) {
+      var existing = ed.cells[key(col, wire)];
+      if (kind === "ADJOINT") return !!existing && existing.role === "gate";
+      if (existing) return false;
+      var counts = columnCounts(ed, col);
+      if (kind === "ctrl") return counts.gate <= 1 && counts.swap <= 2 && counts.measure === 0;
+      if (kind === "measure") return counts.ctrl === 0 && counts.gate === 0 && counts.swap === 0 && counts.measure === 0;
+      if (kind === "SWAP") return counts.gate === 0 && counts.swap < 2 && counts.measure === 0;
+      // plain single-qubit gate tile: unlimited independent gates share a
+      // column when no ctrl is present in it; once a ctrl is present, only
+      // the one gate it controls may join.
+      return counts.measure === 0 && counts.swap === 0 && (counts.ctrl === 0 || counts.gate === 0);
+    }
+    function placeKind(ed, col, wire, kind) {
+      var k = key(col, wire);
+      if (kind === "ADJOINT") {
+        var existing = ed.cells[k];
+        if (existing && existing.role === "gate") existing.adjoint = !existing.adjoint;
+        return;
+      }
+      if (kind === "ctrl") { ed.cells[k] = { role: "ctrl" }; return; }
+      if (kind === "measure") { ed.cells[k] = { role: "measure" }; return; }
+      if (kind === "SWAP") { ed.cells[k] = { role: "swap" }; return; }
+      var cell = { role: "gate", gate: kind, adjoint: false };
+      if (kind === "R") { cell.theta = Math.PI / 2; cell.axis = "Z"; }
+      if (kind === "CP") { cell.theta = Math.PI / 2; }
+      ed.cells[k] = cell;
+    }
+    // After placing the first leg of the two-step SWAP tile, returns the
+    // palette kind that should auto-arm next (its other leg), or null.
+    function comboNext(ed, kind, col) {
+      if (kind === "SWAP") return columnCounts(ed, col).swap < 2 ? "SWAP" : null;
+      return null;
+    }
+    // What a placed cell "is" for canPlace/move purposes.
+    function representativeKind(cellObj) {
+      if (cellObj.role === "ctrl") return "ctrl";
+      if (cellObj.role === "measure") return "measure";
+      if (cellObj.role === "swap") return "SWAP";
+      return cellObj.gate;
+    }
+    // kind + optional text for rendering a cell/tile glyph.
+    function glyphKindAndText(cellSpec, isXTarget) {
+      if (cellSpec.role === "ctrl") return { kind: "ctrl", text: null };
+      if (cellSpec.role === "measure") return { kind: "box", text: "M" };
+      if (cellSpec.role === "swap") return { kind: "swap", text: null };
+      if (isXTarget) return { kind: "target", text: null };
+      var label = cellSpec.gate === "R" ? "R" + (cellSpec.axis || "Z").toLowerCase() : cellSpec.gate === "CP" ? "P" : cellSpec.gate;
+      return { kind: "box", text: label + (cellSpec.adjoint ? "†" : "") };
+    }
+    function createGhost(kind, colorClass) {
+      var gt;
+      if (kind === "ADJOINT") gt = { kind: "box", text: "†" };
+      else if (kind === "SWAP") gt = { kind: "swap", text: null };
+      else if (kind === "measure") gt = { kind: "box", text: "M" };
+      else if (kind === "R") gt = { kind: "box", text: "Rz" };
+      else if (kind === "CP") gt = { kind: "box", text: "P" };
+      else if (kind === "ctrl") gt = { kind: "ctrl", text: null };
+      else gt = { kind: "box", text: kind };
+      var g = CircuitCanvas.makeGateGlyph(gt.kind, colorClass, gt.text);
+      g.className += " drag-ghost";
+      g.style.position = "fixed"; g.style.zIndex = "999"; g.style.pointerEvents = "none";
+      g.style.transform = "translate(-50%, -50%)";
+      document.body.appendChild(g);
+      return g;
+    }
+    function createGhostForCell(cellObj, colorClass) {
+      var gt = glyphKindAndText(cellObj, false);
+      var g = CircuitCanvas.makeGateGlyph(gt.kind, colorClass, gt.text);
+      g.className += " drag-ghost";
+      g.style.position = "fixed"; g.style.zIndex = "999"; g.style.pointerEvents = "none";
+      g.style.transform = "translate(-50%, -50%)";
+      document.body.appendChild(g);
+      return g;
+    }
+    function positionGhost(g, x, y) { g.style.left = x + "px"; g.style.top = y + "px"; }
+
+    function attachPaletteDrag(tileEl, kind, ed) {
+      tileEl.style.touchAction = "none";
+      tileEl.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        var startX = e.clientX, startY = e.clientY, moved = false, ghost = null;
+        function onMove(ev) {
+          var dx = ev.clientX - startX, dy = ev.clientY - startY;
+          if (!moved && Math.hypot(dx, dy) > 6) { moved = true; setArmed(ed, null); ghost = createGhost(kind, ed.colorClass); }
+          if (moved) positionGhost(ghost, ev.clientX, ev.clientY);
+        }
+        function onUp(ev) {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          if (moved) {
+            var slot = hitTestSlot(ed, ev.clientX, ev.clientY);
+            if (slot && canPlace(ed, slot.col, slot.wire, kind)) {
+              placeKind(ed, slot.col, slot.wire, kind);
+              var next = comboNext(ed, kind, slot.col);
+              render(ed);
+              if (next) setArmed(ed, next, ed.tileElByKind[next]);
+            }
+            if (ghost) ghost.remove();
+          } else {
+            setArmed(ed, ed.armedKind === kind ? null : kind, tileEl);
+          }
+        }
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp);
+      });
+      tileEl.tabIndex = 0;
+      tileEl.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setArmed(ed, ed.armedKind === kind ? null : kind, tileEl); }
+      });
+    }
+    function attachPlacedDrag(glyphEl, col, wire, ed) {
+      glyphEl.style.touchAction = "none";
+      glyphEl.tabIndex = 0;
+      function doDelete() { delete ed.cells[key(col, wire)]; render(ed); }
+      // A tap on an occupied cell normally deletes it — but if a modifier
+      // (currently just Adjoint†) is armed and applies to this exact cell,
+      // the tap applies it instead. This is the tap/keyboard-accessible
+      // path for toggling adjoint in place, since the underlying qc-slot
+      // is visually covered by this glyph and can't be tapped directly.
+      function tapAction() {
+        if (ed.armedKind && canPlace(ed, col, wire, ed.armedKind)) {
+          placeKind(ed, col, wire, ed.armedKind);
+          setArmed(ed, null);
+          render(ed);
+        } else {
+          doDelete();
+        }
+      }
+      glyphEl.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapAction(); } });
+      glyphEl.addEventListener("pointerdown", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.clientX, startY = e.clientY, moved = false, ghost = null;
+        var cellObj = ed.cells[key(col, wire)];
+        var kind = representativeKind(cellObj);
+        function onMove(ev) {
+          var dx = ev.clientX - startX, dy = ev.clientY - startY;
+          if (!moved && Math.hypot(dx, dy) > 6) { moved = true; delete ed.cells[key(col, wire)]; render(ed); ghost = createGhostForCell(cellObj, ed.colorClass); }
+          if (moved) positionGhost(ghost, ev.clientX, ev.clientY);
+        }
+        function onUp(ev) {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          if (moved) {
+            var slot = hitTestSlot(ed, ev.clientX, ev.clientY);
+            if (slot && canPlace(ed, slot.col, slot.wire, kind)) ed.cells[key(slot.col, slot.wire)] = cellObj;
+            if (ghost) ghost.remove();
+            render(ed);
+          } else { tapAction(); }
+        }
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp);
+      });
+    }
+    var PALETTE_GLYPH = {
+      SWAP: { kind: "swap", text: null }, ADJOINT: { kind: "box", text: "†" },
+      measure: { kind: "box", text: "M" }, ctrl: { kind: "ctrl", text: null },
+      R: { kind: "box", text: "Rz" }, CP: { kind: "box", text: "P" }
+    };
+    function renderPalette(ed) {
+      var el = document.getElementById(ed.paletteId);
+      el.innerHTML = "";
+      ed.tileElByKind = {};
+      ed.gateKinds.forEach(function (k) {
+        var tile = document.createElement("div");
+        tile.className = "palette-tile";
+        var glyphWrap = document.createElement("div");
+        glyphWrap.className = "palette-glyph";
+        var gt = PALETTE_GLYPH[k.kind] || { kind: "box", text: k.kind };
+        glyphWrap.appendChild(CircuitCanvas.makeGateGlyph(gt.kind, ed.colorClass, gt.text));
+        var lbl = document.createElement("div");
+        lbl.className = "palette-label";
+        lbl.textContent = k.label;
+        tile.appendChild(glyphWrap); tile.appendChild(lbl);
+        attachPaletteDrag(tile, k.kind, ed);
+        el.appendChild(tile);
+        ed.tileElByKind[k.kind] = tile;
+      });
+    }
+    // Renders one labeled row per placed R(θ)/CP(θ) cell into ed.paramsId
+    // (if configured), with an axis toggle (R only) and a theta/pi slider.
+    // The 'input' event only updates the cell + a live readout (no full
+    // render — keeps the slider from losing focus mid-drag); 'change'
+    // (on release) triggers a full render so the circuit diagram label
+    // and win-check both pick up the new value.
+    function renderParamPanel(ed) {
+      if (!ed.paramsId) return;
+      var el = document.getElementById(ed.paramsId);
+      if (!el) return;
+      el.innerHTML = "";
+      var entries = [];
+      Object.keys(ed.cells).forEach(function (k) {
+        var cell = ed.cells[k];
+        if (cell.role === "gate" && (cell.gate === "R" || cell.gate === "CP")) {
+          var parts = k.split(",");
+          entries.push({ col: +parts[0], wire: +parts[1], cell: cell });
+        }
+      });
+      entries.sort(function (a, b) { return a.col - b.col || a.wire - b.wire; });
+      entries.forEach(function (entry) {
+        var cell = entry.cell;
+        var row = document.createElement("div");
+        row.className = "param-row";
+        var label = document.createElement("div");
+        label.className = "param-label";
+        label.textContent = (cell.gate === "R" ? "R" : "CP") + " — " + ed.wireLabels[entry.wire];
+        row.appendChild(label);
+        if (cell.gate === "R") {
+          var axisWrap = document.createElement("div");
+          axisWrap.className = "param-axis";
+          ["X", "Y", "Z"].forEach(function (ax) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "param-axis-btn" + (cell.axis === ax ? " active" : "");
+            btn.textContent = ax;
+            btn.addEventListener("click", function () { cell.axis = ax; render(ed); });
+            axisWrap.appendChild(btn);
+          });
+          row.appendChild(axisWrap);
+        }
+        var slider = document.createElement("input");
+        slider.type = "range"; slider.className = "param-slider";
+        slider.min = "-2"; slider.max = "2"; slider.step = "0.05";
+        slider.value = (cell.theta / Math.PI).toFixed(2);
+        var readout = document.createElement("span");
+        readout.className = "param-readout";
+        readout.textContent = (cell.theta / Math.PI).toFixed(2) + "π";
+        slider.addEventListener("input", function () {
+          cell.theta = parseFloat(slider.value) * Math.PI;
+          readout.textContent = parseFloat(slider.value).toFixed(2) + "π";
+        });
+        slider.addEventListener("change", function () { render(ed); });
+        row.appendChild(slider); row.appendChild(readout);
+        el.appendChild(row);
+      });
+    }
+    function render(ed) {
+      var canvas = CircuitCanvas.init(ed.container, ed.nWires, ed.nCols, ed.rowH || 72, ed.colW || 64, ed.labelW || 48, ed.wireLabels);
+      ed.canvas = canvas;
+      ed.container.style.touchAction = "none";
+
+      if (ed.showHintFlag) {
+        ed.canonical.forEach(function (g) {
+          var col = g.rank;
+          if (g.role === "controlled") {
+            var wires = g.controls.concat([g.target]);
+            var top = Math.min.apply(null, wires), bot = Math.max.apply(null, wires);
+            var pTop = canvas.posFor(col, top), pBot = canvas.posFor(col, bot);
+            ed.container.appendChild(CircuitCanvas.makeConnector(pTop.x, pTop.y, pBot.y, "qc-ghost"));
+            g.controls.forEach(function (cw) {
+              var pCtrl = canvas.posFor(col, cw);
+              var dot = CircuitCanvas.makeGateGlyph("ctrl", "qc-ghost"); CircuitCanvas.placeAtPixel(dot, pCtrl.x, pCtrl.y); ed.container.appendChild(dot);
+            });
+            var pTgt = canvas.posFor(col, g.target);
+            var gt = glyphKindAndText(g, g.gate === "X" && !g.adjoint);
+            var tgtGlyph = CircuitCanvas.makeGateGlyph(gt.kind, "qc-ghost", gt.text);
+            CircuitCanvas.placeAtPixel(tgtGlyph, pTgt.x, pTgt.y); ed.container.appendChild(tgtGlyph);
+          } else {
+            var p = canvas.posFor(col, g.wire);
+            var gt2 = glyphKindAndText(g, false);
+            var box = CircuitCanvas.makeGateGlyph(gt2.kind, "qc-ghost", gt2.text); CircuitCanvas.placeAtPixel(box, p.x, p.y); ed.container.appendChild(box);
+          }
+        });
+      }
+
+      var resolved = resolve(ed);
+      var incompleteSet = {};
+      resolved.incomplete.forEach(function (it) { incompleteSet[key(it.col, it.wire)] = true; });
+      // Cells that are the target of a controlled-X (and not adjoint) get
+      // the classic ⊕ ring instead of a boxed "X" — purely a rendering
+      // convention.
+      var xTargetSet = {};
+      resolved.gates.forEach(function (g) { if (g.role === "controlled" && g.gate === "X" && !g.adjoint) xTargetSet[key(g.col, g.target)] = true; });
+
+      for (var c = 0; c < ed.nCols; c++) {
+        var specialWires = [];
+        for (var w = 0; w < ed.nWires; w++) {
+          var kd = ed.cells[key(c, w)];
+          if (kd && kd.role !== "measure") specialWires.push(w);
+        }
+        // Only control (ctrl->target) and swap (leg->leg) relationships get
+        // a connecting line -- independent single-qubit gates that merely
+        // happen to share a column (no ctrl, no swap) render standalone.
+        var colCounts = columnCounts(ed, c);
+        if (specialWires.length >= 2 && (colCounts.ctrl > 0 || colCounts.swap > 0)) {
+          var top2 = Math.min.apply(null, specialWires), bot2 = Math.max.apply(null, specialWires);
+          var pTop3 = canvas.posFor(c, top2), pBot3 = canvas.posFor(c, bot2);
+          ed.container.appendChild(CircuitCanvas.makeConnector(pTop3.x, pTop3.y, pBot3.y, ed.colorClass));
+        }
+      }
+
+      for (var c2 = 0; c2 < ed.nCols; c2++) {
+        for (var w2 = 0; w2 < ed.nWires; w2++) {
+          var k2 = key(c2, w2);
+          var p2 = canvas.posFor(c2, w2);
+          var slot = document.createElement("div");
+          slot.className = "qc-slot";
+          slot.style.left = (p2.x - 28) + "px"; slot.style.top = (p2.y - 28) + "px";
+          slot.style.width = "56px"; slot.style.height = "56px";
+          slot.tabIndex = 0; slot.setAttribute("role", "button");
+          slot.setAttribute("aria-label", ed.wireLabels[w2] + " slot " + c2);
+          (function (cc, ww, kk) {
+            function placeIfArmed() {
+              if (!ed.armedKind) return;
+              if (!canPlace(ed, cc, ww, ed.armedKind)) return;
+              placeKind(ed, cc, ww, ed.armedKind);
+              var next = comboNext(ed, ed.armedKind, cc);
+              setArmed(ed, null);
+              render(ed);
+              if (next) setArmed(ed, next, ed.tileElByKind[next]);
+            }
+            slot.addEventListener("pointerdown", function (e) { e.preventDefault(); placeIfArmed(); });
+            slot.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); placeIfArmed(); } });
+          })(c2, w2, k2);
+          ed.container.appendChild(slot);
+
+          var occ = ed.cells[k2];
+          if (occ) {
+            var extra = incompleteSet[k2] ? "qc-incomplete" : ed.colorClass;
+            var gt3 = glyphKindAndText(occ, occ.role === "gate" && xTargetSet[k2]);
+            var glyph = CircuitCanvas.makeGateGlyph(gt3.kind, extra, gt3.text);
+            glyph.setAttribute("data-col", c2); glyph.setAttribute("data-wire", w2);
+            CircuitCanvas.placeAtPixel(glyph, p2.x, p2.y);
+            attachPlacedDrag(glyph, c2, w2, ed);
+            ed.container.appendChild(glyph);
+          }
+        }
+      }
+
+      renderParamPanel(ed);
+      if (ed.onChange) ed.onChange(ed, matchesCanonical(ed), resolved);
+    }
+    function create(config) {
+      return {
+        container: document.getElementById(config.containerId),
+        paletteId: config.paletteId, paramsId: config.paramsId,
+        wireLabels: config.wireLabels, nWires: config.wireLabels.length,
+        nCols: config.nCols || 4,
+        rowH: config.rowH, colW: config.colW, labelW: config.labelW,
+        canonical: config.canonical, gateKinds: config.gateKinds, colorClass: config.colorClass,
+        onChange: config.onChange, equivState: config.equivState,
+        cells: {}, showHintFlag: false, armedKind: null, armedTileEl: null, canvas: null, tileElByKind: {}
+      };
+    }
+    return {
+      create: create, render: render, renderPalette: renderPalette,
+      resolve: resolve, matches: matchesCanonical, autoFill: autoFillCanonical,
+      gateSignature: gateSignature, gateWires: gateWires
+    };
+  })();
+
+  // Expose the three engines for reuse by future games on this page.
+  window.QEngine = QEngine;
+  window.CircuitCanvas = CircuitCanvas;
+  window.CircuitEditor = CircuitEditor;
+
+  // =========================================================
+  // Magic-square-specific game logic below. Nothing above this
+  // line knows what a "row," "column," or "Charlie" is.
+  // =========================================================
+  // Base tiles only — no separate "Toffoli"/"Fredkin"/"CNOT-with-adjoint"
+  // entries. +Control stacks onto any gate tile (drop it on the gate's
+  // wire/column to add a control node; drop a second to make a Toffoli);
+  // Adjoint(†) toggles in place on any already-placed gate. CNOT/CZ/SWAP
+  // is a two-step "preset" tile: placing one leg auto-arms the other.
+  // CNOT and CZ aren't separate tiles -- +Control on X or Z already builds
+  // them (a player learning this palette is assumed to know CNOT is C-X).
+  var GATE_KINDS_FULL = [
+    { kind: "H", label: "H" }, { kind: "X", label: "X" }, { kind: "Y", label: "Y" }, { kind: "Z", label: "Z" },
+    { kind: "S", label: "S" }, { kind: "T", label: "T" }, { kind: "R", label: "R(θ)" },
+    { kind: "SWAP", label: "SWAP" }, { kind: "CP", label: "CP(θ)" },
+    { kind: "ctrl", label: "+Control" }, { kind: "ADJOINT", label: "Adjoint †" },
+    { kind: "measure", label: "M" }
+  ];
+
+  function rowValues(r, m0, m1) {
+    if (r === 0) return [m1, m0, m0 * m1];
+    if (r === 1) return [m0, m1, m0 * m1];
+    return [-m0, -m1, m0 * m1];
+  }
+  function colValues(c, m0, m1) {
+    if (c === 0) return [m1, m0, -m0 * m1];
+    if (c === 1) return [m0, m1, -m0 * m1];
+    return [m1, m0, -m0 * m1];
+  }
+
+  // rank = precedence group; ordering is only enforced between
+  // canonical gates that touch a shared wire (independent gates
+  // may land in any relative column).
+  var CANON = {
+    row: [
+      [],
+      [{ role: "single", gate: "H", wire: 0, rank: 0 }, { role: "single", gate: "H", wire: 1, rank: 0 }],
+      [{ role: "controlled", controls: [0], target: 1, gate: "Z", rank: 0 }, { role: "single", gate: "H", wire: 0, rank: 1 }, { role: "single", gate: "H", wire: 1, rank: 1 }]
+    ],
+    col: [
+      [{ role: "single", gate: "H", wire: 0, rank: 0 }],
+      [{ role: "single", gate: "H", wire: 1, rank: 0 }],
+      [{ role: "controlled", controls: [0], target: 1, gate: "X", rank: 0 }, { role: "single", gate: "H", wire: 0, rank: 1 }]
+    ],
+    charlie: [
+      { role: "single", gate: "H", wire: 0, rank: 0 }, { role: "controlled", controls: [0], target: 1, gate: "X", rank: 1 },
+      { role: "single", gate: "H", wire: 2, rank: 0 }, { role: "controlled", controls: [2], target: 3, gate: "X", rank: 1 }
+    ]
+  };
+
+  var ROW_CONTEXT = [
+    "Target measurement basis: Z⊗Z (computational) on both qubits — measure |0⟩/|1⟩ directly. I⊗Z, Z⊗I, Z⊗Z are already diagonal there, so no gate is needed before measuring.",
+    "Target measurement basis: X⊗X — rotate both qubits into |+⟩/|−⟩ before measuring. X⊗I, I⊗X, X⊗X are diagonal there, not in the default Z basis.",
+    "Target measurement basis: the shared eigenbasis of −X⊗Z, −Z⊗X, and Y⊗Y. This basis is entangled — no rotation of each qubit on its own reaches it. First entangle your two qubits with each other, then rotate each into the X basis."
+  ];
+  var COL_CONTEXT = [
+    "Target measurement basis: X on qubit B0 (rotate to |+⟩/|−⟩), Z on qubit B1 (leave it alone). I⊗Z, X⊗I, −X⊗Z are diagonal there.",
+    "Target measurement basis: Z on qubit B0 (leave it alone), X on qubit B1 (rotate to |+⟩/|−⟩). Z⊗I, I⊗X, −Z⊗X are diagonal there.",
+    "Target measurement basis: the Bell basis {|Φ+⟩, |Φ−⟩, |Ψ+⟩, |Ψ−⟩}. Z⊗Z, X⊗X, Y⊗Y are diagonal there — this basis is entangled, so first entangle your two qubits with each other, then rotate."
+  ];
+  var CHARLIE_CONTEXT = "Create two independent Bell pairs, (|00⟩+|11⟩)/√2 each — entangle Q0 with Q1, and separately Q2 with Q3, each with Hadamard then CNOT (Hadamard first — order matters, or you'll get a plain unentangled superposition instead).";
+  var ROUTING_CONTEXT = "Split each entangled pair one qubit to Alice, one to Bob — AND land them in matching wire slots (both “wire 0,” or both “wire 1”). Q0/Q1 must split with matching slots; so must Q2/Q3. Splitting a pair correctly but into mismatched slots still breaks the correlation.";
+
+  function chip(label, value, resultStyle) {
+    return '<div class="measure-chip' + (resultStyle ? " result" : "") + '"><span class="k">' + label + '</span><span class="v">' + value + "</span></div>";
+  }
+
+  var qState = null; // shared 4-qubit statevector for the current quantum round
+
+  function newQuantumRound() {
+    state.aliceRow = Math.floor(Math.random() * 3);
+    state.bobCol = Math.floor(Math.random() * 3);
+    qState = QEngine.makeState(4);
+    state.aliceQubits = null;
+    state.bobQubits = null;
+  }
+
+  function renderMeasurementPreview(role, ed, index, valuesFn, qubits) {
+    var r = CircuitEditor.resolve(ed);
+    var clone = QEngine.cloneState(qState);
+    r.gates.slice().sort(function (a, b) { return a.col - b.col; }).forEach(function (g) {
+      QEngine.applyGate(clone, g, qubits);
+    });
+    var probs = QEngine.marginalProbs(clone, qubits);
+    var matches = CircuitEditor.matches(ed);
+    var container = document.getElementById(role + "-preview");
+    container.innerHTML = "";
+    for (var o = 0; o < 4; o++) {
+      var b0 = (o >> 1) & 1, b1 = o & 1;
+      var m0 = b0 === 0 ? 1 : -1, m1 = b1 === 0 ? 1 : -1;
+      var row = document.createElement("div");
+      row.className = "prob-row";
+      var pct = probs[o] * 100;
+      var extra = matches ? " <b>→ " + valuesFn(index, m0, m1).map(fmt).join(", ") + "</b>" : "";
+      row.innerHTML =
+        '<span class="prob-bits">' + b0 + b1 + "</span>" +
+        '<span class="prob-bar"><span class="prob-fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="prob-pct">' + pct.toFixed(1) + "%" + extra + "</span>";
+      container.appendChild(row);
+    }
+  }
+
+  function updateTurnStatus(role, ed, matches, resolved) {
+    var statusEl = document.getElementById(role + "-status");
+    if (matches) { statusEl.textContent = "✓ Correct — this diagonalizes the right operators. Ready to run."; statusEl.className = "circuit-status ok"; }
+    else if (resolved.incomplete.length > 0) { statusEl.textContent = "Incomplete — every control needs exactly one gate to control in the same column."; statusEl.className = "circuit-status warn"; }
+    else { statusEl.textContent = "Not yet — this circuit doesn't match the basis this row/column needs."; statusEl.className = "circuit-status bad"; }
+    document.getElementById(role + "-run-btn").disabled = !matches;
+    document.getElementById(role + "-preview").innerHTML = ""; // clear any stale preview from before this edit
+  }
+
+  // =========================================================
+  // Charlie's turn: build the entangling circuit, then route
+  // the four qubits to Alice/Bob.
+  // =========================================================
+  var charlieEditor = null;
+  var routing = null;
+
+  function renderCharlieTurn() {
+    charlieApplied = false;
+    document.getElementById("charlie-context").textContent = CHARLIE_CONTEXT;
+    document.getElementById("charlie-routing-context").textContent = ROUTING_CONTEXT;
+    charlieEditor = CircuitEditor.create({
+      containerId: "charlie-editor", paletteId: "charlie-palette", paramsId: "charlie-params",
+      wireLabels: ["Q0", "Q1", "Q2", "Q3"], nCols: 5,
+      canonical: CANON.charlie, gateKinds: GATE_KINDS_FULL, colorClass: "qc-charlie",
+      equivState: { getState: function () { return qState; }, qubits: function () { return [0, 1, 2, 3]; } },
+      onChange: function (ed, matches, resolved) { updateCharlieStatus(matches, resolved); }
+    });
+    document.getElementById("charlie-hint-btn").classList.remove("active");
+    CircuitEditor.renderPalette(charlieEditor);
+    CircuitEditor.render(charlieEditor);
+    document.getElementById("charlie-step1").style.display = "";
+    document.getElementById("charlie-step2").style.display = "none";
+    showScene("scene-charlie");
+  }
+
+  function updateCharlieStatus(matches, resolved) {
+    var el = document.getElementById("charlie-status");
+    if (matches) { el.textContent = "✓ Correct — two valid Bell pairs. Ready to apply."; el.className = "circuit-status ok"; }
+    else if (resolved.incomplete.length > 0) { el.textContent = "Incomplete — every control needs exactly one gate to control in the same column."; el.className = "circuit-status warn"; }
+    else { el.textContent = "Not yet — this doesn't create two valid Bell pairs on (Q0,Q1) and (Q2,Q3)."; el.className = "circuit-status bad"; }
+    document.getElementById("charlie-apply-btn").disabled = !matches;
+  }
+
+  document.getElementById("charlie-hint-btn").addEventListener("click", function () {
+    charlieEditor.showHintFlag = !charlieEditor.showHintFlag;
+    this.classList.toggle("active", charlieEditor.showHintFlag);
+    CircuitEditor.render(charlieEditor);
+  });
+  document.getElementById("charlie-skip-btn").addEventListener("click", function () {
+    CircuitEditor.autoFill(charlieEditor);
+    charlieEditor.showHintFlag = false;
+    document.getElementById("charlie-hint-btn").classList.remove("active");
+    CircuitEditor.render(charlieEditor);
+    setTimeout(applyCharlieCircuit, 700);
+  });
+  document.getElementById("charlie-apply-btn").addEventListener("click", applyCharlieCircuit);
+
+  var charlieApplied = false;
+  function applyCharlieCircuit() {
+    if (charlieApplied || !CircuitEditor.matches(charlieEditor)) return;
+    charlieApplied = true;
+    var gates = CircuitEditor.resolve(charlieEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
+    var identity = [0, 1, 2, 3];
+    gates.forEach(function (g) { QEngine.applyGate(qState, g, identity); });
+
+    CircuitCanvas.renderStatic("charlie-recap-circuit", ["Q0", "Q1", "Q2", "Q3"], gates);
+
+    document.getElementById("charlie-step1").style.display = "none";
+    document.getElementById("charlie-step2").style.display = "";
+    routing = { assignment: {}, armedQubit: null, armedTokenEl: null, showHintFlag: false };
+    qubitsSent = false;
+    renderRouting();
+  }
+
+  function routingValid() {
+    var a = routing.assignment;
+    if (a.A0 == null || a.A1 == null || a.B0 == null || a.B1 == null) return false;
+    var used = [a.A0, a.A1, a.B0, a.B1];
+    if (new Set(used).size !== 4) return false;
+    var pairs = [[0, 1], [2, 3]];
+    function samePair(x, y) { return pairs.some(function (p) { return p.indexOf(x) !== -1 && p.indexOf(y) !== -1; }); }
+    return samePair(a.A0, a.B0) && samePair(a.A1, a.B1);
+  }
+
+  function setRoutingArmed(qubit, tokenEl) {
+    if (routing.armedTokenEl) routing.armedTokenEl.classList.remove("armed");
+    routing.armedQubit = qubit;
+    routing.armedTokenEl = qubit != null ? tokenEl : null;
+    if (tokenEl && qubit != null) tokenEl.classList.add("armed");
+  }
+
+  function makeQubitToken(qubit, extraClass) {
+    var el = document.createElement("div");
+    el.className = "qubit-token" + (extraClass ? " " + extraClass : "");
+    el.textContent = "Q" + qubit;
+    return el;
+  }
+
+  function attachTokenInteractions(tok, qubit, currentSlot) {
+    tok.tabIndex = 0;
+    tok.style.touchAction = "none";
+    function unassign() { if (currentSlot) delete routing.assignment[currentSlot]; renderRouting(); }
+    function tapAction() {
+      if (currentSlot) unassign();
+      else setRoutingArmed(routing.armedQubit === qubit ? null : qubit, tok);
+    }
+    tok.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapAction(); } });
+    tok.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var startX = e.clientX, startY = e.clientY, moved = false, ghost = null;
+      function onMove(ev) {
+        var dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if (!moved && Math.hypot(dx, dy) > 6) {
+          moved = true;
+          if (currentSlot) delete routing.assignment[currentSlot];
+          renderRouting();
+          ghost = makeQubitToken(qubit);
+          ghost.className += " drag-ghost";
+          ghost.style.position = "fixed"; ghost.style.zIndex = "999"; ghost.style.pointerEvents = "none";
+          ghost.style.transform = "translate(-50%, -50%)";
+          document.body.appendChild(ghost);
+        }
+        if (moved) { ghost.style.left = ev.clientX + "px"; ghost.style.top = ev.clientY + "px"; }
+      }
+      function onUp(ev) {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        if (moved) {
+          var target = document.elementFromPoint(ev.clientX, ev.clientY);
+          var slotEl = target ? target.closest(".zone-slot") : null;
+          if (ghost) ghost.remove();
+          if (slotEl && slotEl.id.indexOf("charlie-slot-") === 0) {
+            var slotId = slotEl.id.replace("charlie-slot-", "");
+            if (routing.assignment[slotId] == null) routing.assignment[slotId] = qubit;
+          }
+          renderRouting();
+        } else {
+          tapAction();
+        }
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    });
+  }
+
+  ["A0", "A1", "B0", "B1"].forEach(function (slotId) {
+    var el = document.getElementById("charlie-slot-" + slotId);
+    el.tabIndex = 0; el.setAttribute("role", "button");
+    function placeIfArmed() {
+      if (!routing || routing.armedQubit == null) return;
+      if (routing.assignment[slotId] != null) return;
+      routing.assignment[slotId] = routing.armedQubit;
+      setRoutingArmed(null);
+      renderRouting();
+    }
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); placeIfArmed(); });
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); placeIfArmed(); } });
+  });
+
+  function renderRouting() {
+    var slotIds = ["A0", "A1", "B0", "B1"];
+    var assignedTo = {};
+    slotIds.forEach(function (s) { if (routing.assignment[s] != null) assignedTo[routing.assignment[s]] = s; });
+
+    var pool = document.getElementById("charlie-pool");
+    pool.innerHTML = "";
+    [0, 1, 2, 3].forEach(function (q) {
+      if (assignedTo[q] != null) return;
+      var tok = makeQubitToken(q);
+      attachTokenInteractions(tok, q, null);
+      pool.appendChild(tok);
+    });
+
+    var hintExample = { A0: 0, B0: 1, A1: 2, B1: 3 };
+    slotIds.forEach(function (s) {
+      var el = document.getElementById("charlie-slot-" + s);
+      el.innerHTML = '<span class="slot-tag">wire ' + s[1] + '</span>';
+      var q = routing.assignment[s];
+      if (q != null) {
+        var tok = makeQubitToken(q);
+        attachTokenInteractions(tok, q, s);
+        el.appendChild(tok);
+      } else if (routing.showHintFlag) {
+        el.appendChild(makeQubitToken(hintExample[s], "ghost"));
+      }
+    });
+
+    var statusEl = document.getElementById("charlie-routing-status");
+    var valid = routingValid();
+    if (valid) { statusEl.textContent = "✓ Correct — each pair splits into matching slots. Ready to send."; statusEl.className = "circuit-status ok"; }
+    else { statusEl.textContent = "Not yet — assign all four qubits so each entangled pair lands in matching wire slots."; statusEl.className = "circuit-status bad"; }
+    document.getElementById("charlie-send-btn").disabled = !valid;
+  }
+
+  document.getElementById("charlie-routing-hint-btn").addEventListener("click", function () {
+    routing.showHintFlag = !routing.showHintFlag;
+    this.classList.toggle("active", routing.showHintFlag);
+    renderRouting();
+  });
+  document.getElementById("charlie-routing-skip-btn").addEventListener("click", function () {
+    routing.assignment = { A0: 0, B0: 1, A1: 2, B1: 3 };
+    routing.showHintFlag = false;
+    document.getElementById("charlie-routing-hint-btn").classList.remove("active");
+    renderRouting();
+    setTimeout(sendQubits, 700);
+  });
+  document.getElementById("charlie-send-btn").addEventListener("click", sendQubits);
+
+  var qubitsSent = false;
+  function sendQubits() {
+    if (qubitsSent || !routingValid()) return;
+    qubitsSent = true;
+    state.aliceQubits = [routing.assignment.A0, routing.assignment.A1];
+    state.bobQubits = [routing.assignment.B0, routing.assignment.B1];
+    goHandoff("alice");
+  }
+
+  // =========================================================
+  // Alice / Bob quantum turns
+  // =========================================================
+  var aliceEditor = null, bobEditor = null;
+
+  function renderAliceQuantumTurn() {
+    aliceCircuitRan = false;
+    var r = state.aliceRow;
+    document.getElementById("alice-q-title").textContent = "Row " + r + " · build the circuit";
+    document.getElementById("alice-q-context").innerHTML = "<b>What this row needs:</b> " + ROW_CONTEXT[r];
+    aliceEditor = CircuitEditor.create({
+      containerId: "alice-editor", paletteId: "alice-palette", paramsId: "alice-params",
+      wireLabels: ["A0", "A1"], nCols: 4,
+      canonical: CANON.row[r], gateKinds: GATE_KINDS_FULL, colorClass: "qc-alice",
+      equivState: { getState: function () { return qState; }, qubits: function () { return state.aliceQubits; } },
+      onChange: function (ed, matches, resolved) { updateTurnStatus("alice", ed, matches, resolved); }
+    });
+    document.getElementById("alice-hint-btn").classList.remove("active");
+    CircuitEditor.renderPalette(aliceEditor);
+    CircuitEditor.render(aliceEditor);
+    document.getElementById("alice-editor-wrap").style.display = "";
+    document.getElementById("alice-run-actions").style.display = "";
+    document.getElementById("alice-q-submit-actions").style.display = "none";
+    document.getElementById("alice-q-readout").innerHTML = "";
+    document.getElementById("alice-preview").innerHTML = "";
+    showScene("scene-alice-quantum");
+  }
+
+  document.getElementById("alice-hint-btn").addEventListener("click", function () {
+    aliceEditor.showHintFlag = !aliceEditor.showHintFlag;
+    this.classList.toggle("active", aliceEditor.showHintFlag);
+    CircuitEditor.render(aliceEditor);
+  });
+  document.getElementById("alice-skip-btn").addEventListener("click", function () {
+    CircuitEditor.autoFill(aliceEditor);
+    aliceEditor.showHintFlag = false;
+    document.getElementById("alice-hint-btn").classList.remove("active");
+    CircuitEditor.render(aliceEditor);
+    setTimeout(runAliceCircuit, 700);
+  });
+  document.getElementById("alice-preview-btn").addEventListener("click", function () {
+    renderMeasurementPreview("alice", aliceEditor, state.aliceRow, rowValues, state.aliceQubits);
+  });
+  document.getElementById("alice-run-btn").addEventListener("click", runAliceCircuit);
+
+  var aliceCircuitRan = false;
+  function runAliceCircuit() {
+    if (aliceCircuitRan || !CircuitEditor.matches(aliceEditor)) return;
+    aliceCircuitRan = true;
+    var gates = CircuitEditor.resolve(aliceEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
+    gates.forEach(function (g) { QEngine.applyGate(qState, g, state.aliceQubits); });
+    var bits = QEngine.partialMeasureAndCollapse(qState, state.aliceQubits);
+    var m0 = bits[0] === 0 ? 1 : -1, m1 = bits[1] === 0 ? 1 : -1;
+    state.aliceVals = rowValues(state.aliceRow, m0, m1);
+
+    var readout = document.getElementById("alice-q-readout");
+    readout.innerHTML =
+      chip("Qubit A0 (physical Q" + state.aliceQubits[0] + ")", bits[0] + " (" + fmt(m0) + ")") +
+      chip("Qubit A1 (physical Q" + state.aliceQubits[1] + ")", bits[1] + " (" + fmt(m1) + ")") +
+      chip("Row " + state.aliceRow + " cells", state.aliceVals.map(fmt).join(", "), true) +
+      chip("Product", fmt(product(state.aliceVals)) + " ✓ (rule satisfied automatically)", true);
+
+    document.getElementById("alice-editor-wrap").style.display = "none";
+    document.getElementById("alice-run-actions").style.display = "none";
+    document.getElementById("alice-q-submit-actions").style.display = "";
+  }
+
+  document.getElementById("alice-q-submit").addEventListener("click", function () {
+    goHandoff("bob");
+  });
+
+  function renderBobQuantumTurn() {
+    bobCircuitRan = false;
+    var c = state.bobCol;
+    document.getElementById("bob-q-title").textContent = "Column " + c + " · build the circuit";
+    document.getElementById("bob-q-context").innerHTML = "<b>What this column needs:</b> " + COL_CONTEXT[c];
+    bobEditor = CircuitEditor.create({
+      containerId: "bob-editor", paletteId: "bob-palette", paramsId: "bob-params",
+      wireLabels: ["B0", "B1"], nCols: 4,
+      canonical: CANON.col[c], gateKinds: GATE_KINDS_FULL, colorClass: "qc-bob",
+      equivState: { getState: function () { return qState; }, qubits: function () { return state.bobQubits; } },
+      onChange: function (ed, matches, resolved) { updateTurnStatus("bob", ed, matches, resolved); }
+    });
+    document.getElementById("bob-hint-btn").classList.remove("active");
+    CircuitEditor.renderPalette(bobEditor);
+    CircuitEditor.render(bobEditor);
+    document.getElementById("bob-editor-wrap").style.display = "";
+    document.getElementById("bob-run-actions").style.display = "";
+    document.getElementById("bob-q-submit-actions").style.display = "none";
+    document.getElementById("bob-q-readout").innerHTML = "";
+    document.getElementById("bob-preview").innerHTML = "";
+    showScene("scene-bob-quantum");
+  }
+
+  document.getElementById("bob-hint-btn").addEventListener("click", function () {
+    bobEditor.showHintFlag = !bobEditor.showHintFlag;
+    this.classList.toggle("active", bobEditor.showHintFlag);
+    CircuitEditor.render(bobEditor);
+  });
+  document.getElementById("bob-skip-btn").addEventListener("click", function () {
+    CircuitEditor.autoFill(bobEditor);
+    bobEditor.showHintFlag = false;
+    document.getElementById("bob-hint-btn").classList.remove("active");
+    CircuitEditor.render(bobEditor);
+    setTimeout(runBobCircuit, 700);
+  });
+  document.getElementById("bob-preview-btn").addEventListener("click", function () {
+    renderMeasurementPreview("bob", bobEditor, state.bobCol, colValues, state.bobQubits);
+  });
+  document.getElementById("bob-run-btn").addEventListener("click", runBobCircuit);
+
+  var bobCircuitRan = false;
+  function runBobCircuit() {
+    if (bobCircuitRan || !CircuitEditor.matches(bobEditor)) return;
+    bobCircuitRan = true;
+    var gates = CircuitEditor.resolve(bobEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
+    gates.forEach(function (g) { QEngine.applyGate(qState, g, state.bobQubits); });
+    var bits = QEngine.partialMeasureAndCollapse(qState, state.bobQubits);
+    var m0 = bits[0] === 0 ? 1 : -1, m1 = bits[1] === 0 ? 1 : -1;
+    state.bobVals = colValues(state.bobCol, m0, m1);
+
+    var readout = document.getElementById("bob-q-readout");
+    readout.innerHTML =
+      chip("Qubit B0 (physical Q" + state.bobQubits[0] + ")", bits[0] + " (" + fmt(m0) + ")") +
+      chip("Qubit B1 (physical Q" + state.bobQubits[1] + ")", bits[1] + " (" + fmt(m1) + ")") +
+      chip("Column " + state.bobCol + " cells", state.bobVals.map(fmt).join(", "), true) +
+      chip("Product", fmt(product(state.bobVals)) + " ✓ (rule satisfied automatically)", true);
+
+    document.getElementById("bob-editor-wrap").style.display = "none";
+    document.getElementById("bob-run-actions").style.display = "none";
+    document.getElementById("bob-q-submit-actions").style.display = "";
+  }
+
+  document.getElementById("bob-q-submit").addEventListener("click", function () {
+    revealResults();
+  });
+
+  updateScoreboard();
+})();
+</script>
