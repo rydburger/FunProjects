@@ -11,9 +11,10 @@ self-contained folder — open its `index.html` in any browser, nothing to build
 
 ## Shared engine
 
-`magic-square` includes a from-scratch quantum circuit simulator and drag-and-drop circuit editor
-(`QEngine`, `CircuitCanvas`, `CircuitEditor` — see [`magic-square/README.md`](magic-square/README.md#under-the-hood)
-for details), written with no dependency on the magic square game itself. Future games in this
-collection are meant to reuse that same engine rather than rebuild circuit simulation from
-scratch — for now it lives inside `magic-square/index.html`; once a second game needs it, it'll be
-pulled out into a shared file both games load.
+[`engine.js`](engine.js) is a from-scratch quantum circuit simulator and drag-and-drop circuit
+editor (`QEngine`, `CircuitCanvas`, `CircuitEditor` — see
+[`magic-square/README.md`](magic-square/README.md#under-the-hood) for details), with no dependency
+on any particular game. Any game in this collection can load it directly with
+`<script src="../engine.js"></script>` (as `magic-square/index.html` does) to get `QEngine`,
+`CircuitCanvas`, and `CircuitEditor` on `window`, rather than rebuilding circuit simulation from
+scratch.

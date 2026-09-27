@@ -1,6 +1,8 @@
 # The Magic Square — Peres–Mermin pseudo-telepathy game
 
-A single self-contained HTML page — open `index.html` in any browser (Chrome preferred), nothing to build or install.
+Open `index.html` in any browser (Chrome preferred), nothing to build or install. It loads the
+shared [`../engine.js`](../engine.js) module for its quantum circuit machinery — keep both files
+together.
 
 ## What it is
 
