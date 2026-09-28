@@ -21,3 +21,9 @@ on any particular game. Any game in this collection can load it directly with
 `<script src="../engine.js"></script>` (as `magic-square/index.html` does) to get `QEngine`,
 `CircuitCanvas`, and `CircuitEditor` on `window`, rather than rebuilding circuit simulation from
 scratch.
+
+[`stabilizer.js`](stabilizer.js) is the stabilizer-code counterpart: Pauli operators as symplectic
+bitmasks, stabilizer-group comparison, syndromes, minimum-weight lookup decoders, and seeded Pauli
+noise (`window.Stabilizer` in the browser, `require()` in Node). It tracks errors, not
+statevectors, so it's exact and fast for error-correction games on stabilizer codes. Tests:
+`node quantum-games/tests/stabilizer.test.js`.

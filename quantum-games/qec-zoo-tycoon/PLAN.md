@@ -166,8 +166,10 @@ quantum-games/
     stabilizer.test.js      NEW — `node quantum-games/tests/stabilizer.test.js`
   qec-zoo-tycoon/
     PLAN.md                 this file
+    zoo-data.js             species / biome / keeper / economy data + placement check
+                            (separate file so the Node tests can load it too)
     README.md               written when v0 ships
-    index.html              the game (UI + game state + species/biome/keeper data)
+    index.html              the game (UI + game state)
 ```
 
 ### `stabilizer.js` (exposes `window.Stabilizer`; also `module.exports` for Node tests)
@@ -196,7 +198,7 @@ quantum-games/
 
 ## 7. Build milestones
 
-1. **M0 — Physics core.** `stabilizer.js` + tests passing. All five species + biomes defined and
+1. ✅ **M0 — Physics core.** `stabilizer.js` + tests passing. All five species + biomes defined and
    validated.
 2. **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
    slider, keeper toggle, play/pause. Watch errors land and get corrected. (Already a fun toy on
