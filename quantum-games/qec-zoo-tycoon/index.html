@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error Correction Zoo Tycoon</title>
+<link rel="stylesheet" href="zoo.css">
+<style>
+  .wrap { max-width: 1320px; }
+
+  /* ---- top bar ---- */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; justify-content: space-between;
+    background: var(--bg-panel); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 12px 16px; margin-bottom: 18px;
+  }
+  .kpis { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .kpi .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 700; display: block; line-height: 1.2; }
+  .kpi .n.neg { color: var(--sick); }
+  .kpi .l { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+  .kpi .sub { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  .kpi .sub.pos { color: var(--accent); }
+  .kpi .sub.neg { color: var(--sick); }
+  .speed { display: flex; gap: 6px; }
+  .speed button { min-width: 48px; }
+
+  /* ---- main layout ---- */
+  .park-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+  @media (max-width: 1180px) {
+    .park-layout { grid-template-columns: 230px minmax(0, 1fr); }
+    .park-layout .inspector-col { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .park-layout { grid-template-columns: minmax(0, 1fr); }
+    .park-layout .park-wrap { order: -1; } /* map first on phones */
+  }
+
+  /* ---- palette ---- */
+  .tools { display: flex; flex-direction: column; gap: 8px; }
+  @media (max-width: 760px) { .tools { flex-direction: row; flex-wrap: wrap; } .tools .tool { flex: 1 1 150px; } }
+  .tool {
+    text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center;
+    background: var(--bg-panel-2);
+  }
+  .tool .sw { width: 22px; height: 22px; border-radius: 6px; grid-row: span 2; border: 2px solid; }
+  .tool .nm { font-size: 13.5px; font-weight: 600; }
+  .tool .meta { font-size: 12px; color: var(--ink-dim); font-family: var(--font-mono); }
+  .tool.on { outline: 3px solid var(--accent); outline-offset: -1px; }
+  .tool:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* biome colours: translucent so they sit on either theme */
+  .b-riverbank { --bc: rgba(52, 139, 214, 0.22); --bb: rgba(52, 139, 214, 0.8); }
+  .b-forest    { --bc: rgba(46, 125, 50, 0.24);  --bb: rgba(46, 125, 50, 0.85); }
+  .b-glade     { --bc: rgba(160, 190, 40, 0.24); --bb: rgba(130, 160, 20, 0.85); }
+  .b-dunes     { --bc: rgba(214, 160, 60, 0.26); --bb: rgba(190, 135, 40, 0.9); }
+  .b-wetlands  { --bc: rgba(30, 160, 150, 0.22); --bb: rgba(30, 150, 140, 0.85); }
+  .sw { background: var(--bc); border-color: var(--bb); }
+
+  /* ---- park grid ---- */
+  .park-wrap { position: relative; }
+  .park {
+    position: relative; display: grid; user-select: none; touch-action: manipulation;
+    grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: repeat(var(--rows), 1fr);
+    aspect-ratio: var(--cols) / var(--rows); width: 100%;
+    background-color: var(--bg-panel-2);
+    background-image:
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+    background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  }
+  .park.building { cursor: crosshair; }
+  .enc {
+    margin: 3px; border-radius: 10px; border: 2px solid var(--bb); background: var(--bc);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; cursor: pointer; min-width: 0; overflow: hidden; padding: 4px;
+    transition: box-shadow 0.2s;
+  }
+  .enc.sel { box-shadow: 0 0 0 3px var(--accent); }
+  .enc.sick { animation: sickflash 1.2s ease; }
+  @keyframes sickflash { 0%, 60% { box-shadow: 0 0 0 4px var(--sick); background: var(--sick-soft); } }
+  .enc .g { font-size: clamp(18px, 3.2vw, 36px); line-height: 1.1; }
+  .enc .g.empty { opacity: 0.45; font-size: clamp(14px, 2vw, 22px); }
+  .enc .nm { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  @media (max-width: 600px) { .enc .nm { display: none; } }
+  .enc .hb { position: absolute; left: 6px; right: 6px; bottom: 5px; height: 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.12); overflow: hidden; }
+  .enc .hb i { display: block; height: 100%; background: var(--accent); }
+  .enc .hb i.mid { background: var(--lit); }
+  .enc .hb i.low { background: var(--sick); }
+  .enc .kp { position: absolute; top: 3px; right: 5px; font-size: clamp(11px, 1.4vw, 16px); }
+  .enc .kp.none { filter: grayscale(1); opacity: 0.8; }
+  .preview { margin: 3px; border-radius: 10px; border: 2px dashed var(--accent); background: var(--accent-soft); pointer-events: none; }
+  .preview.bad { border-color: var(--sick); background: var(--sick-soft); }
+  .ticker {
+    margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: var(--bg-panel);
+    border: 1px solid var(--line); font-size: 13.5px; min-height: 40px;
+  }
+  .ticker.sick { border-color: var(--sick); background: var(--sick-soft); }
+  .ticker .t { font-family: var(--font-mono); color: var(--ink-dim); font-size: 11.5px; margin-right: 8px; }
+
+  /* ---- inspector ---- */
+  .insp-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .insp-head h3 { font-family: var(--font-display); font-weight: 500; font-size: 21px; margin: 0; }
+  .insp-head .sub { font-size: 12.5px; color: var(--ink-dim); }
+  .x-btn { background: none; border: none; font-size: 20px; color: var(--ink-dim); cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .section { margin-top: 16px; }
+  .section > .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 8px; display: block; }
+  /* Stacked, so long thin layouts (the Tortoise's line) get the full width. */
+  .inspector .views { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 8px; }
+  .inspector .view svg { max-height: 170px; }
+  @media (min-width: 761px) and (max-width: 1180px) { .inspector .views { grid-template-columns: 1fr 1fr; } }
+  .inspector .health { min-width: 0; flex: none; margin-top: 12px; }
+  .species-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .species-list li { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg-panel-2); }
+  .species-list .row { display: flex; align-items: center; gap: 10px; }
+  .species-list .g { font-size: 26px; }
+  .species-list .who { flex: 1; min-width: 0; }
+  .species-list .who b { font-size: 14px; display: block; }
+  .species-list .who span { font-size: 12px; color: var(--ink-dim); font-family: var(--font-mono); }
+  .species-list .why { font-size: 12px; color: var(--sick); margin-top: 6px; }
+  .species-list li.no { opacity: 0.75; }
+  .btn {
+    font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--bg-panel); white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.quiet { background: none; color: var(--ink); border-color: var(--line); font-weight: 500; }
+  .btn.danger { background: none; color: var(--sick); border-color: var(--sick); }
+  .btn.danger.armed { background: var(--sick); color: var(--bg-panel); }
+  .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mini-stats .stat .n { font-size: 16px; }
+  .mini-stats .stat .l { font-size: 10px; }
+  .overview { list-style: none; margin: 0; padding: 0; }
+  .overview li { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13.5px; }
+  .overview li:last-child { border-bottom: none; }
+  .overview li:hover { background: var(--bg-panel-2); }
+  .overview .g { font-size: 20px; width: 26px; text-align: center; }
+  .overview .nm { flex: 1; min-width: 0; }
+  .overview .h { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  details.placard-d summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+  details.placard-d .placard { margin-top: 8px; }
+  .insp-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+  .kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  /* ---- goal ---- */
+  .kpi.goal { min-width: 190px; }
+  .gbar { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin-top: 3px; }
+  .gbar .b { flex: 1; height: 6px; border-radius: 3px; background: var(--bg-panel-2); border: 1px solid var(--line); overflow: hidden; min-width: 80px; }
+  .gbar .b i { display: block; height: 100%; background: var(--accent); }
+  .gbar .t { min-width: 92px; text-align: right; }
+  .kpi .sub.warn { color: var(--sick); font-weight: 600; }
+
+  /* ---- dialogs ---- */
+  .modal { position: fixed; inset: 0; background: rgba(8, 14, 10, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .modal .card {
+    background: var(--bg-panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+    width: min(540px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px;
+    animation: rise 0.25s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .modal h2.title { font-family: var(--font-display); font-weight: 500; font-size: 26px; margin: 0 0 6px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .modal .quote { font-family: var(--font-display); font-style: italic; font-size: 17px; margin: 14px 0; padding-left: 12px; border-left: 3px solid var(--accent); }
+  .modal table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 10px 0; }
+  .modal td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .modal td:last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .modal tr.total td { font-weight: 700; border-bottom: none; }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
+  .modal p { margin: 8px 0; }
+  .neg-t { color: var(--sick); }
+  .pos-t { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <span class="eyebrow">Quantum Games · A quantum startup, but it's a zoo</span>
+      <h1>Error Correction <em>Zoo</em> Tycoon</h1>
+    </div>
+    <div class="header-actions">
+      <a class="ghost" href="sandbox.html">Exhibit sandbox</a>
+      <button class="ghost" id="newGameBtn" type="button">New game</button>
+      <button class="ghost" id="themeBtn" type="button">Theme: auto</button>
+    </div>
+  </header>
+
+  <div class="topbar">
+    <div class="kpis">
+      <div class="kpi"><span class="l">Funding</span><span class="n" id="kCash"></span><span class="sub" id="kNet"></span></div>
+      <div class="kpi"><span class="l">Date</span><span class="n" id="kDay"></span><span class="sub" id="kHour"></span></div>
+      <div class="kpi"><span class="l">Reputation</span><span class="n" id="kRep"></span><span class="sub" id="kRepSub"></span></div>
+      <div class="kpi"><span class="l">Visitors / day</span><span class="n" id="kVis"></span><span class="sub" id="kVisSub"></span></div>
+      <div class="kpi goal"><span class="l" id="kGoalLabel">Series A goal</span>
+        <div class="gbar"><span class="b"><i id="gCash"></i></span><span class="t" id="gCashT"></span></div>
+        <div class="gbar"><span class="b"><i id="gRep"></i></span><span class="t" id="gRepT"></span></div>
+        <span class="sub" id="kGoal"></span></div>
+    </div>
+    <div class="seg speed" id="speedSeg" aria-label="Game speed">
+      <button type="button" data-speed="0" title="Pause (space)">⏸</button>
+      <button type="button" data-speed="1" title="Normal speed (1)">▶</button>
+      <button type="button" data-speed="3" title="Fast (2)">▶▶</button>
+      <button type="button" data-speed="10" title="Very fast (3)">▶▶▶</button>
+    </div>
+  </div>
+
+  <div class="park-layout">
+    <!-- palette -->
+    <div>
+      <div class="panel">
+        <h2>Build an enclosure</h2>
+        <div class="tools" id="tools"></div>
+        <div class="hint" id="toolHint">Pick a habitat, then click the park to place it. <span class="kbd">Esc</span> cancels.</div>
+      </div>
+      <div class="panel">
+        <h2>Zoo news</h2>
+        <ul class="log" id="log"></ul>
+      </div>
+    </div>
+
+    <!-- park -->
+    <div class="park-wrap">
+      <div class="park" id="park" aria-label="Park map"></div>
+      <div class="ticker" id="ticker"></div>
+    </div>
+
+    <!-- inspector -->
+    <div class="inspector-col">
+      <div class="panel inspector" id="inspector"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="card" id="modalCard"></div></div>
+
+<script src="../stabilizer.js"></script>
+<script src="zoo-data.js"></script>
+<script src="exhibit-sim.js"></script>
+<script src="exhibit-view.js"></script>
+<script src="park.js"></script>
+<script>
+(function () {
+  var S = window.Stabilizer, Z = window.ZooData, V = window.ExhibitView, Park = window.Park;
+  var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, KEEPERS = Z.KEEPERS, ECO = Z.ECONOMY;
+
+  function $(id) { return document.getElementById(id); }
+  function h(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+  function money(v) { return (v < 0 ? "−$" : "$") + Math.round(Math.abs(v)).toLocaleString(); }
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function clock(tick) { return "Day " + (Math.floor(tick / ECO.ticksPerDay) + 1) + " " + pad2(tick % ECO.ticksPerDay) + ":00"; }
+  function healthClass(v) { return v < 40 ? "low" : v < 75 ? "mid" : ""; }
+  function popcount(v) { var c = 0; while (v) { c += v & 1; v >>>= 1; } return c; }
+  function channelName(c) {
+    return { depolarizing: "Depolarizing", bitFlip: "Bit flips only", phaseFlip: "Phase flips only", biasedZ: "Z-biased" }[c.channel] +
+      ", " + (c.p * 100).toFixed(1) + "% per qubit per hour";
+  }
+
+  // ---------- state ----------
+  var park = Park.createPark();
+  var ui = {
+    speed: 1,          // 0 = paused; otherwise multiplier
+    tool: null,        // biome id being placed, or null
+    hover: null,       // { x, y } cell under the pointer
+    selected: null,    // exhibit id
+    armedDemolish: false,
+    sickFlash: {},     // exhibit id -> until timestamp
+    modalOpen: false,
+    speedBeforeModal: 1
+  };
+  var TICKS_PER_SECOND_AT_1X = 2;
+
+  // ---------- news ----------
+  var news = [];
+  function post(text, kind) {
+    news.unshift({ t: park.tick, text: text, kind: kind || "" });
+    if (news.length > 80) news.pop();
+    renderNews();
+    var tk = $("ticker");
+    tk.className = "ticker " + (kind || "");
+    tk.innerHTML = '<span class="t">' + clock(park.tick) + "</span>" + text;
+  }
+  function renderNews() {
+    var ul = $("log");
+    ul.innerHTML = "";
+    news.forEach(function (n) {
+      var li = h("li", n.kind, '<span class="t">' + clock(n.t) + "</span>" + n.text);
+      ul.appendChild(li);
+    });
+  }
+
+  // ---------- palette ----------
+  function renderTools() {
+    var box = $("tools");
+    box.innerHTML = "";
+    Object.keys(BIOMES).forEach(function (id) {
+      var b = BIOMES[id], sp = SPECIES[b.native];
+      var btn = h("button", "tool b-" + id + (ui.tool === id ? " on" : ""));
+      btn.type = "button";
+      btn.dataset.biome = id;
+      btn.innerHTML = '<span class="sw"></span><span class="nm">' + b.name + "</span>" +
+        '<span class="meta">' + money(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + sp.glyph + "</span>";
+      btn.disabled = park.cash < b.cost;
+      btn.title = b.blurb;
+      btn.addEventListener("click", function () { setTool(ui.tool === id ? null : id); });
+      box.appendChild(btn);
+    });
+  }
+  function updateToolAffordability() {
+    Array.prototype.forEach.call(document.querySelectorAll(".tool"), function (btn) {
+      btn.disabled = park.cash < BIOMES[btn.dataset.biome].cost;
+    });
+  }
+  function setTool(id) {
+    ui.tool = id;
+    $("park").classList.toggle("building", !!id);
+    renderTools();
+    renderPark();
+    $("toolHint").innerHTML = id
+      ? "Placing <b>" + BIOMES[id].name + "</b> (" + BIOMES[id].footprint.join("×") + "). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
+      : "Pick a habitat, then click the park to place it. <span class=\"kbd\">Esc</span> cancels.";
+  }
+
+  // ---------- park grid ----------
+  var parkEl = $("park");
+  parkEl.style.setProperty("--cols", park.width);
+  parkEl.style.setProperty("--rows", park.height);
+
+  function anchorFor(biomeId, cell) {
+    // Centre the footprint on the pointer.
+    var fp = BIOMES[biomeId].footprint;
+    return { x: cell.x - Math.floor((fp[0] - 1) / 2), y: cell.y - Math.floor((fp[1] - 1) / 2) };
+  }
+  function place(elm, x, y, w, hh) {
+    elm.style.gridColumn = (x + 1) + " / span " + w;
+    elm.style.gridRow = (y + 1) + " / span " + hh;
+  }
+  var encEls = {};
+  function renderPark() {
+    parkEl.innerHTML = "";
+    encEls = {};
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id];
+      var e = h("div", "enc b-" + rec.biomeId);
+      place(e, rec.x, rec.y, rec.w, rec.h);
+      e.dataset.id = id;
+      e.innerHTML = '<span class="g"></span><span class="nm"></span><span class="kp"></span><span class="hb"><i></i></span>';
+      e.title = Park.exhibitLabel(rec);
+      parkEl.appendChild(e);
+      encEls[id] = e;
+    });
+    if (ui.tool && ui.hover) {
+      var a = anchorFor(ui.tool, ui.hover), fp = BIOMES[ui.tool].footprint;
+      var ok = Park.canBuild(park, ui.tool, a.x, a.y).ok;
+      // Clamp the preview into the grid so it stays visible at the edges.
+      var px = Math.max(0, Math.min(park.width - fp[0], a.x)), py = Math.max(0, Math.min(park.height - fp[1], a.y));
+      var pv = h("div", "preview" + (ok ? "" : " bad"));
+      place(pv, px, py, fp[0], fp[1]);
+      parkEl.appendChild(pv);
+    }
+    updatePark();
+  }
+  function updatePark() {
+    var now = performance.now();
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id], e = encEls[id];
+      if (!e) return;
+      var g = e.querySelector(".g"), nm = e.querySelector(".nm"), kp = e.querySelector(".kp"), hb = e.querySelector(".hb i");
+      if (rec.animal) {
+        var sp = SPECIES[rec.animal.speciesId];
+        g.textContent = sp.glyph; g.className = "g";
+        nm.textContent = sp.name.split(" ")[1];
+        hb.parentNode.style.display = "";
+        hb.style.width = Math.round(rec.animal.health) + "%";
+        hb.className = healthClass(rec.animal.health);
+      } else {
+        g.textContent = "empty"; g.className = "g empty";
+        nm.textContent = BIOMES[rec.biomeId].name;
+        hb.parentNode.style.display = "none";
+      }
+      kp.textContent = rec.keeperId ? KEEPERS[rec.keeperId].glyph : (rec.animal ? "⚠️" : "");
+      kp.title = rec.keeperId ? KEEPERS[rec.keeperId].name : "No keeper";
+      e.classList.toggle("sel", ui.selected === id);
+      e.classList.toggle("sick", (ui.sickFlash[id] || 0) > now);
+    });
+  }
+  function cellFromEvent(ev) {
+    var r = parkEl.getBoundingClientRect();
+    var x = Math.floor((ev.clientX - r.left) / r.width * park.width);
+    var y = Math.floor((ev.clientY - r.top) / r.height * park.height);
+    if (x < 0 || y < 0 || x >= park.width || y >= park.height) return null;
+    return { x: x, y: y };
+  }
+  parkEl.addEventListener("pointermove", function (ev) {
+    if (!ui.tool) return;
+    var c = cellFromEvent(ev);
+    if (!c || (ui.hover && c.x === ui.hover.x && c.y === ui.hover.y)) return;
+    ui.hover = c;
+    renderPark();
+  });
+  parkEl.addEventListener("pointerleave", function () { if (ui.hover) { ui.hover = null; renderPark(); } });
+  parkEl.addEventListener("click", function (ev) {
+    var c = cellFromEvent(ev);
+    if (!c) return;
+    if (ui.tool) {
+      var a = anchorFor(ui.tool, c);
+      var r = Park.build(park, ui.tool, a.x, a.y);
+      if (!r.ok) { post("Can't build there: " + r.reason, "sick"); return; }
+      post("Built the <b>" + Park.exhibitLabel(r.exhibit) + "</b> for " + money(BIOMES[ui.tool].cost) + ".");
+      ui.selected = r.exhibit.id;
+      ui.armedDemolish = false;
+      setTool(null);
+      refreshAll();
+      return;
+    }
+    var rec = Park.exhibitAt(park, c.x, c.y);
+    select(rec ? rec.id : null);
+  });
+  function select(id) {
+    ui.selected = id;
+    ui.armedDemolish = false;
+    renderInspector();
+    updatePark();
+  }
+
+  // ---------- inspector ----------
+  var insp = $("inspector");
+  function renderInspector() {
+    insp.innerHTML = "";
+    var rec = ui.selected !== null ? park.exhibits[ui.selected] : null;
+    if (!rec) { renderOverview(); return; }
+    var biome = BIOMES[rec.biomeId];
+
+    var head = h("div", "insp-head");
+    var title = h("div", "");
+    var sp = rec.animal ? SPECIES[rec.animal.speciesId] : null;
+    title.appendChild(h("h3", "", (sp ? sp.glyph + " " + sp.name : "Empty enclosure")));
+    title.appendChild(h("div", "sub", Park.exhibitLabel(rec) + (sp ? " · " + sp.params : "")));
+    head.appendChild(title);
+    var close = h("button", "x-btn", "×");
+    close.type = "button"; close.title = "Close"; close.setAttribute("aria-label", "Close inspector");
+    close.addEventListener("click", function () { select(null); });
+    head.appendChild(close);
+    insp.appendChild(head);
+
+    if (rec.animal) {
+      var hb = h("div", "health",
+        '<div class="row"><span>Health</span><span class="mono" id="iHealth"></span></div>' +
+        '<div class="bar"><div class="fill" id="iHealthFill"></div></div>');
+      insp.appendChild(hb);
+
+      var sec = h("div", "section");
+      sec.appendChild(h("span", "label", 'Last incident <span id="iIncident"></span>'));
+      var views = h("div", "views");
+      views.innerHTML =
+        '<div class="view"><div class="cap"><span>Really there</span></div><svg id="iGod" role="img" aria-label="Errors in the last incident"></svg></div>' +
+        '<div class="view"><div class="cap"><span>Keeper sees</span><span class="mono" id="iFired"></span></div><svg id="iKeeper" role="img" aria-label="Checks fired in the last incident"></svg>' +
+        '<div class="overlay" id="iNoKeeper"' + (rec.keeperId ? " hidden" : "") + "><span>No keeper on duty.</span></div></div>";
+      sec.appendChild(views);
+      insp.appendChild(sec);
+
+      var st = h("div", "section mini-stats");
+      st.innerHTML =
+        '<div class="stat"><span class="n" id="iSick"></span><span class="l">Logical errors</span></div>' +
+        '<div class="stat"><span class="n" id="iVis"></span><span class="l">Visitors / day</span></div>' +
+        '<div class="stat"><span class="n" id="iCost"></span><span class="l">Costs / day</span></div>';
+      insp.appendChild(st);
+    }
+
+    // Keeper
+    var ks = h("div", "section");
+    ks.appendChild(h("span", "label", "Zookeeper"));
+    var seg = h("div", "seg");
+    [[null, "None"]].concat(Object.keys(KEEPERS).map(function (k) { return [k, KEEPERS[k].glyph + " " + KEEPERS[k].name]; }))
+      .forEach(function (opt) {
+        var b = h("button", rec.keeperId === opt[0] ? "on" : "", opt[1]);
+        b.type = "button";
+        b.title = opt[0] ? KEEPERS[opt[0]].blurb + " $" + KEEPERS[opt[0]].salary + "/day" : "No keeper";
+        b.addEventListener("click", function () {
+          if (rec.keeperId === opt[0]) return;
+          Park.setKeeper(park, rec.id, opt[0]);
+          post(opt[0] ? "Hired a <b>" + KEEPERS[opt[0]].name + "</b> for the " + Park.exhibitLabel(rec) + " ($" + KEEPERS[opt[0]].salary + "/day)."
+            : "Let the keeper at the " + Park.exhibitLabel(rec) + " go.");
+          refreshAll();
+        });
+        seg.appendChild(b);
+      });
+    ks.appendChild(seg);
+    ks.appendChild(h("div", "hint", rec.keeperId
+      ? KEEPERS[rec.keeperId].blurb + " $" + KEEPERS[rec.keeperId].salary + "/day."
+      : rec.animal ? "⚠️ Nobody is measuring the checks — errors will pile up." : "You can hire a keeper before the animal arrives."));
+    insp.appendChild(ks);
+
+    // Animal purchase
+    if (!rec.animal) {
+      var ps = h("div", "section");
+      ps.appendChild(h("span", "label", "Buy an animal"));
+      var ul = h("ul", "species-list");
+      Park.speciesOptions(park, rec.id).forEach(function (o) {
+        var s = SPECIES[o.speciesId];
+        var li = h("li", o.ok ? "" : "no");
+        var row = h("div", "row", '<span class="g">' + s.glyph + '</span><span class="who"><b>' + s.name + "</b><span>" + s.params + " · " + money(o.cost) + "</span></span>");
+        var buy = h("button", "btn", "Buy");
+        buy.type = "button";
+        buy.dataset.cost = o.cost;
+        buy.dataset.ok = o.ok ? "1" : "";
+        buy.disabled = !o.ok || !o.affordable;
+        buy.addEventListener("click", function () {
+          var r = Park.buyAnimal(park, rec.id, o.speciesId);
+          if (!r.ok) { post(r.reason, "sick"); return; }
+          post("A <b>" + s.name + "</b> " + s.glyph + " moved into the " + Park.exhibitLabel(rec) + " (" + money(o.cost) + ").");
+          refreshAll();
+        });
+        row.appendChild(buy);
+        li.appendChild(row);
+        if (!o.ok) li.appendChild(h("div", "why", "✗ " + o.reason));
+        ul.appendChild(li);
+      });
+      ps.appendChild(ul);
+      insp.appendChild(ps);
+    }
+
+    // Habitat info + placard
+    var hs = h("div", "section");
+    hs.appendChild(h("span", "label", "Habitat"));
+    hs.appendChild(h("div", "hint", biome.blurb + "<br>Climate: " + channelName(biome.climate) + ". Upkeep $" + biome.upkeep + "/day."));
+    insp.appendChild(hs);
+    if (sp) {
+      var d = h("details", "placard-d section");
+      d.innerHTML = "<summary>Zoo placard</summary><div class=\"placard\"><div>" + sp.placard + "</div>" +
+        '<div class="ops">Stabilizers: ' + sp.code.stabilizers.map(S.toString).join(", ") +
+        "<br>Logical X̄ = " + S.toString(sp.code.logicalX[0]) + ", Z̄ = " + S.toString(sp.code.logicalZ[0]) + "</div></div>";
+      insp.appendChild(d);
+    }
+
+    var foot = h("div", "insp-foot");
+    if (rec.animal) {
+      var q = new URLSearchParams({
+        species: rec.animal.speciesId, keeper: rec.keeperId || "none",
+        channel: biome.climate.channel, p: String(biome.climate.p)
+      });
+      var a = h("a", "ghost", "Watch closely in the sandbox →");
+      a.href = "sandbox.html?" + q.toString();
+      foot.appendChild(a);
+    } else {
+      foot.appendChild(h("span", ""));
+    }
+    var refund = Math.round(biome.cost * ECO.demolishRefund);
+    var dem = h("button", "btn danger" + (ui.armedDemolish ? " armed" : ""),
+      ui.armedDemolish ? "Confirm: demolish (+" + money(refund) + ")" : "Demolish");
+    dem.type = "button";
+    dem.addEventListener("click", function () {
+      if (!ui.armedDemolish) { ui.armedDemolish = true; renderInspector(); return; }
+      var label = Park.exhibitLabel(rec);
+      var lost = rec.animal ? " The " + SPECIES[rec.animal.speciesId].name + " was rehomed." : "";
+      Park.demolish(park, rec.id);
+      post("Demolished the " + label + " (refund " + money(refund) + ")." + lost);
+      ui.selected = null; ui.armedDemolish = false;
+      refreshAll();
+    });
+    foot.appendChild(dem);
+    insp.appendChild(foot);
+
+    updateInspector();
+  }
+
+  function renderOverview() {
+    insp.appendChild(h("h2", "", "Your zoo"));
+    if (!park.order.length) {
+      insp.appendChild(h("div", "placard",
+        "<p><b>Welcome, founder.</b> You have " + money(park.cash) + " in pre-seed funding and an empty lot.</p>" +
+        "<p>1. Pick a habitat on the left and place it in the park.<br>" +
+        "2. Click it to buy an animal — each animal is a quantum error-correcting code, and it can only live in a habitat that measures exactly its stabilizers.<br>" +
+        "3. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors.</p>" +
+        "<p class=\"hint\">Healthy, rare animals draw visitors. Sick ones cost vet bills and reputation. " +
+        "The <a href=\"sandbox.html\">exhibit sandbox</a> shows one enclosure round by round.</p>"));
+      return;
+    }
+    var ul = h("ul", "overview");
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id];
+      var sp = rec.animal ? SPECIES[rec.animal.speciesId] : null;
+      var li = h("li", "",
+        '<span class="g">' + (sp ? sp.glyph : "·") + '</span><span class="nm">' + (sp ? sp.name : "Empty") +
+        '<br><span class="h">' + Park.exhibitLabel(rec) + '</span></span><span class="h" data-ov="' + id + '"></span>');
+      li.addEventListener("click", function () { select(id); });
+      ul.appendChild(li);
+    });
+    insp.appendChild(ul);
+    insp.appendChild(h("div", "hint", "Click an enclosure on the map (or here) to manage it."));
+    updateInspector();
+  }
+
+  function updateInspector() {
+    var rec = ui.selected !== null ? park.exhibits[ui.selected] : null;
+    if (!rec) {
+      Array.prototype.forEach.call(insp.querySelectorAll("[data-ov]"), function (e) {
+        var r = park.exhibits[e.dataset.ov];
+        e.textContent = !r ? "" : r.animal ? Math.round(r.animal.health) + "%" + (r.keeperId ? "" : " ⚠️") : "—";
+      });
+      return;
+    }
+    Array.prototype.forEach.call(insp.querySelectorAll(".species-list .btn"), function (b) {
+      b.disabled = !b.dataset.ok || park.cash < Number(b.dataset.cost);
+    });
+    if (!rec.animal) return;
+    var an = rec.animal, hv = Math.round(an.health);
+    $("iHealth").textContent = hv + "%";
+    var fill = $("iHealthFill");
+    fill.style.width = hv + "%";
+    fill.className = "fill " + healthClass(an.health);
+    var inc = an.incident, hasKeeper = !!rec.keeperId;
+    var view = inc ? { errors: inc.before, pulse: null, syndrome: inc.syndrome, correction: inc.correction, keeper: hasKeeper }
+      : { errors: an.E, pulse: null, syndrome: null, correction: null, keeper: hasKeeper };
+    var key = inc ? inc.tick + ":" + an.rounds : "none";
+    if (insp.dataset.drawn !== key + ":" + hasKeeper) {
+      insp.dataset.drawn = key + ":" + hasKeeper;
+      V.draw($("iGod"), an.speciesId, view, "god");
+      V.draw($("iKeeper"), an.speciesId, view, "keeper");
+      var born = rec.animalTick || 0;
+      $("iIncident").textContent = inc ? "· " + clock(born + inc.tick) + (inc.sick ? " · logical " + inc.sick.kind + "!" : "") : "· none yet";
+      $("iFired").textContent = inc && hasKeeper && inc.syndrome !== null ? popcount(inc.syndrome) + " fired" : "";
+    }
+    $("iSick").textContent = an.sick;
+    $("iVis").textContent = Math.round(Park.exhibitVisitors(park, rec));
+    $("iCost").textContent = money(Park.exhibitCosts(rec));
+  }
+
+  // ---------- top bar ----------
+  function renderTopbar() {
+    var r = Park.rates(park);
+    var cash = $("kCash");
+    cash.textContent = money(park.cash);
+    cash.className = "n" + (park.cash < 0 ? " neg" : "");
+    var net = $("kNet");
+    net.textContent = (r.net >= 0 ? "+" : "") + money(r.net) + " / day";
+    net.className = "sub " + (r.net > 0 ? "pos" : r.net < 0 ? "neg" : "");
+    $("kDay").textContent = "Day " + Park.day(park);
+    $("kHour").textContent = pad2(Park.hour(park)) + ":00";
+    $("kRep").textContent = Math.round(park.reputation);
+    $("kRepSub").textContent = "of 100";
+    $("kVis").textContent = Math.round(r.visitors).toLocaleString();
+    $("kVisSub").textContent = "@ $" + ECO.ticketPrice + " a ticket";
+    var goal = ECO.goal;
+    $("gCash").style.width = Math.max(0, Math.min(100, 100 * park.cash / goal.cash)) + "%";
+    $("gCashT").textContent = "$" + Math.round(Math.max(0, park.cash) / 1000) + "k / $" + goal.cash / 1000 + "k";
+    $("gRep").style.width = Math.min(100, 100 * park.reputation / goal.reputation) + "%";
+    $("gRepT").textContent = "rep " + Math.round(park.reputation) + " / " + goal.reputation;
+    var gs = $("kGoal");
+    if (park.status === "won") { gs.textContent = "🎉 Closed on day " + park.endDay; gs.className = "sub pos"; }
+    else if (park.status === "lost") { gs.textContent = "Ran out of runway on day " + park.endDay; gs.className = "sub warn"; }
+    else if (park.daysInDebt > 0) {
+      var left = ECO.bankruptDays - park.daysInDebt;
+      gs.textContent = "⚠️ In debt — " + left + " day" + (left === 1 ? "" : "s") + " of runway left";
+      gs.className = "sub warn";
+    } else if (park.cash < 0) { gs.textContent = "⚠️ In the red — get back above $0 by midnight"; gs.className = "sub warn"; }
+    else { gs.textContent = ""; gs.className = "sub"; }
+    Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
+      b.classList.toggle("on", Number(b.dataset.speed) === ui.speed);
+    });
+  }
+
+  function refreshAll() {
+    renderTopbar();
+    renderTools();
+    renderPark();
+    renderInspector();
+    saveGame();
+  }
+
+  // ---------- dialogs ----------
+  // buttons: [{ label, cls, onClick }]; the game pauses while a dialog is open.
+  function openModal(html, buttons) {
+    var card = $("modalCard");
+    card.innerHTML = html;
+    var actions = h("div", "actions");
+    buttons.forEach(function (b, i) {
+      var btn = h("button", "btn " + (b.cls || ""), b.label);
+      btn.type = "button";
+      btn.addEventListener("click", b.onClick);
+      actions.appendChild(btn);
+      if (i === buttons.length - 1) setTimeout(function () { btn.focus(); }, 0);
+    });
+    card.appendChild(actions);
+    if (!ui.modalOpen) { ui.speedBeforeModal = ui.speed || ui.speedBeforeModal; setSpeed(0); }
+    ui.modalOpen = true;
+    $("modal").hidden = false;
+  }
+  function closeModal(resume) {
+    $("modal").hidden = true;
+    ui.modalOpen = false;
+    if (resume) setSpeed(ui.speedBeforeModal || 1);
+  }
+  function row(label, value, cls) {
+    return "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + label + "</td><td>" + value + "</td></tr>";
+  }
+  function investorQuote(e) {
+    if (e.net > 0 && e.sick <= 2) return "Textbook fault tolerance. We're very excited about this team.";
+    if (e.net > 0) return "Revenue looks great — but walk us through those logical errors.";
+    if (e.runwayDays !== null && e.runwayDays < 30) return "We need to talk about your burn rate.";
+    if (e.vet > e.revenue / 4) return "Those vet bills are eating your margins. Who's minding the animals?";
+    if (e.revenue < 1) return "Pre-revenue is fine at this stage. Keep building.";
+    return "Growth is expensive. Show us the path to profitability.";
+  }
+  function showInvestorUpdate(e) {
+    var sick = e.sickest && park.exhibits[e.sickest.exhibitId];
+    var html = '<span class="eyebrow">Investor update · Month ' + e.month + '</span>' +
+      '<h2 class="title" id="modalTitle">' + (e.net >= 0 ? "In the black" : "Burning cash") + "</h2>" +
+      '<div class="quote">“' + investorQuote(e) + "”</div>" +
+      "<table>" +
+      row("Ticket revenue (" + Math.round(e.visitors).toLocaleString() + " visitors)", money(e.revenue)) +
+      row("Salaries & upkeep", "−" + money(e.expenses)) +
+      row("Vet bills (" + e.sick + " logical error" + (e.sick === 1 ? "" : "s") + ")", "−" + money(e.vet)) +
+      row("Net for the month", '<span class="' + (e.net >= 0 ? "pos-t" : "neg-t") + '">' + money(e.net) + "</span>", "total") +
+      "</table>" +
+      "<p>" + (e.runwayDays === null ? "Runway: <b>profitable</b> — you're not burning cash."
+        : "Runway: <b>" + Math.floor(e.runwayDays) + " days</b> at this month's burn.") + "</p>" +
+      (sick ? "<p>Sickest exhibit: <b>" + (sick.animal ? SPECIES[sick.animal.speciesId].name : "The animal") + "</b> in the " +
+        Park.exhibitLabel(sick) + " (" + e.sickest.count + " logical error" + (e.sickest.count === 1 ? "" : "s") + ")." +
+        (sick.keeperId ? "" : " It has no keeper!") + "</p>" : "") +
+      '<p class="hint">Series A needs ' + money(ECO.goal.cash) + " in the bank and reputation " + ECO.goal.reputation +
+      ". You're at " + money(park.cash) + " and " + Math.round(park.reputation) + ".</p>";
+    openModal(html, [{ label: "Back to the zoo", onClick: function () { closeModal(true); } }]);
+  }
+  function zooSummary() {
+    var counts = {};
+    park.order.forEach(function (id) { var a = park.exhibits[id].animal; if (a) counts[a.speciesId] = (counts[a.speciesId] || 0) + 1; });
+    var animals = Object.keys(counts).map(function (k) { return SPECIES[k].glyph + "×" + counts[k]; }).join("  ") || "none";
+    return "<table>" + row("Days in business", park.endDay) + row("Funding", money(park.cash)) +
+      row("Reputation", Math.round(park.reputation)) + row("Animals", animals) +
+      row("Logical errors, all time", park.totalSick) + "</table>";
+  }
+  function showEnd() {
+    if (park.status === "won") {
+      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Series A closed! 🎉</h2>' +
+        "<p>Your zoo hit " + money(ECO.goal.cash) + " in the bank with a reputation of " + Math.round(park.reputation) +
+        ". The investors are in — every animal on show is a logical qubit that stayed alive.</p>" + zooSummary(),
+        [{ label: "New game", cls: "quiet", onClick: function () { closeModal(false); newGame(); } },
+         { label: "Keep playing", onClick: function () { Park.continueAfterWin(park); closeModal(true); saveGame(); } }]);
+    } else {
+      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Ran out of runway</h2>' +
+        "<p>After " + ECO.bankruptDays + " days in the red, the board pulled the plug.</p>" + zooSummary() +
+        '<p class="hint">Tips: every animal needs a keeper — unkept codes are worse than a bare qubit. ' +
+        "Match the keeper to the animal: the Perfect Pangolin is a perfect code, so an Intern already knows every syndrome it can produce, " +
+        "while the Owl and Axolotl roughly halve their sick days with a Keeper. Don't build enclosures you can't stock yet.</p>",
+        [{ label: "Look around", cls: "quiet", onClick: function () { closeModal(false); } },
+         { label: "New game", onClick: function () { closeModal(false); newGame(); } }]);
+    }
+  }
+
+  // ---------- save / load ----------
+  var SAVE_KEY = "qecZooSave";
+  function saveGame() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ park: Park.save(park), news: news.slice(0, 40) })); }
+    catch (e) { /* storage unavailable: the game still works, it just won't persist */ }
+  }
+  function loadGame() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      park = Park.load(data.park);
+      news = Array.isArray(data.news) ? data.news : [];
+      return true;
+    } catch (e) { return false; }
+  }
+  function newGame() {
+    park = Park.createPark();
+    news = [];
+    ui.selected = null; ui.tool = null; ui.armedDemolish = false; ui.sickFlash = {};
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    setTool(null);
+    refreshAll();
+    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+    setSpeed(1);
+  }
+  $("newGameBtn").addEventListener("click", function () {
+    if (!park.order.length && park.tick === 0) return;
+    openModal('<h2 class="title" id="modalTitle">Start over?</h2><p>Your current zoo (day ' + Park.day(park) + ", " +
+      money(park.cash) + ") will be lost.</p>",
+      [{ label: "Cancel", cls: "quiet", onClick: function () { closeModal(true); } },
+       { label: "New game", cls: "danger armed", onClick: function () { closeModal(false); newGame(); } }]);
+  });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveGame(); });
+  window.addEventListener("pagehide", saveGame);
+
+  // ---------- time ----------
+  function handleEvents(events) {
+    events.forEach(function (e) {
+      if (e.type === "sick") {
+        var rec = park.exhibits[e.exhibitId];
+        ui.sickFlash[e.exhibitId] = performance.now() + 1200;
+        var why = e.cause === "undetectable" ? "errors slipped past the checks"
+          : e.cause === "miscorrected" ? "the keeper's correction backfired" : "nobody kept up with the errors";
+        post("The " + SPECIES[e.speciesId].name + " in the " + Park.exhibitLabel(rec) + " caught a logical " + e.kind +
+          " — " + why + ". Vet bill −" + money(e.bill).slice(1) + ".", "sick");
+      } else if (e.type === "day") {
+        if (park.order.length) {
+          post("Day " + e.day + " closed: " + Math.round(e.visitors).toLocaleString() + " visitors, tickets " + money(e.revenue) +
+            ", running costs " + money(e.expenses) + (e.vet ? ", vet bills " + money(e.vet) : "") + ".");
+        }
+        saveGame();
+      } else if (e.type === "debt") {
+        post("⚠️ The zoo ended the day in debt. " + e.daysLeft + " more day" + (e.daysLeft === 1 ? "" : "s") +
+          " in the red and the board pulls the plug.", "sick");
+      } else if (e.type === "investor") {
+        if (park.order.length) showInvestorUpdate(e);
+      } else if (e.type === "won" || e.type === "lost") {
+        post(e.type === "won" ? "🎉 <b>Series A closed</b> on day " + e.day + "!" : "<b>Ran out of runway</b> on day " + e.day + ".", e.type === "lost" ? "sick" : "");
+        saveGame();
+        showEnd();
+      }
+    });
+  }
+  var lastFrame = 0, acc = 0;
+  function frame(t) {
+    if (!lastFrame) lastFrame = t;
+    var dt = Math.min(250, t - lastFrame);
+    lastFrame = t;
+    if (ui.speed > 0) {
+      acc += dt;
+      var msPerTick = 1000 / (TICKS_PER_SECOND_AT_1X * ui.speed);
+      var n = 0;
+      while (acc >= msPerTick && n < 20 && !ui.modalOpen) {
+        acc -= msPerTick; n++;
+        handleEvents(Park.tick(park));
+        if (ui.selected !== null && !park.exhibits[ui.selected]) ui.selected = null;
+      }
+      if (n) { renderTopbar(); updateToolAffordability(); updateInspector(); }
+    }
+    updatePark(); // sick flashes fade with wall-clock time
+    requestAnimationFrame(frame);
+  }
+  function setSpeed(s) { ui.speed = s; acc = 0; renderTopbar(); }
+  Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
+    b.addEventListener("click", function () { setSpeed(Number(b.dataset.speed)); });
+  });
+  var lastSpeed = 1;
+  document.addEventListener("keydown", function (e) {
+    if (e.target.closest && e.target.closest("input, select, textarea")) return;
+    if (ui.modalOpen) return;
+    if (e.key === "Escape") { if (ui.tool) setTool(null); else select(null); }
+    else if (e.key === " ") {
+      e.preventDefault();
+      if (ui.speed) { lastSpeed = ui.speed; setSpeed(0); } else setSpeed(lastSpeed);
+    }
+    else if (e.key === "1") setSpeed(1);
+    else if (e.key === "2") setSpeed(3);
+    else if (e.key === "3") setSpeed(10);
+  });
+
+  // Theme toggle: auto -> light -> dark. Remembered per viewer if storage works.
+  var THEMES = ["auto", "light", "dark"];
+  var theme = "auto";
+  try { theme = localStorage.getItem("qecZooTheme") || "auto"; } catch (e) { /* storage unavailable */ }
+  function applyTheme() {
+    if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", theme);
+    $("themeBtn").textContent = "Theme: " + theme;
+  }
+  $("themeBtn").addEventListener("click", function () {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    try { localStorage.setItem("qecZooTheme", theme); } catch (e) { /* ignore */ }
+    applyTheme();
+  });
+
+  applyTheme();
+  if (loadGame()) {
+    refreshAll();
+    renderNews();
+    post("Welcome back! Your zoo is where you left it: day " + Park.day(park) + ", " + money(park.cash) + ".");
+    if (park.status === "lost" || (park.status === "won" && !park.freePlay)) showEnd();
+  } else {
+    refreshAll();
+    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -106,6 +106,16 @@ Per tick, for each stocked exhibit:
    commutes with all stabilizers at that point.)
 4. **Stats.** Update the exhibit's rolling logical-error rate → health bar (0–100%).
 
+**Rounds split the noise.** With perfect measurements, a second feeding round in the same tick
+would find nothing new, so each tick's noise is split evenly across the keeper's
+`roundsPerTick` (each round sees rate p/R). A Head Keeper therefore really does see fewer errors
+between checks, and the logical rate drops roughly as p²/R.
+
+**The vet.** Health is judged the same way with or without a keeper: after each round, the vet asks
+whether the best keeper (minimum-weight table) could still decode the current error without a
+logical flip. If not, the animal is sick and the frame is reset. Leftover errors that are
+themselves stabilizers act trivially on the animal and are swept away.
+
 Syndrome measurement is **perfect** in v0 (no measurement errors). Faulty measurements and
 repeated rounds are the first thing on the roadmap — they're what make surface codes shine.
 
@@ -116,16 +126,39 @@ Per day:
 - **Expenses** = Σ keeper salaries + biome upkeep.
 - **Reputation** drifts up with average health, drops on each logical error.
 
-## 4. Economy & win/lose (starting numbers, to be tuned)
+## 4. Economy & win/lose
 
 - Start: **$50,000 "pre-seed"**, empty 12×8 park grid, reputation 50.
 - Enclosure: $5k–$20k by biome; animal: $3k (Tortoise) → $25k (Axolotl); keeper salary
-  $100–$600/day; vet bill $1–3k per logical error.
+  $100 / $220 / $400 per day; vet bill $2k and −1.5 reputation per logical error; reputation
+  drifts 15%/day toward average animal health. Revenue: 0.8 visitors/day per point of appeal,
+  scaled by health and (0.5 + reputation/100), at $12 a ticket.
+- **Climate**: 2% per qubit per hour in every habitat (depolarizing; bit flips only for the
+  Riverbank).
 - **Lose**: cash < 0 for 7 consecutive days → "ran out of runway".
 - **Win (v0 goal)**: reach $250k cash and reputation ≥ 80 → "Series A closed". Show days taken as
   a score.
-- A monthly **investor update** toast summarizes revenue, burn rate, runway, and your sickest
-  exhibit — the first hook for the later investor-guest mechanics.
+- A monthly **investor update** (a dialog that pauses the game) summarizes revenue, costs, vet
+  bills, runway, and your sickest exhibit. It's the first hook for the later investor-guest
+  mechanics.
+
+**Balance pass (M3).** At the original 1% noise, keepers almost only ever saw single errors, so the
+cheapest keeper always won (all-Intern bots closed the Series A 30 days before all-Keeper bots,
+and all-Head-Keeper bots never did). At 2% the decoders' differences show, and they differ by
+species in ways that come straight from the codes:
+
+| Sick days / 30 days at 2% | Intern | Keeper | Head Keeper |
+|---|---|---|---|
+| Shor Owl | 7.2 | 4.7 | 1.5 |
+| Steane Peacock | 6.0 | 5.3 | 1.5 |
+| Perfect Pangolin | 1.7 | 1.7 | 1.2 |
+| Surface Axolotl | 7.7 | 4.2 | 1.3 |
+
+(The Pangolin's Intern = Keeper because it's a perfect code: the single-error table already
+covers every syndrome.) Seeded bots now close the Series A on median day ~67 when keepers are
+matched to animals, ~85 with Keepers everywhere, ~118 with Head Keepers everywhere, and go
+bankrupt within ~10 days with no keepers. The balance tests in `tests/zoo-tycoon.test.js` pin
+this ordering.
 
 ## 5. UI layout (single page)
 
@@ -166,9 +199,18 @@ quantum-games/
     stabilizer.test.js      NEW — `node quantum-games/tests/stabilizer.test.js`
   qec-zoo-tycoon/
     PLAN.md                 this file
+    zoo-data.js             species / biome / keeper / economy data + placement check
+    exhibit-sim.js          one exhibit: noise -> measure -> correct rounds, the vet, health
+    park.js                 the zoo: grid, build/buy/hire/demolish, money, reputation, clock
+    exhibit-view.js         SVG drawing of an exhibit ("really there" / "keeper sees")
+    zoo.css                 shared theme tokens + panel/exhibit styles
+    index.html              the park (UI only; logic lives in park.js)
+    sandbox.html            single-exhibit sandbox (M1), linked from the park inspector
     README.md               written when v0 ships
-    index.html              the game (UI + game state + species/biome/keeper data)
 ```
+
+Everything except the two HTML pages, `exhibit-view.js` and `zoo.css` is DOM-free and loads in
+Node, so game logic is covered by `tests/zoo-tycoon.test.js` alongside `tests/stabilizer.test.js`.
 
 ### `stabilizer.js` (exposes `window.Stabilizer`; also `module.exports` for Node tests)
 
@@ -196,14 +238,14 @@ quantum-games/
 
 ## 7. Build milestones
 
-1. **M0 — Physics core.** `stabilizer.js` + tests passing. All five species + biomes defined and
+1. ✅ **M0 — Physics core.** `stabilizer.js` + tests passing. All five species + biomes defined and
    validated.
-2. **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
+2. ✅ **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
    slider, keeper toggle, play/pause. Watch errors land and get corrected. (Already a fun toy on
    its own and the place to tune the visuals.)
-3. **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,
+3. ✅ **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,
    event ticker, placement validation messages.
-4. **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
+4. ✅ **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
    `localStorage`, README with rules + "under the hood", link from `quantum-games/README.md`.
 
 ## Later roadmap (not in v0)
