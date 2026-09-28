@@ -121,13 +121,13 @@
   var BIOMES = {
     riverbank: {
       name: "Parity Riverbank", native: "tortoise", cost: 5000, upkeep: 40, footprint: [2, 2],
-      climate: { channel: "bitFlip", p: 0.01 },
+      climate: { channel: "bitFlip", p: 0.02 },
       checks: ["ZIZ", "IZZ"],
       blurb: "A calm, bit-flip-only stretch of river. Measures pairwise Z parities."
     },
     forest: {
       name: "Nine-Fold Forest", native: "owl", cost: 12000, upkeep: 120, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.01 },
+      climate: { channel: "depolarizing", p: 0.02 },
       checks: [
         sup(9, "Z", [0, 2]), sup(9, "Z", [1, 2]), sup(9, "Z", [3, 5]),
         sup(9, "Z", [4, 5]), sup(9, "Z", [6, 8]), sup(9, "Z", [7, 8]),
@@ -137,7 +137,7 @@
     },
     glade: {
       name: "Hamming Glade", native: "peacock", cost: 14000, upkeep: 100, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.01 },
+      climate: { channel: "depolarizing", p: 0.02 },
       // Row-reduced differently: rows (1+2), 2, 3 of the Hamming checks.
       checks: [
         sup(7, "X", [1, 2, 3, 4]), sup(7, "X", [1, 2, 5, 6]), sup(7, "X", [0, 2, 4, 6]),
@@ -147,14 +147,14 @@
     },
     dunes: {
       name: "Cyclic Dunes", native: "pangolin", cost: 16000, upkeep: 110, footprint: [3, 2],
-      climate: { channel: "depolarizing", p: 0.01 },
+      climate: { channel: "depolarizing", p: 0.02 },
       // Four of the five cyclic shifts of XZZXI (the fifth is their product).
       checks: ["IXZZX", "XIXZZ", "ZXIXZ", "ZZXIX"],
       blurb: "Wind-sculpted ridges that repeat every five steps. Checks mix X and Z."
     },
     wetlands: {
       name: "Checkerboard Wetlands", native: "axolotl", cost: 20000, upkeep: 90, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.01 },
+      climate: { channel: "depolarizing", p: 0.02 },
       checks: [
         sup(9, "X", [0, 2, 3, 4]), sup(9, "X", [4, 5, 7, 8]), sup(9, "X", [1, 2]), sup(9, "X", [6, 7]),
         sup(9, "Z", [1, 2, 4, 5]), sup(9, "Z", [3, 4, 6, 7]), sup(9, "Z", [0, 3]), sup(9, "Z", [5, 8])
@@ -172,9 +172,9 @@
   var KEEPERS = {
     intern: { name: "Intern", glyph: "🧑‍🎓", salary: 100, roundsPerTick: 1, maxWeight: 1,
       blurb: "Knows the single-error syndromes by heart. Shrugs at anything else." },
-    keeper: { name: "Keeper", glyph: "🧑‍🌾", salary: 300, roundsPerTick: 1, maxWeight: 2,
+    keeper: { name: "Keeper", glyph: "🧑‍🌾", salary: 220, roundsPerTick: 1, maxWeight: 2,
       blurb: "Always picks the lowest-weight explanation for what they see." },
-    head: { name: "Head Keeper", glyph: "🧑‍🔬", salary: 600, roundsPerTick: 3, maxWeight: 2,
+    head: { name: "Head Keeper", glyph: "🧑‍🔬", salary: 400, roundsPerTick: 3, maxWeight: 2,
       blurb: "Same instincts as a Keeper, but checks on the animals three times as often." }
   };
 
@@ -182,11 +182,11 @@
   var ECONOMY = {
     startingCash: 50000, startingReputation: 50,
     ticksPerDay: 24, parkSize: [12, 8],
-    vetBill: 1500, bankruptDays: 7,
+    vetBill: 2000, bankruptDays: 7,
     ticketPrice: 12,          // $ per visitor
     visitorsPerAppeal: 0.8,   // visitors/day per point of appeal, at full health and reputation 50
-    sickReputationHit: 3,     // reputation lost per logical error
-    reputationDrift: 0.1,     // daily pull of reputation toward average animal health
+    sickReputationHit: 1.5,    // reputation lost per logical error
+    reputationDrift: 0.15,    // daily pull of reputation toward average animal health
     demolishRefund: 0.5,      // fraction of build cost returned
     goal: { cash: 250000, reputation: 80 }
   };

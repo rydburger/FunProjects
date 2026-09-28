@@ -126,16 +126,39 @@ Per day:
 - **Expenses** = Σ keeper salaries + biome upkeep.
 - **Reputation** drifts up with average health, drops on each logical error.
 
-## 4. Economy & win/lose (starting numbers, to be tuned)
+## 4. Economy & win/lose
 
 - Start: **$50,000 "pre-seed"**, empty 12×8 park grid, reputation 50.
 - Enclosure: $5k–$20k by biome; animal: $3k (Tortoise) → $25k (Axolotl); keeper salary
-  $100–$600/day; vet bill $1–3k per logical error.
+  $100 / $220 / $400 per day; vet bill $2k and −1.5 reputation per logical error; reputation
+  drifts 15%/day toward average animal health. Revenue: 0.8 visitors/day per point of appeal,
+  scaled by health and (0.5 + reputation/100), at $12 a ticket.
+- **Climate**: 2% per qubit per hour in every habitat (depolarizing; bit flips only for the
+  Riverbank).
 - **Lose**: cash < 0 for 7 consecutive days → "ran out of runway".
 - **Win (v0 goal)**: reach $250k cash and reputation ≥ 80 → "Series A closed". Show days taken as
   a score.
-- A monthly **investor update** toast summarizes revenue, burn rate, runway, and your sickest
-  exhibit — the first hook for the later investor-guest mechanics.
+- A monthly **investor update** (a dialog that pauses the game) summarizes revenue, costs, vet
+  bills, runway, and your sickest exhibit. It's the first hook for the later investor-guest
+  mechanics.
+
+**Balance pass (M3).** At the original 1% noise, keepers almost only ever saw single errors, so the
+cheapest keeper always won (all-Intern bots closed the Series A 30 days before all-Keeper bots,
+and all-Head-Keeper bots never did). At 2% the decoders' differences show, and they differ by
+species in ways that come straight from the codes:
+
+| Sick days / 30 days at 2% | Intern | Keeper | Head Keeper |
+|---|---|---|---|
+| Shor Owl | 7.2 | 4.7 | 1.5 |
+| Steane Peacock | 6.0 | 5.3 | 1.5 |
+| Perfect Pangolin | 1.7 | 1.7 | 1.2 |
+| Surface Axolotl | 7.7 | 4.2 | 1.3 |
+
+(The Pangolin's Intern = Keeper because it's a perfect code: the single-error table already
+covers every syndrome.) Seeded bots now close the Series A on median day ~67 when keepers are
+matched to animals, ~85 with Keepers everywhere, ~118 with Head Keepers everywhere, and go
+bankrupt within ~10 days with no keepers. The balance tests in `tests/zoo-tycoon.test.js` pin
+this ordering.
 
 ## 5. UI layout (single page)
 
@@ -222,7 +245,7 @@ Node, so game logic is covered by `tests/zoo-tycoon.test.js` alongside `tests/st
    its own and the place to tune the visuals.)
 3. ✅ **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,
    event ticker, placement validation messages.
-4. **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
+4. ✅ **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
    `localStorage`, README with rules + "under the hood", link from `quantum-games/README.md`.
 
 ## Later roadmap (not in v0)

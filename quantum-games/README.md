@@ -8,10 +8,11 @@ self-contained folder — open its `index.html` in any browser, nothing to build
 - [`magic-square/`](magic-square/) — the Peres–Mermin magic square, a quantum "pseudo-telepathy"
   game. Classical and quantum modes; the quantum mode has you build the actual entangling circuits
   by hand.
-- [`qec-zoo-tycoon/`](qec-zoo-tycoon/) — *(in progress)* Error Correction Zoo Tycoon: run a quantum-startup
+- [`qec-zoo-tycoon/`](qec-zoo-tycoon/) — Error Correction Zoo Tycoon: run a quantum-startup
   zoo where the animals are error-correcting codes and the zookeepers are decoders. `index.html` is
   the park (build enclosures, buy animals, hire keepers, keep the funding flowing);
-  `sandbox.html` follows a single exhibit round by round. See [`PLAN.md`](qec-zoo-tycoon/PLAN.md).
+  `sandbox.html` follows a single exhibit round by round. See the
+  [game README](qec-zoo-tycoon/README.md) and [`PLAN.md`](qec-zoo-tycoon/PLAN.md).
 
 ## Shared engine
 

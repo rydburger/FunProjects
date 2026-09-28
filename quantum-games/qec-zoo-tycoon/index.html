@@ -143,6 +143,33 @@
   details.placard-d .placard { margin-top: 8px; }
   .insp-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
   .kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  /* ---- goal ---- */
+  .kpi.goal { min-width: 190px; }
+  .gbar { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); margin-top: 3px; }
+  .gbar .b { flex: 1; height: 6px; border-radius: 3px; background: var(--bg-panel-2); border: 1px solid var(--line); overflow: hidden; min-width: 80px; }
+  .gbar .b i { display: block; height: 100%; background: var(--accent); }
+  .gbar .t { min-width: 92px; text-align: right; }
+  .kpi .sub.warn { color: var(--sick); font-weight: 600; }
+
+  /* ---- dialogs ---- */
+  .modal { position: fixed; inset: 0; background: rgba(8, 14, 10, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .modal .card {
+    background: var(--bg-panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+    width: min(540px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px;
+    animation: rise 0.25s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .modal h2.title { font-family: var(--font-display); font-weight: 500; font-size: 26px; margin: 0 0 6px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .modal .quote { font-family: var(--font-display); font-style: italic; font-size: 17px; margin: 14px 0; padding-left: 12px; border-left: 3px solid var(--accent); }
+  .modal table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 10px 0; }
+  .modal td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .modal td:last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .modal tr.total td { font-weight: 700; border-bottom: none; }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
+  .modal p { margin: 8px 0; }
+  .neg-t { color: var(--sick); }
+  .pos-t { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -154,6 +181,7 @@
     </div>
     <div class="header-actions">
       <a class="ghost" href="sandbox.html">Exhibit sandbox</a>
+      <button class="ghost" id="newGameBtn" type="button">New game</button>
       <button class="ghost" id="themeBtn" type="button">Theme: auto</button>
     </div>
   </header>
@@ -164,6 +192,10 @@
       <div class="kpi"><span class="l">Date</span><span class="n" id="kDay"></span><span class="sub" id="kHour"></span></div>
       <div class="kpi"><span class="l">Reputation</span><span class="n" id="kRep"></span><span class="sub" id="kRepSub"></span></div>
       <div class="kpi"><span class="l">Visitors / day</span><span class="n" id="kVis"></span><span class="sub" id="kVisSub"></span></div>
+      <div class="kpi goal"><span class="l" id="kGoalLabel">Series A goal</span>
+        <div class="gbar"><span class="b"><i id="gCash"></i></span><span class="t" id="gCashT"></span></div>
+        <div class="gbar"><span class="b"><i id="gRep"></i></span><span class="t" id="gRepT"></span></div>
+        <span class="sub" id="kGoal"></span></div>
     </div>
     <div class="seg speed" id="speedSeg" aria-label="Game speed">
       <button type="button" data-speed="0" title="Pause (space)">⏸</button>
@@ -199,6 +231,8 @@
     </div>
   </div>
 </div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="card" id="modalCard"></div></div>
 
 <script src="../stabilizer.js"></script>
 <script src="zoo-data.js"></script>
@@ -236,7 +270,8 @@
     selected: null,    // exhibit id
     armedDemolish: false,
     sickFlash: {},     // exhibit id -> until timestamp
-    purchaseTick: {}   // exhibit id -> park tick when its animal arrived
+    modalOpen: false,
+    speedBeforeModal: 1
   };
   var TICKS_PER_SECOND_AT_1X = 2;
 
@@ -478,7 +513,6 @@
         buy.addEventListener("click", function () {
           var r = Park.buyAnimal(park, rec.id, o.speciesId);
           if (!r.ok) { post(r.reason, "sick"); return; }
-          ui.purchaseTick[rec.id] = park.tick;
           post("A <b>" + s.name + "</b> " + s.glyph + " moved into the " + Park.exhibitLabel(rec) + " (" + money(o.cost) + ").");
           refreshAll();
         });
@@ -588,7 +622,7 @@
       insp.dataset.drawn = key + ":" + hasKeeper;
       V.draw($("iGod"), an.speciesId, view, "god");
       V.draw($("iKeeper"), an.speciesId, view, "keeper");
-      var born = ui.purchaseTick[rec.id] || 0;
+      var born = rec.animalTick || 0;
       $("iIncident").textContent = inc ? "· " + clock(born + inc.tick) + (inc.sick ? " · logical " + inc.sick.kind + "!" : "") : "· none yet";
       $("iFired").textContent = inc && hasKeeper && inc.syndrome !== null ? popcount(inc.syndrome) + " fired" : "";
     }
@@ -612,6 +646,20 @@
     $("kRepSub").textContent = "of 100";
     $("kVis").textContent = Math.round(r.visitors).toLocaleString();
     $("kVisSub").textContent = "@ $" + ECO.ticketPrice + " a ticket";
+    var goal = ECO.goal;
+    $("gCash").style.width = Math.max(0, Math.min(100, 100 * park.cash / goal.cash)) + "%";
+    $("gCashT").textContent = "$" + Math.round(Math.max(0, park.cash) / 1000) + "k / $" + goal.cash / 1000 + "k";
+    $("gRep").style.width = Math.min(100, 100 * park.reputation / goal.reputation) + "%";
+    $("gRepT").textContent = "rep " + Math.round(park.reputation) + " / " + goal.reputation;
+    var gs = $("kGoal");
+    if (park.status === "won") { gs.textContent = "🎉 Closed on day " + park.endDay; gs.className = "sub pos"; }
+    else if (park.status === "lost") { gs.textContent = "Ran out of runway on day " + park.endDay; gs.className = "sub warn"; }
+    else if (park.daysInDebt > 0) {
+      var left = ECO.bankruptDays - park.daysInDebt;
+      gs.textContent = "⚠️ In debt — " + left + " day" + (left === 1 ? "" : "s") + " of runway left";
+      gs.className = "sub warn";
+    } else if (park.cash < 0) { gs.textContent = "⚠️ In the red — get back above $0 by midnight"; gs.className = "sub warn"; }
+    else { gs.textContent = ""; gs.className = "sub"; }
     Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
       b.classList.toggle("on", Number(b.dataset.speed) === ui.speed);
     });
@@ -622,7 +670,124 @@
     renderTools();
     renderPark();
     renderInspector();
+    saveGame();
   }
+
+  // ---------- dialogs ----------
+  // buttons: [{ label, cls, onClick }]; the game pauses while a dialog is open.
+  function openModal(html, buttons) {
+    var card = $("modalCard");
+    card.innerHTML = html;
+    var actions = h("div", "actions");
+    buttons.forEach(function (b, i) {
+      var btn = h("button", "btn " + (b.cls || ""), b.label);
+      btn.type = "button";
+      btn.addEventListener("click", b.onClick);
+      actions.appendChild(btn);
+      if (i === buttons.length - 1) setTimeout(function () { btn.focus(); }, 0);
+    });
+    card.appendChild(actions);
+    if (!ui.modalOpen) { ui.speedBeforeModal = ui.speed || ui.speedBeforeModal; setSpeed(0); }
+    ui.modalOpen = true;
+    $("modal").hidden = false;
+  }
+  function closeModal(resume) {
+    $("modal").hidden = true;
+    ui.modalOpen = false;
+    if (resume) setSpeed(ui.speedBeforeModal || 1);
+  }
+  function row(label, value, cls) {
+    return "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + label + "</td><td>" + value + "</td></tr>";
+  }
+  function investorQuote(e) {
+    if (e.net > 0 && e.sick <= 2) return "Textbook fault tolerance. We're very excited about this team.";
+    if (e.net > 0) return "Revenue looks great — but walk us through those logical errors.";
+    if (e.runwayDays !== null && e.runwayDays < 30) return "We need to talk about your burn rate.";
+    if (e.vet > e.revenue / 4) return "Those vet bills are eating your margins. Who's minding the animals?";
+    if (e.revenue < 1) return "Pre-revenue is fine at this stage. Keep building.";
+    return "Growth is expensive. Show us the path to profitability.";
+  }
+  function showInvestorUpdate(e) {
+    var sick = e.sickest && park.exhibits[e.sickest.exhibitId];
+    var html = '<span class="eyebrow">Investor update · Month ' + e.month + '</span>' +
+      '<h2 class="title" id="modalTitle">' + (e.net >= 0 ? "In the black" : "Burning cash") + "</h2>" +
+      '<div class="quote">“' + investorQuote(e) + "”</div>" +
+      "<table>" +
+      row("Ticket revenue (" + Math.round(e.visitors).toLocaleString() + " visitors)", money(e.revenue)) +
+      row("Salaries & upkeep", "−" + money(e.expenses)) +
+      row("Vet bills (" + e.sick + " logical error" + (e.sick === 1 ? "" : "s") + ")", "−" + money(e.vet)) +
+      row("Net for the month", '<span class="' + (e.net >= 0 ? "pos-t" : "neg-t") + '">' + money(e.net) + "</span>", "total") +
+      "</table>" +
+      "<p>" + (e.runwayDays === null ? "Runway: <b>profitable</b> — you're not burning cash."
+        : "Runway: <b>" + Math.floor(e.runwayDays) + " days</b> at this month's burn.") + "</p>" +
+      (sick ? "<p>Sickest exhibit: <b>" + (sick.animal ? SPECIES[sick.animal.speciesId].name : "The animal") + "</b> in the " +
+        Park.exhibitLabel(sick) + " (" + e.sickest.count + " logical error" + (e.sickest.count === 1 ? "" : "s") + ")." +
+        (sick.keeperId ? "" : " It has no keeper!") + "</p>" : "") +
+      '<p class="hint">Series A needs ' + money(ECO.goal.cash) + " in the bank and reputation " + ECO.goal.reputation +
+      ". You're at " + money(park.cash) + " and " + Math.round(park.reputation) + ".</p>";
+    openModal(html, [{ label: "Back to the zoo", onClick: function () { closeModal(true); } }]);
+  }
+  function zooSummary() {
+    var counts = {};
+    park.order.forEach(function (id) { var a = park.exhibits[id].animal; if (a) counts[a.speciesId] = (counts[a.speciesId] || 0) + 1; });
+    var animals = Object.keys(counts).map(function (k) { return SPECIES[k].glyph + "×" + counts[k]; }).join("  ") || "none";
+    return "<table>" + row("Days in business", park.endDay) + row("Funding", money(park.cash)) +
+      row("Reputation", Math.round(park.reputation)) + row("Animals", animals) +
+      row("Logical errors, all time", park.totalSick) + "</table>";
+  }
+  function showEnd() {
+    if (park.status === "won") {
+      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Series A closed! 🎉</h2>' +
+        "<p>Your zoo hit " + money(ECO.goal.cash) + " in the bank with a reputation of " + Math.round(park.reputation) +
+        ". The investors are in — every animal on show is a logical qubit that stayed alive.</p>" + zooSummary(),
+        [{ label: "New game", cls: "quiet", onClick: function () { closeModal(false); newGame(); } },
+         { label: "Keep playing", onClick: function () { Park.continueAfterWin(park); closeModal(true); saveGame(); } }]);
+    } else {
+      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Ran out of runway</h2>' +
+        "<p>After " + ECO.bankruptDays + " days in the red, the board pulled the plug.</p>" + zooSummary() +
+        '<p class="hint">Tips: every animal needs a keeper — unkept codes are worse than a bare qubit. ' +
+        "Match the keeper to the animal: the Perfect Pangolin is a perfect code, so an Intern already knows every syndrome it can produce, " +
+        "while the Owl and Axolotl roughly halve their sick days with a Keeper. Don't build enclosures you can't stock yet.</p>",
+        [{ label: "Look around", cls: "quiet", onClick: function () { closeModal(false); } },
+         { label: "New game", onClick: function () { closeModal(false); newGame(); } }]);
+    }
+  }
+
+  // ---------- save / load ----------
+  var SAVE_KEY = "qecZooSave";
+  function saveGame() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ park: Park.save(park), news: news.slice(0, 40) })); }
+    catch (e) { /* storage unavailable: the game still works, it just won't persist */ }
+  }
+  function loadGame() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      park = Park.load(data.park);
+      news = Array.isArray(data.news) ? data.news : [];
+      return true;
+    } catch (e) { return false; }
+  }
+  function newGame() {
+    park = Park.createPark();
+    news = [];
+    ui.selected = null; ui.tool = null; ui.armedDemolish = false; ui.sickFlash = {};
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    setTool(null);
+    refreshAll();
+    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+    setSpeed(1);
+  }
+  $("newGameBtn").addEventListener("click", function () {
+    if (!park.order.length && park.tick === 0) return;
+    openModal('<h2 class="title" id="modalTitle">Start over?</h2><p>Your current zoo (day ' + Park.day(park) + ", " +
+      money(park.cash) + ") will be lost.</p>",
+      [{ label: "Cancel", cls: "quiet", onClick: function () { closeModal(true); } },
+       { label: "New game", cls: "danger armed", onClick: function () { closeModal(false); newGame(); } }]);
+  });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveGame(); });
+  window.addEventListener("pagehide", saveGame);
 
   // ---------- time ----------
   function handleEvents(events) {
@@ -634,9 +799,21 @@
           : e.cause === "miscorrected" ? "the keeper's correction backfired" : "nobody kept up with the errors";
         post("The " + SPECIES[e.speciesId].name + " in the " + Park.exhibitLabel(rec) + " caught a logical " + e.kind +
           " — " + why + ". Vet bill −" + money(e.bill).slice(1) + ".", "sick");
-      } else if (e.type === "day" && park.order.length) {
-        post("Day " + e.day + " closed: " + Math.round(e.visitors).toLocaleString() + " visitors, tickets " + money(e.revenue) +
-          ", running costs " + money(e.expenses) + (e.vet ? ", vet bills " + money(e.vet) : "") + ".");
+      } else if (e.type === "day") {
+        if (park.order.length) {
+          post("Day " + e.day + " closed: " + Math.round(e.visitors).toLocaleString() + " visitors, tickets " + money(e.revenue) +
+            ", running costs " + money(e.expenses) + (e.vet ? ", vet bills " + money(e.vet) : "") + ".");
+        }
+        saveGame();
+      } else if (e.type === "debt") {
+        post("⚠️ The zoo ended the day in debt. " + e.daysLeft + " more day" + (e.daysLeft === 1 ? "" : "s") +
+          " in the red and the board pulls the plug.", "sick");
+      } else if (e.type === "investor") {
+        if (park.order.length) showInvestorUpdate(e);
+      } else if (e.type === "won" || e.type === "lost") {
+        post(e.type === "won" ? "🎉 <b>Series A closed</b> on day " + e.day + "!" : "<b>Ran out of runway</b> on day " + e.day + ".", e.type === "lost" ? "sick" : "");
+        saveGame();
+        showEnd();
       }
     });
   }
@@ -649,7 +826,7 @@
       acc += dt;
       var msPerTick = 1000 / (TICKS_PER_SECOND_AT_1X * ui.speed);
       var n = 0;
-      while (acc >= msPerTick && n < 20) {
+      while (acc >= msPerTick && n < 20 && !ui.modalOpen) {
         acc -= msPerTick; n++;
         handleEvents(Park.tick(park));
         if (ui.selected !== null && !park.exhibits[ui.selected]) ui.selected = null;
@@ -666,6 +843,7 @@
   var lastSpeed = 1;
   document.addEventListener("keydown", function (e) {
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
+    if (ui.modalOpen) return;
     if (e.key === "Escape") { if (ui.tool) setTool(null); else select(null); }
     else if (e.key === " ") {
       e.preventDefault();
@@ -692,8 +870,15 @@
   });
 
   applyTheme();
-  refreshAll();
-  post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+  if (loadGame()) {
+    refreshAll();
+    renderNews();
+    post("Welcome back! Your zoo is where you left it: day " + Park.day(park) + ", " + money(park.cash) + ".");
+    if (park.status === "lost" || (park.status === "won" && !park.freePlay)) showEnd();
+  } else {
+    refreshAll();
+    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+  }
   requestAnimationFrame(frame);
 })();
 </script>

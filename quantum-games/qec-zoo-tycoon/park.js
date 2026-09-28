@@ -8,7 +8,13 @@
 // Money flows continuously: ticket revenue and running costs
 // (salaries + upkeep) accrue every tick as 1/24 of their daily rate;
 // vet bills are charged immediately. A "day" event summarises
-// yesterday's books at each rollover.
+// yesterday's books at each rollover; every 30 days an "investor"
+// event summarises the month.
+//
+// Win: cash >= ECONOMY.goal.cash and reputation >= goal.reputation at
+// the end of a day ("Series A closed"). Lose: in debt at the end of
+// ECONOMY.bankruptDays consecutive days ("ran out of runway").
+// save()/load() round-trip the whole park through JSON.
 //
 // Browser: load after ../stabilizer.js, zoo-data.js, exhibit-sim.js;
 // exposes `window.Park`. Node: require("./park.js").
@@ -33,9 +39,18 @@
       tick: 0,                           // absolute hours since opening
       today: { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0 },
       yesterday: null,
+      month: freshMonth(),
+      status: "playing",                 // "playing" | "won" | "lost"
+      freePlay: false,                   // keep running after a win
+      endDay: null,                      // day the game was won or lost
+      daysInDebt: 0,
+      totalSick: 0,
       rng: opts.rng || Math.random
     };
   }
+
+  function freshMonth() { return { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0, sickBy: {} }; }
+  var DAYS_PER_MONTH = 30;
 
   function day(park) { return Math.floor(park.tick / ECO.ticksPerDay) + 1; }
   function hour(park) { return park.tick % ECO.ticksPerDay; }
@@ -104,6 +119,7 @@
     var cost = Z.SPECIES[speciesId].cost;
     if (park.cash < cost) return { ok: false, reason: "Not enough funding ($" + cost.toLocaleString() + " needed)." };
     park.cash -= cost;
+    rec.animalTick = park.tick;
     rec.animal = X.createExhibit({
       speciesId: speciesId, keeperId: rec.keeperId,
       climate: Z.BIOMES[rec.biomeId].climate, rng: park.rng
@@ -144,14 +160,24 @@
   // Advance the whole park by one tick (one hour). Returns events:
   //   { type: "sick", exhibitId, speciesId, kind, cause, bill }
   //   { type: "day", day, revenue, expenses, vet, visitors, sick, reputation }
+  //   { type: "debt", daysInDebt, daysLeft }       (end of a day spent in debt)
+  //   { type: "investor", month, revenue, expenses, vet, visitors, sick,
+  //     net, dailyNet, runwayDays, sickest: { exhibitId, count } | null }
+  //   { type: "won", day } / { type: "lost", day }
+  // A lost game, or a won one the player hasn't chosen to continue,
+  // no longer advances.
   function tick(park) {
     var events = [];
+    if (park.status === "lost" || (park.status === "won" && !park.freePlay)) return events;
     var perTick = 1 / ECO.ticksPerDay;
     var r = rates(park);
     park.cash += (r.revenue - r.costs) * perTick;
     park.today.revenue += r.revenue * perTick;
     park.today.expenses += r.costs * perTick;
     park.today.visitors += r.visitors * perTick;
+    park.month.revenue += r.revenue * perTick;
+    park.month.expenses += r.costs * perTick;
+    park.month.visitors += r.visitors * perTick;
 
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
@@ -160,6 +186,10 @@
         park.cash -= ECO.vetBill;
         park.today.vet += ECO.vetBill;
         park.today.sick++;
+        park.month.vet += ECO.vetBill;
+        park.month.sick++;
+        park.totalSick++;
+        park.month.sickBy[id] = (park.month.sickBy[id] || 0) + 1;
         park.reputation = Math.max(0, park.reputation - ECO.sickReputationHit);
         events.push({ type: "sick", exhibitId: id, speciesId: rec.animal.speciesId, kind: s.kind, cause: s.cause, bill: ECO.vetBill });
       });
@@ -180,8 +210,73 @@
         vet: park.today.vet, visitors: park.today.visitors, sick: park.today.sick, reputation: park.reputation
       });
       park.today = { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0 };
+
+      var d = day(park) - 1;
+      if (d % DAYS_PER_MONTH === 0) events.push(investorUpdate(park, d / DAYS_PER_MONTH));
+
+      park.daysInDebt = park.cash < 0 ? park.daysInDebt + 1 : 0;
+      if (park.daysInDebt >= ECO.bankruptDays) {
+        park.status = "lost"; park.endDay = d;
+        events.push({ type: "lost", day: d });
+      } else if (park.daysInDebt > 0) {
+        events.push({ type: "debt", daysInDebt: park.daysInDebt, daysLeft: ECO.bankruptDays - park.daysInDebt });
+      } else if (park.status === "playing" && park.cash >= ECO.goal.cash && park.reputation >= ECO.goal.reputation) {
+        park.status = "won"; park.endDay = d;
+        events.push({ type: "won", day: d });
+      }
     }
     return events;
+  }
+
+  function investorUpdate(park, monthNumber) {
+    var m = park.month, sickest = null;
+    Object.keys(m.sickBy).forEach(function (id) {
+      if (park.exhibits[id] && (!sickest || m.sickBy[id] > sickest.count)) sickest = { exhibitId: Number(id), count: m.sickBy[id] };
+    });
+    var r = rates(park);
+    var net = m.revenue - m.expenses - m.vet;
+    var dailyNet = net / DAYS_PER_MONTH;
+    var ev = {
+      type: "investor", month: monthNumber, revenue: m.revenue, expenses: m.expenses, vet: m.vet,
+      visitors: m.visitors, sick: m.sick, net: net, dailyNet: dailyNet,
+      // Runway at this month's average burn (null = not burning cash).
+      runwayDays: dailyNet < 0 ? Math.max(0, park.cash) / -dailyNet : null,
+      currentNet: r.net, sickest: sickest
+    };
+    park.month = freshMonth();
+    return ev;
+  }
+
+  // Keep playing after a win (the goal is met; there is no further one yet).
+  function continueAfterWin(park) { if (park.status === "won") park.freePlay = true; }
+
+  // ---------- save / load ----------
+  var SAVE_VERSION = 1;
+  // Plain JSON: drops each animal's code (rebuilt from its species) and
+  // RNGs (functions). Paulis are already plain { n, x, z } objects.
+  function save(park) {
+    return JSON.stringify(park, function (key, value) {
+      if (key === "rng" || key === "code") return undefined;
+      return value;
+    }).replace(/^\{/, '{"version":' + SAVE_VERSION + ",");
+  }
+  function load(json, opts) {
+    opts = opts || {};
+    var data = typeof json === "string" ? JSON.parse(json) : json;
+    if (!data || data.version !== SAVE_VERSION) throw new Error("Unsupported save version");
+    delete data.version;
+    var park = data;
+    park.rng = opts.rng || Math.random;
+    Object.keys(park.exhibits).forEach(function (id) {
+      var rec = park.exhibits[id];
+      if (!Z.BIOMES[rec.biomeId]) throw new Error("Unknown biome in save: " + rec.biomeId);
+      if (rec.animal) {
+        if (!Z.SPECIES[rec.animal.speciesId]) throw new Error("Unknown species in save: " + rec.animal.speciesId);
+        rec.animal.code = Z.SPECIES[rec.animal.speciesId].code;
+        rec.animal.rng = park.rng;
+      }
+    });
+    return park;
   }
 
   function exhibitLabel(rec) {
@@ -193,7 +288,8 @@
     canBuild: canBuild, build: build, exhibitAt: exhibitAt, demolish: demolish,
     speciesOptions: speciesOptions, buyAnimal: buyAnimal, setKeeper: setKeeper,
     exhibitVisitors: exhibitVisitors, exhibitCosts: exhibitCosts, rates: rates,
-    tick: tick, exhibitLabel: exhibitLabel
+    tick: tick, exhibitLabel: exhibitLabel, continueAfterWin: continueAfterWin,
+    save: save, load: load, DAYS_PER_MONTH: DAYS_PER_MONTH
   };
   if (isNode) module.exports = Park;
   else root.Park = Park;

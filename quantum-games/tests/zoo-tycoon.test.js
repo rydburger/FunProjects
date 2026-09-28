@@ -220,5 +220,134 @@ test("a well-run starter zoo turns a profit over a month", function () {
   assert.ok(P.cash > cash0, "cash went from " + cash0 + " to " + P.cash);
 });
 
+console.log("Rules: win, lose, investors, save/load");
+function runDays(P, n) { var ev = []; for (var i = 0; i < n * Z.ECONOMY.ticksPerDay; i++) ev = ev.concat(Park.tick(P)); return ev; }
+test("seven days in debt loses the game, and the park stops", function () {
+  var P = park(21);
+  P.cash = -1;
+  var ev = runDays(P, Z.ECONOMY.bankruptDays);
+  assert.strictEqual(ev.filter(function (e) { return e.type === "debt"; }).length, Z.ECONOMY.bankruptDays - 1);
+  var lost = ev.filter(function (e) { return e.type === "lost"; });
+  assert.strictEqual(lost.length, 1);
+  assert.strictEqual(lost[0].day, Z.ECONOMY.bankruptDays);
+  assert.strictEqual(P.status, "lost");
+  var t = P.tick;
+  assert.deepStrictEqual(Park.tick(P), []);
+  assert.strictEqual(P.tick, t);
+});
+test("climbing back above zero resets the debt counter", function () {
+  var P = park(22);
+  P.cash = -1;
+  runDays(P, 3);
+  assert.strictEqual(P.daysInDebt, 3);
+  P.cash = 1000;
+  runDays(P, 1);
+  assert.strictEqual(P.daysInDebt, 0);
+  assert.strictEqual(P.status, "playing");
+});
+test("meeting the goal at day end wins; continueAfterWin keeps the park running", function () {
+  var P = park(23);
+  P.cash = Z.ECONOMY.goal.cash + 1; P.reputation = Z.ECONOMY.goal.reputation;
+  var ev = runDays(P, 1);
+  assert.ok(ev.some(function (e) { return e.type === "won" && e.day === 1; }));
+  assert.strictEqual(P.status, "won");
+  assert.deepStrictEqual(Park.tick(P), []);
+  Park.continueAfterWin(P);
+  runDays(P, 2);
+  assert.strictEqual(Park.day(P), 4);
+  assert.strictEqual(P.status, "won", "no second win event");
+});
+test("cash alone isn't enough: reputation must meet the goal too", function () {
+  var P = park(24);
+  P.cash = Z.ECONOMY.goal.cash * 2; P.reputation = Z.ECONOMY.goal.reputation - 10;
+  runDays(P, 1);
+  assert.strictEqual(P.status, "playing");
+});
+test("an investor update arrives every 30 days with the month's books", function () {
+  var P = park(25);
+  P.cash = 100000;
+  var rec = Park.build(P, "riverbank", 0, 0).exhibit;
+  Park.buyAnimal(P, rec.id, "tortoise");
+  var ev = runDays(P, 61).filter(function (e) { return e.type === "investor"; });
+  assert.deepStrictEqual(ev.map(function (e) { return e.month; }), [1, 2]);
+  var m = ev[0];
+  assert.ok(m.revenue > 0 && m.expenses > 0);
+  assert.ok(Math.abs(m.net - (m.revenue - m.expenses - m.vet)) < 1e-6);
+  assert.strictEqual(m.vet, m.sick * Z.ECONOMY.vetBill);
+  if (m.sick) assert.strictEqual(m.sickest.exhibitId, rec.id);
+});
+test("save/load round-trips the park and play continues identically", function () {
+  var P = park(26);
+  P.cash = 100000;
+  var a = Park.build(P, "wetlands", 0, 0).exhibit;
+  Park.buyAnimal(P, a.id, "axolotl"); Park.setKeeper(P, a.id, "keeper");
+  runDays(P, 5);
+  var json = Park.save(P);
+  var Q = Park.load(json, { rng: S.seededRng(99) });
+  P.rng = S.seededRng(99); P.exhibits[a.id].animal.rng = P.rng;
+  assert.strictEqual(Q.cash, P.cash);
+  assert.strictEqual(Q.tick, P.tick);
+  assert.strictEqual(Q.exhibits[a.id].animal.code, Z.SPECIES.axolotl.code);
+  assert.deepStrictEqual(Q.grid, P.grid);
+  runDays(P, 5); runDays(Q, 5);
+  assert.strictEqual(Q.cash, P.cash, "same RNG stream -> same future");
+  assert.strictEqual(Q.exhibits[a.id].animal.sick, P.exhibits[a.id].animal.sick);
+});
+test("load rejects foreign or corrupted saves", function () {
+  assert.throws(function () { Park.load('{"version":999}'); });
+  var bad = JSON.parse(Park.save(park()));
+  bad.exhibits = { 1: { biomeId: "volcano" } };
+  assert.throws(function () { Park.load(bad); });
+});
+
+console.log("Balance (seeded bot players, one year max)");
+// Simple scripted players: each morning, buy the priciest animal they can
+// afford (plus its habitat, keeping a $3k buffer), staffed per strategy.
+function freeSpot(P, b) {
+  var fp = Z.BIOMES[b].footprint;
+  for (var y = 0; y + fp[1] <= P.height; y++) for (var x = 0; x + fp[0] <= P.width; x++) {
+    var free = true;
+    for (var dy = 0; dy < fp[1] && free; dy++) for (var dx = 0; dx < fp[0] && free; dx++) if (P.grid[(y + dy) * P.width + x + dx] !== null) free = false;
+    if (free) return [x, y];
+  }
+  return null;
+}
+var HOME = {};
+Object.keys(Z.BIOMES).forEach(function (b) { HOME[Z.BIOMES[b].native] = b; });
+function botWinDay(keeperFor, seed) {
+  var P = park(seed), prefs = ["axolotl", "pangolin", "peacock", "owl", "tortoise"];
+  for (var d = 0; d < 365; d++) {
+    for (var i = 0; i < prefs.length; i++) {
+      var sp = prefs[i], b = HOME[sp], cost = Z.BIOMES[b].cost + Z.SPECIES[sp].cost;
+      if (P.cash < cost + 3000) continue;
+      var spot = freeSpot(P, b);
+      if (!spot) continue;
+      var rec = Park.build(P, b, spot[0], spot[1]).exhibit;
+      Park.buyAnimal(P, rec.id, sp);
+      Park.setKeeper(P, rec.id, keeperFor(sp));
+      break;
+    }
+    runDays(P, 1);
+    if (P.status === "won") return P.endDay;
+    if (P.status === "lost") return -P.endDay;
+  }
+  return Infinity;
+}
+function median3(f) { var r = [1, 2, 3].map(f).sort(function (a, b) { return a - b; }); return r[1]; }
+var smart = function (sp) { return sp === "pangolin" || sp === "tortoise" ? "intern" : "keeper"; };
+test("matching keepers to animals wins within ~3 months", function () {
+  var d = median3(function (s) { return botWinDay(smart, s); });
+  assert.ok(d > 30 && d < 110, "won on day " + d);
+});
+test("matching keepers beats staffing everything with Keepers", function () {
+  var smartDay = median3(function (s) { return botWinDay(smart, s); });
+  var allKeepers = median3(function (s) { return botWinDay(function () { return "keeper"; }, s); });
+  assert.ok(smartDay < allKeepers, "smart " + smartDay + " vs all-keepers " + allKeepers);
+});
+test("a zoo with no keepers goes bankrupt", function () {
+  var d = median3(function (s) { return botWinDay(function () { return null; }, s); });
+  assert.ok(d < 0 && -d < 60, "result " + d);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
