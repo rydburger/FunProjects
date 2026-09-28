@@ -106,6 +106,16 @@ Per tick, for each stocked exhibit:
    commutes with all stabilizers at that point.)
 4. **Stats.** Update the exhibit's rolling logical-error rate → health bar (0–100%).
 
+**Rounds split the noise.** With perfect measurements, a second feeding round in the same tick
+would find nothing new, so each tick's noise is split evenly across the keeper's
+`roundsPerTick` (each round sees rate p/R). A Head Keeper therefore really does see fewer errors
+between checks, and the logical rate drops roughly as p²/R.
+
+**The vet.** Health is judged the same way with or without a keeper: after each round, the vet asks
+whether the best keeper (minimum-weight table) could still decode the current error without a
+logical flip. If not, the animal is sick and the frame is reset. Leftover errors that are
+themselves stabilizers act trivially on the animal and are swept away.
+
 Syndrome measurement is **perfect** in v0 (no measurement errors). Faulty measurements and
 repeated rounds are the first thing on the roadmap — they're what make surface codes shine.
 
@@ -200,7 +210,7 @@ quantum-games/
 
 1. ✅ **M0 — Physics core.** `stabilizer.js` + tests passing. All five species + biomes defined and
    validated.
-2. **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
+2. ✅ **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
    slider, keeper toggle, play/pause. Watch errors land and get corrected. (Already a fun toy on
    its own and the place to tune the visuals.)
 3. **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,

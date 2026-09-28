@@ -68,8 +68,10 @@
         logicalX: "XXXXXXX", logicalZ: "ZZZZZZZ"
       }),
       params: "[[7,1,3]]",
-      // Triangle: the smallest 2D color code.
-      layout: [[1, 0], [0.5, 1], [1, 1.35], [1.5, 1], [0, 2], [1, 2], [2, 2]],
+      // Triangle: the smallest 2D color code. Each Hamming check is one of
+      // three faces; qubit 6 sits in all three, 2/4/5 on the edges between
+      // faces, 0/1/3 at the corners.
+      layout: [[2, 1.73], [0, 1.73], [1, 1.73], [1, 0], [1.5, 0.87], [0.5, 0.87], [1, 1.15]],
       placard: "Built from two copies of the classical Hamming code, one for X and one for Z. " +
         "Fewer qubits than the Owl for the same protection, and every Clifford gate can be " +
         "applied transversally — a very well-behaved bird."
@@ -82,8 +84,10 @@
         logicalX: "XXXXX", logicalZ: "ZZZZZ"
       }),
       params: "[[5,1,3]]",
-      // Pentagon.
+      // Pentagon. Each check skips one qubit, so its centroid sits close to
+      // the middle; checkSpread pushes the check nodes outward to stay legible.
       layout: [[1, 0], [1.95, 0.69], [1.59, 1.81], [0.41, 1.81], [0.05, 0.69]],
+      checkSpread: 2.3,
       placard: "The smallest code that corrects an arbitrary single-qubit error, and 'perfect': " +
         "every one of its 16 syndromes points to exactly one single-qubit error (or none). " +
         "Its checks mix X and Z, so it needs a habitat unlike any other."
