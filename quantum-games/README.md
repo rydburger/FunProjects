@@ -10,8 +10,8 @@ self-contained folder — open its `index.html` in any browser, nothing to build
   by hand.
 - [`qec-zoo-tycoon/`](qec-zoo-tycoon/) — *(in progress)* Error Correction Zoo Tycoon: run a quantum-startup
   zoo where the animals are error-correcting codes and the zookeepers are decoders. `index.html` is
-  currently a single-exhibit sandbox: watch noise land, checks fire, and a keeper correct them. See
-  [`PLAN.md`](qec-zoo-tycoon/PLAN.md).
+  the park (build enclosures, buy animals, hire keepers, keep the funding flowing);
+  `sandbox.html` follows a single exhibit round by round. See [`PLAN.md`](qec-zoo-tycoon/PLAN.md).
 
 ## Shared engine
 
@@ -27,4 +27,4 @@ scratch.
 bitmasks, stabilizer-group comparison, syndromes, minimum-weight lookup decoders, and seeded Pauli
 noise (`window.Stabilizer` in the browser, `require()` in Node). It tracks errors, not
 statevectors, so it's exact and fast for error-correction games on stabilizer codes. Tests:
-`node quantum-games/tests/stabilizer.test.js`.
+`node quantum-games/tests/stabilizer.test.js` (and `zoo-tycoon.test.js` for the game logic built on it).

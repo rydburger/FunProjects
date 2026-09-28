@@ -177,10 +177,17 @@ quantum-games/
   qec-zoo-tycoon/
     PLAN.md                 this file
     zoo-data.js             species / biome / keeper / economy data + placement check
-                            (separate file so the Node tests can load it too)
+    exhibit-sim.js          one exhibit: noise -> measure -> correct rounds, the vet, health
+    park.js                 the zoo: grid, build/buy/hire/demolish, money, reputation, clock
+    exhibit-view.js         SVG drawing of an exhibit ("really there" / "keeper sees")
+    zoo.css                 shared theme tokens + panel/exhibit styles
+    index.html              the park (UI only; logic lives in park.js)
+    sandbox.html            single-exhibit sandbox (M1), linked from the park inspector
     README.md               written when v0 ships
-    index.html              the game (UI + game state)
 ```
+
+Everything except the two HTML pages, `exhibit-view.js` and `zoo.css` is DOM-free and loads in
+Node, so game logic is covered by `tests/zoo-tycoon.test.js` alongside `tests/stabilizer.test.js`.
 
 ### `stabilizer.js` (exposes `window.Stabilizer`; also `module.exports` for Node tests)
 
@@ -213,7 +220,7 @@ quantum-games/
 2. ✅ **M1 — Single-exhibit sandbox.** One enclosure with the inspector: pick a species, climate
    slider, keeper toggle, play/pause. Watch errors land and get corrected. (Already a fun toy on
    its own and the place to tune the visuals.)
-3. **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,
+3. ✅ **M2 — The park.** Grid, build/buy/hire flow, tick loop over all exhibits, cash/reputation,
    event ticker, placement validation messages.
 4. **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
    `localStorage`, README with rules + "under the hood", link from `quantum-games/README.md`.

@@ -183,6 +183,11 @@
     startingCash: 50000, startingReputation: 50,
     ticksPerDay: 24, parkSize: [12, 8],
     vetBill: 1500, bankruptDays: 7,
+    ticketPrice: 12,          // $ per visitor
+    visitorsPerAppeal: 0.8,   // visitors/day per point of appeal, at full health and reputation 50
+    sickReputationHit: 3,     // reputation lost per logical error
+    reputationDrift: 0.1,     // daily pull of reputation toward average animal health
+    demolishRefund: 0.5,      // fraction of build cost returned
     goal: { cash: 250000, reputation: 80 }
   };
 
