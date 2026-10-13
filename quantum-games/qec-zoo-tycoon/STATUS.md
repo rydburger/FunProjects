@@ -1,19 +1,23 @@
 # Zoo Tycoon — status & handoff
 
-Last updated: 2026-09-28. Written so a new session can resume without the original chat.
-Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap) and [`README.md`](README.md) (player-facing
-rules and how it works).
+Last updated: 2026-10-13. Written so a new session can resume without the original chat.
+Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan**) and
+[`README.md`](README.md) (player-facing rules and how it works).
 
 ## Where things stand
 
-**v0 is complete (milestones M0–M3).**
+**v0 is complete (M0–M3). v1 is under way: M4 (factual placards) and M5 (engine) are done.**
+The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan" before continuing.
 
 - **PR history:**
   - [#2](https://github.com/rydburger/FunProjects/pull/2) merged the plan.
-  - [#3](https://github.com/rydburger/FunProjects/pull/3) merged M0–M3. Everything is on `main`;
-    start new work from there.
-- **Tests:** 51 in `tests/stabilizer.test.js` and 32 in `tests/zoo-tycoon.test.js`, all passing.
-- **Browser checks:** verified in headless Chromium in light and dark themes and at 390px width.
+  - [#3](https://github.com/rydburger/FunProjects/pull/3) merged M0–M3.
+  - [#4](https://github.com/rydburger/FunProjects/pull/4) added CLAUDE.md and this file.
+  - M4 + M5 are on branch `claude/epic-ride-l7e51i`.
+- **Tests:** 68 in `tests/stabilizer.test.js`, 16 in `tests/detectors.test.js` and 43 in
+  `tests/zoo-tycoon.test.js`, all passing.
+- **Browser checks:** placards verified in headless Chromium in light and dark themes and at
+  390px width, with no console errors.
 
 | Milestone | Delivered |
 |---|---|
@@ -21,6 +25,11 @@ rules and how it works).
 | M1 sandbox | `sandbox.html`: one exhibit, step through noise → syndrome → correction |
 | M2 park | `index.html` + `park.js` + `exhibit-sim.js` + `exhibit-view.js` + `zoo.css` |
 | M3 game loop | win/lose, monthly investor dialog, localStorage autosave, balance pass, README |
+| M4 placards | `placard.js`; structured, factual placards in `zoo-data.js` with computed parameters |
+| M5 engine | code analysis in `../stabilizer.js`; `../detectors.js` (option A, option B scaffold); `tests/detectors.test.js` |
+
+**Important:** the game itself still runs the v0 simulation (`exhibit-sim.js`, perfect
+measurements, three keeper tiers). `detectors.js` is tested but not wired in yet; that is M6.
 
 ## Architecture in one breath
 
@@ -31,6 +40,25 @@ rules and how it works).
 - `sameStabilizerGroup` (GF(2) row spaces) and `buildLookupDecoder(code, maxWeight)` (minimum
   weight, found by enumerating errors in order of weight).
 - `seededRng` and `sampleNoise`.
+- Code analysis from a bare list of checks: `analyzeChecks` (commuting? rank, redundant checks,
+  k, CSS, computed logicals, distance), `findLogicals` (symplectic Gram–Schmidt), `isCSS`,
+  `codeDistance` (exhaustive by weight, with a work budget), plus `rotatedSurface(d)` and
+  `repetition(n)`.
+
+`detectors.js` (shared, game-agnostic) adds repeated noisy measurement:
+- `createMemory` / `measureRound`: the true error E, a software Pauli frame, and detectors
+  (outcome XOR previous outcome). Noise models: `phenomenological(rates, q)`; `circuitLevel` is a
+  scaffold that throws "not implemented".
+- `phenoDEM`: the detector error model over a window of rounds.
+- Decoders with `push(round)` / `flush(round)` / `reset()`: `lookupDecoder` (single-shot, raw
+  syndromes) and `matchingDecoder` (sliding window; exact matching by DP over subsets of lit
+  detectors, greedy past `maxDefects`; needs every fault to light ≤ 2 detectors, so surface,
+  repetition and Shor yes, Steane and five-qubit no).
+- `runMemory`: a full memory experiment ending in a perfect round.
+- Measured behaviour (tests pin it): matching fixes every single fault (d = 3, windows 1–4) and
+  every pair of X/measurement faults (d = 5, window 5). With p = 0.5% and q = 2% on d = 3, matching
+  fails about 6× less often than lookup. d = 5 beats d = 3 at p = 1%, q = 0.5%, and loses at
+  p = 12%, q = 6% (threshold behaviour).
 
 The game files build on it:
 - `zoo-data.js` holds the data: `SPECIES` (5 codes plus layout and placard), `BIOMES` (check
@@ -56,7 +84,8 @@ The game files build on it:
   that is itself a stabilizer is cleared as harmless.
 - **Rounds split the noise.** A keeper with R rounds per tick sees p/R per round. Otherwise extra
   rounds are useless with perfect measurements. This is what makes the Head Keeper meaningful.
-- **Syndrome measurement is perfect in v0.** Noisy measurements are roadmap item #1.
+- **Syndrome measurement is perfect in the game (v0 sim).** `detectors.js` has noisy measurement;
+  wiring it into the game is M6.
 
 ## Current numbers (zoo-data.js)
 
@@ -95,21 +124,19 @@ The game files build on it:
 - The Pangolin uses 🦔 because there is no pangolin emoji.
 - Revenue/appeal ROI is similar across species (~33-day payback). Could differentiate further.
 
-## Next steps (pick one)
+## Next steps
 
-From the original brief (the owner's ideas):
-1. **Guests with needs**: funding agencies (want prestige: high distance, exotic codes),
-   investors (revenue growth, low burn), academics, press. The monthly investor update is the
-   hook.
-2. **Park design**: paths, guest flow, placement bonuses. Also tour guides, gift shops and food
-   stands.
+Follow the v1 milestones in PLAN.md:
+1. **M6: keepers and the lab.** Wire `Detectors` into `exhibit-sim.js` (each exhibit is a memory;
+   the vet judges E·frame). Replace the three keeper tiers with a named roster that learns
+   (algorithm + speed + window; backlog, not random mistakes). Add a space-time lookup decoder
+   for small non-matchable codes (Steane, five-qubit). Lab dials with research timers. Rebalance
+   with the seeded bots in `tests/zoo-tycoon.test.js`.
+2. **M7: freeform habitat builder** with discovery, blueprint book, k animals per enclosure.
+3. **M8: circuit-level noise** (option B).
 
-Physics-driven:
-3. **Noisy syndrome measurements** + repeated rounds, and larger surface codes (d=5/7, n ≤ 32
-   fits the bitmasks), with matching or union-find decoders as premium keepers.
-4. **Habitat editor**: players compose biomes from Pauli checks; `sameStabilizerGroup` and
-   `firstForeignCheck` already exist for this.
-5. **Climates**: biased noise (XZZX-style codes), erasure, leakage "escape attempts".
+Still open from v0: guests with needs (funding agencies, investors, academics, press), park design
+(paths, guest flow, tour guides, shops), climates (biased noise, erasure, leakage).
 
 ## Starter prompt for a new session
 

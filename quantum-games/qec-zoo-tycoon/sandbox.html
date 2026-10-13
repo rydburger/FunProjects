@@ -148,6 +148,7 @@
 
 <script src="../stabilizer.js"></script>
 <script src="zoo-data.js"></script>
+<script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
 <script src="exhibit-view.js"></script>
 <script>
@@ -351,9 +352,7 @@
       ? "Watch mode walks through each round: noise → checks → correction."
       : "About " + state.speed + " tick" + (state.speed === "1" ? "" : "s") + " per second.";
     var sp = SPECIES[state.speciesId];
-    $("placard").innerHTML = "<div>" + sp.placard + "</div>" +
-      '<div class="ops">Stabilizers: ' + sp.code.stabilizers.map(S.toString).join(", ") +
-      "<br>Logical X̄ = " + S.toString(sp.code.logicalX[0]) + ", Z̄ = " + S.toString(sp.code.logicalZ[0]) + "</div>";
+    $("placard").innerHTML = Placard.html(sp);
   }
 
   // ---------- time ----------

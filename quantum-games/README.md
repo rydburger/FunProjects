@@ -25,7 +25,15 @@ on any particular game. Any game in this collection can load it directly with
 scratch.
 
 [`stabilizer.js`](stabilizer.js) is the stabilizer-code counterpart: Pauli operators as symplectic
-bitmasks, stabilizer-group comparison, syndromes, minimum-weight lookup decoders, and seeded Pauli
-noise (`window.Stabilizer` in the browser, `require()` in Node). It tracks errors, not
-statevectors, so it's exact and fast for error-correction games on stabilizer codes. Tests:
-`node quantum-games/tests/stabilizer.test.js` (and `zoo-tycoon.test.js` for the game logic built on it).
+bitmasks, stabilizer-group comparison, syndromes, code analysis from a bare list of checks
+(logical operators, CSS test, exact distance), code families (rotated surface, repetition),
+minimum-weight lookup decoders, and seeded Pauli noise (`window.Stabilizer` in the browser,
+`require()` in Node). It tracks errors, not statevectors, so it's exact and fast for
+error-correction games on stabilizer codes.
+
+[`detectors.js`](detectors.js) adds time: repeated, noisy syndrome measurement in the detector
+paradigm (phenomenological noise; circuit-level noise is scaffolded), detector error models, and
+decoders that read them (single-shot lookup, sliding-window minimum-weight matching).
+
+Tests: `node quantum-games/tests/stabilizer.test.js`, `detectors.test.js`, and
+`zoo-tycoon.test.js` for the game logic built on them.

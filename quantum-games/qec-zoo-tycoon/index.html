@@ -236,6 +236,7 @@
 
 <script src="../stabilizer.js"></script>
 <script src="zoo-data.js"></script>
+<script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
 <script src="exhibit-view.js"></script>
 <script src="park.js"></script>
@@ -532,9 +533,7 @@
     insp.appendChild(hs);
     if (sp) {
       var d = h("details", "placard-d section");
-      d.innerHTML = "<summary>Zoo placard</summary><div class=\"placard\"><div>" + sp.placard + "</div>" +
-        '<div class="ops">Stabilizers: ' + sp.code.stabilizers.map(S.toString).join(", ") +
-        "<br>Logical X̄ = " + S.toString(sp.code.logicalX[0]) + ", Z̄ = " + S.toString(sp.code.logicalZ[0]) + "</div></div>";
+      d.innerHTML = "<summary>Zoo placard</summary><div class=\"placard\">" + Placard.html(sp) + "</div>";
       insp.appendChild(d);
     }
 

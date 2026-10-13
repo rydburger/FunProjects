@@ -208,6 +208,88 @@ test("under-measuring habitat reports the missing check", function () {
   assert.deepStrictEqual(missing.map(str), ["IZZ"]);
 });
 
+console.log("Code analysis");
+// Textbook parameters, verified independently of each species' `params` string.
+var EXPECT = { tortoise: [3, 1, 1], owl: [9, 1, 3], peacock: [7, 1, 3], pangolin: [5, 1, 3], axolotl: [9, 1, 3] };
+SPECIES_IDS.forEach(function (id) {
+  test(Zoo.SPECIES[id].name + ": computed [[n,k,d]] = " + JSON.stringify(EXPECT[id]), function () {
+    var a = S.analyzeChecks(Zoo.SPECIES[id].code.n, Zoo.SPECIES[id].code.stabilizers);
+    assert.deepStrictEqual([a.n, a.k, a.d], EXPECT[id]);
+    assert.ok(a.commuting && a.redundant === 0);
+  });
+});
+test("CSS detection: Shor, Steane, surface, repetition yes; five-qubit no", function () {
+  ["tortoise", "owl", "peacock", "axolotl"].forEach(function (id) { assert.ok(S.isCSS(Zoo.SPECIES[id].code.stabilizers), id); });
+  assert.ok(!S.isCSS(Zoo.SPECIES.pangolin.code.stabilizers));
+  // Dunes measures products of the five-qubit generators: still not CSS.
+  assert.ok(!S.isCSS(Zoo.BIOMES.dunes.checkOps));
+  // A CSS group written with mixed generators is still CSS: {XX·ZZ, ZZ} -> YY, ZZ.
+  assert.ok(S.isCSS([P("YY"), P("ZZ")]));
+});
+test("computed logicals are valid pairs for every species and biome", function () {
+  BIOME_IDS.forEach(function (id) {
+    var b = Zoo.BIOMES[id], n = b.checkOps[0].n;
+    var a = S.analyzeChecks(n, b.checkOps);
+    var v = S.validateCode(a.code);
+    assert.ok(v.ok, id + ": " + v.errors.join("; "));
+    assert.strictEqual(a.k, 1);
+  });
+});
+test("the vet's view: a biome's computed code has the species' distance", function () {
+  BIOME_IDS.forEach(function (id) {
+    var b = Zoo.BIOMES[id];
+    assert.strictEqual(S.analyzeChecks(b.checkOps[0].n, b.checkOps).d, EXPECT[b.native][2], id);
+  });
+});
+test("[[4,2,2]]: two logical qubits (two animals), distance 2", function () {
+  var a = S.analyzeChecks(4, [P("XXXX"), P("ZZZZ")]);
+  assert.strictEqual(a.k, 2);
+  assert.strictEqual(a.d, 2);
+  assert.ok(S.validateCode(a.code).ok);
+});
+test("anticommuting checks are reported, with the clashing pair", function () {
+  var a = S.analyzeChecks(3, [P("ZZI"), P("IZZ"), P("XII")]);
+  assert.ok(!a.commuting);
+  assert.deepStrictEqual(a.clash, [0, 2]);
+  assert.strictEqual(a.code, null);
+});
+test("redundant checks are counted, not rejected", function () {
+  var a = S.analyzeChecks(3, [P("ZZI"), P("IZZ"), P("ZIZ")]);
+  assert.ok(a.commuting);
+  assert.strictEqual(a.redundant, 1);
+  assert.strictEqual(a.k, 1);
+});
+test("a full set of checks leaves no room for an animal (k = 0)", function () {
+  var a = S.analyzeChecks(2, [P("XX"), P("ZZ")]);
+  assert.strictEqual(a.k, 0);
+  assert.strictEqual(a.code, null);
+});
+test("rotatedSurface(3) is the Axolotl's code", function () {
+  var c = S.rotatedSurface(3);
+  assert.ok(S.validateCode(c).ok);
+  assert.ok(S.sameStabilizerGroup(c.stabilizers, Zoo.SPECIES.axolotl.code.stabilizers));
+});
+[3, 5].forEach(function (d) {
+  test("rotatedSurface(" + d + ") is [[" + d * d + ",1," + d + "]] with " + (d * d - 1) + " checks", function () {
+    var c = S.rotatedSurface(d);
+    assert.ok(S.validateCode(c).ok, S.validateCode(c).errors.join("; "));
+    assert.strictEqual(c.stabilizers.length, d * d - 1);
+    assert.strictEqual(S.codeDistance(c).d, d);
+  });
+});
+test("repetition codes: bit-flip and phase-flip versions are valid, d = 1", function () {
+  [["Z", 5], ["X", 4]].forEach(function (c) {
+    var code = S.repetition(c[1], c[0]);
+    assert.ok(S.validateCode(code).ok, S.validateCode(code).errors.join("; "));
+    assert.strictEqual(S.codeDistance(code).d, 1);
+  });
+});
+test("codeDistance gives up honestly past its budget", function () {
+  var r = S.codeDistance(S.rotatedSurface(5), 6, 1000);
+  assert.strictEqual(r.d, null);
+  assert.ok(r.atLeast >= 1);
+});
+
 console.log("Monte Carlo sanity");
 // Code-capacity noise, one round: E ~ depolarizing(p), decode once.
 function logicalRate(code, dec, p, trials, seed) {
