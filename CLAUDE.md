@@ -12,7 +12,7 @@ step. Open an `index.html` directly.
 - `quantum-games/detectors.js`: repeated noisy measurement, detectors, detector error models and
   decoders (`Detectors`). Phenomenological noise; circuit-level noise is a scaffold.
 - `quantum-games/magic-square/`: Peres–Mermin magic square game (done).
-- `quantum-games/qec-zoo-tycoon/`: Error Correction Zoo Tycoon. v0 is complete.
+- `quantum-games/qec-zoo-tycoon/`: Error Correction Zoo Tycoon. v0 is complete; v1 is done through M7 (habitat workshop).
   **Read `quantum-games/qec-zoo-tycoon/STATUS.md` before working on it.** It has the progress
   log, design decisions, numbers, and next steps.
 - `quantum-games/tests/`: plain Node tests, no dependencies.

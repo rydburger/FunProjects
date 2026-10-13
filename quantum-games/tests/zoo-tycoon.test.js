@@ -7,6 +7,7 @@ var Z = require("../qec-zoo-tycoon/zoo-data.js");
 var X = require("../qec-zoo-tycoon/exhibit-sim.js");
 var Park = require("../qec-zoo-tycoon/park.js");
 var Placard = require("../qec-zoo-tycoon/placard.js");
+var Habitat = require("../qec-zoo-tycoon/habitat.js");
 
 var passed = 0, failed = 0;
 function test(name, fn) {
@@ -119,13 +120,17 @@ test("a misread check fools a trainee but not a senior keeper", function () {
   });
 });
 test("a slow keeper runs the best decoder they can keep up with", function () {
-  var ex = exhibit("axolotl", 4, BASE, 9, null, 4);
-  // Axolotl: 8 checks, so space-time work is ×2: window 3 costs 6, window 2 costs 4.
+  var ex = exhibit("giant", 4, BASE, 9, null, 7);
+  // Giant Axolotl: 24 checks, so space-time work is ×3: window 3 costs 9, window 2 costs 6.
   assert.strictEqual(X.effectiveLevel(ex, ex.keeper), 3);
   X.setLab(ex, labWith({ cycle: 2 }));
-  assert.strictEqual(X.effectiveLevel(ex, ex.keeper), 2); // 2 rounds/hour: 1.5 × 2 = 3 <= 4
+  assert.strictEqual(X.effectiveLevel(ex, ex.keeper), 2); // 2 rounds/hour: 6 × 2 > 7, 1.5 × 2 <= 7
   X.setKeeper(ex, { level: 4, speed: 12 });
+  assert.strictEqual(ex.level, 3); // 9 × 2 > 12 = 6 × 2
+  X.setLab(ex, BASE);
   assert.strictEqual(ex.level, 4);
+  // Up to 8 checks there is no extra work: the Axolotl's window 3 costs 3.
+  assert.strictEqual(X.workPerRound(exhibit("axolotl", 4, BASE, 9), 4), 3);
 });
 test("no keeper is much worse than a keeper", function () {
   var none = runTicks(exhibit("axolotl", 0, BASE, 11), 3000);
@@ -158,7 +163,7 @@ test("Tortoise thrives in bit-flip climate, suffers under phase flips", function
 });
 test("health recovers per tick and is capped at 100", function () {
   var ex = exhibit("axolotl", 2, QUIET, 14);
-  ex.health = 50;
+  ex.healths = [50];
   runTicks(ex, 10);
   assert.strictEqual(ex.health, 50 + 10 * X.RECOVERY_PER_TICK);
   runTicks(ex, 1000);
@@ -175,7 +180,8 @@ test("snapshot/restore keeps the state (and is plain JSON)", function () {
 });
 
 console.log("Park");
-function park(seed) { return Park.createPark({ rng: S.seededRng(seed || 1) }); }
+// Parks for testing the mechanics know every species from the start.
+function park(seed) { return Park.createPark({ rng: S.seededRng(seed || 1), known: Object.keys(Z.SPECIES) }); }
 function quiet(P) { // silence all noise in a park's animals
   P.order.forEach(function (id) { var a = P.exhibits[id].animal; if (a) X.setLab(a, QUIET); });
 }
@@ -207,7 +213,7 @@ test("enclosures of the same biome are numbered", function () {
   var P = park();
   Park.build(P, "riverbank", 0, 0);
   var b = Park.build(P, "riverbank", 2, 0);
-  assert.strictEqual(Park.exhibitLabel(b.exhibit), "Parity Riverbank #2");
+  assert.strictEqual(Park.exhibitLabel(P, b.exhibit), "Parity Riverbank #2");
 });
 test("only the native species can be bought into an enclosure", function () {
   var P = park();
@@ -481,11 +487,220 @@ test("Placard.html works for a computed code with two animals", function () {
   assert.ok(html.indexOf("[[4,2,2]]") >= 0 && html.indexOf("2 animals") >= 0 && html.indexOf("X̄2") >= 0);
 });
 
+console.log("Habitat workshop (designs, identification, discovery)");
+function P(str) { return S.fromString(str); }
+// A design from Pauli strings, qubits along a row and checks below.
+function designOf(checks) {
+  var n = checks[0].length;
+  return {
+    qubits: checks[0].split("").map(function (_, q) { return [q, 0]; }),
+    checks: checks.map(function (c, i) {
+      var wires = [];
+      c.split("").forEach(function (t, q) { if (t !== "I") wires.push([q, t]); });
+      return { at: [i % n, 1 + Math.floor(i / n)], wires: wires };
+    })
+  };
+}
+// Relabel qubits, shuffle the checks and swap X/Y/Z on individual qubits.
+var CYCLE = { X: "Z", Z: "Y", Y: "X" };
+function scramble(design, rng) {
+  var n = design.qubits.length, perm = [], i;
+  for (i = 0; i < n; i++) perm.push(i);
+  for (i = n - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)), t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+  var turns = perm.map(function () { return Math.floor(rng() * 3); });
+  function turn(t, k) { while (k--) t = CYCLE[t]; return t; }
+  var qubits = []; for (i = 0; i < n; i++) qubits[perm[i]] = design.qubits[i];
+  var checks = design.checks.map(function (c) {
+    return { at: c.at, wires: c.wires.map(function (w) { return [perm[w[0]], turn(w[1], turns[w[0]])]; }) };
+  });
+  checks.sort(function () { return rng() - 0.5; });
+  return { qubits: qubits, checks: checks };
+}
+function enumerator(gens) { // weight distribution of the whole stabilizer group
+  var A = {};
+  for (var m = 0; m < (1 << gens.length); m++) {
+    var p = { n: gens[0].n, x: 0, z: 0 };
+    for (var i = 0; i < gens.length; i++) if ((m >> i) & 1) p = S.multiply(p, gens[i]);
+    var w = S.weight(p); A[w] = (A[w] || 0) + 1;
+  }
+  return JSON.stringify(A);
+}
+var EXPECTED_PARAMS = { tortoise: [3, 1, 1], owl: [9, 1, 3], peacock: [7, 1, 3], pangolin: [5, 1, 3], axolotl: [9, 1, 3],
+  penguins: [4, 2, 2], giant: [25, 1, 5] };
+Object.keys(Z.SPECIES).forEach(function (id) {
+  test(Z.SPECIES[id].name + ": the reference design analyses to " + JSON.stringify(EXPECTED_PARAMS[id]) + " and is identified, however it's labelled", function () {
+    var d = Habitat.designFor(id), a = Habitat.analyze(d);
+    assert.ok(a.valid, a.problems.join("; "));
+    assert.strictEqual(Habitat.malformed(d), null);
+    assert.deepStrictEqual([a.n, a.k, a.d], EXPECTED_PARAMS[id]);
+    assert.strictEqual(Habitat.identify(a.code, Habitat.textbook()).id, id);
+    var rng = S.seededRng(id.length * 31);
+    for (var t = 0; t < 4; t++) {
+      var a2 = Habitat.analyze(scramble(d, rng), { budget: 1 });
+      var hit = Habitat.identify(a2.code, Habitat.textbook());
+      assert.ok(hit && hit.id === id, "scrambled #" + t + " identified as " + (hit && hit.id));
+      // The equivalence really maps the built group onto the species' group.
+      a2.code.stabilizers.forEach(function (g) {
+        assert.ok(S.inGroup(Z.SPECIES[id].code.stabilizers, Habitat.mapPauli(g, hit.eq)));
+      });
+    }
+  });
+});
+test("same [[n,k,d]] is not the same species: Shor's code and the d = 3 surface code differ", function () {
+  var owl = Z.SPECIES.owl.code, ax = Z.SPECIES.axolotl.code;
+  assert.notStrictEqual(enumerator(owl.stabilizers), enumerator(ax.stabilizers)); // so no relabelling can match them
+  assert.strictEqual(Habitat.equivalence(owl, ax), null);
+  // Swapping X and Z everywhere (a transversal Hadamard) is the same species.
+  var dual = Habitat.analyze(designOf(Z.SPECIES.owl.code.stabilizers.map(function (g) { return S.toString({ n: 9, x: g.z, z: g.x }); })));
+  assert.strictEqual(Habitat.identify(dual.code, Habitat.textbook()).id, "owl");
+});
+test("analysis explains what's wrong with a design", function () {
+  var clash = Habitat.analyze(designOf(["ZZI", "IZZ", "XXI"]));
+  assert.ok(!clash.valid && clash.clash && clash.clash.a === 1 && clash.clash.b === 2);
+  assert.deepStrictEqual(clash.clash.qubits, [1]);
+  assert.ok(/Checks B and C anticommute/.test(clash.problems[0]), clash.problems[0]);
+  var full = Habitat.analyze(designOf(["ZI", "IZ"]));
+  assert.ok(!full.valid && full.k === 0 && /k = 0/.test(full.problems[0]));
+  var empty = Habitat.analyze({ qubits: [[0, 0]], checks: [{ at: [1, 1], wires: [] }] });
+  assert.ok(/Check A has no wires/.test(empty.problems[0]));
+  var idle = Habitat.analyze(designOf(["ZZII", "IZZI"]));
+  assert.ok(idle.valid && idle.d === 1 && idle.idle.join() === "3" && /Qubit 3 isn't in any check/.test(idle.notes[0]));
+  var red = Habitat.analyze(designOf(["ZZI", "IZZ", "ZIZ"]));
+  assert.ok(red.valid && red.redundant === 1 && red.k === 1 && red.notes.some(function (t) { return /1 redundant check/.test(t); }));
+  assert.ok(Habitat.malformed({ qubits: [[0, 0], [0, 0]], checks: [] }), "two qubits on one cell");
+  assert.ok(Habitat.malformed({ qubits: [[0, 0]], checks: [{ at: [1, 0], wires: [[3, "X"]] }] }), "wire to a missing qubit");
+});
+test("price and footprint: every qubit costs the same and takes half a tile", function () {
+  var a = Habitat.analyze(Habitat.designFor("axolotl"));
+  assert.strictEqual(a.cost, 17 * Z.BUILD.perQubit + 24 * Z.BUILD.perWire);
+  assert.deepStrictEqual(a.footprint, [3, 3]); // 17 qubits -> 9 tiles
+  assert.deepStrictEqual(Habitat.footprint(49), [5, 5]);
+  assert.deepStrictEqual(Habitat.footprint(5), [2, 2]);
+  assert.strictEqual(Habitat.checkLabel(0) + Habitat.checkLabel(25) + Habitat.checkLabel(26), "AZAA");
+});
+test("Penguin placard: no [[3,1,2]] stabilizer code exists, and [[4,2,2]] meets the Singleton bound", function () {
+  // Every pair of commuting, independent 3-qubit Paulis: none has distance 2.
+  var all = []; for (var x = 0; x < 8; x++) for (var z = 0; z < 8; z++) if (x || z) all.push({ n: 3, x: x, z: z });
+  var best = 0;
+  for (var i = 0; i < all.length; i++) for (var j = i + 1; j < all.length; j++) {
+    if (!S.commutes(all[i], all[j]) || S.rank([all[i], all[j]]) < 2) continue;
+    var a = S.analyzeChecks(3, [all[i], all[j]]);
+    best = Math.max(best, a.d);
+  }
+  assert.strictEqual(best, 1);
+  var c = Z.SPECIES.penguins.code, f = Placard.computedFacts(c);
+  assert.strictEqual(f.n - f.k, 2 * (f.d - 1));
+});
+
+console.log("Many animals, discovery and the blueprint book");
+test("k animals: each logical qubit gets sick on its own", function () {
+  var ex = exhibit("penguins", 0, QUIET, 1);
+  assert.strictEqual(ex.k, 2);
+  ex.mem.E = P("XXII"); // X̄1 only
+  var sick = X.runTick(ex);
+  assert.deepStrictEqual(sick.map(function (s) { return s.animal + s.kind; }), ["0X̄1"]);
+  assert.ok(ex.healths[0] < 100 && ex.healths[1] === 100 && ex.health === (ex.healths[0] + 100) / 2);
+  ex.mem.E = P("IXXI"); // X̄1 X̄2: both animals
+  assert.deepStrictEqual(X.runTick(ex).map(function (s) { return s.animal; }), [0, 1]);
+  assert.strictEqual(ex.sick, 3);
+});
+test("a new park knows only the Tortoise; other catalogue habitats need a discovery first", function () {
+  var P0 = Park.createPark({ rng: S.seededRng(1) });
+  assert.ok(Park.isKnown(P0, "tortoise") && !Park.isKnown(P0, "owl"));
+  assert.ok(Park.canBuild(P0, "riverbank", 0, 0).ok);
+  var r = Park.canBuild(P0, "forest", 0, 0);
+  assert.ok(!r.ok && /workshop/.test(r.reason));
+});
+test("building the Owl's design (any labelling) discovers it and unlocks the Nine-Fold Forest", function () {
+  var P0 = Park.createPark({ rng: S.seededRng(2) }), d = scramble(Habitat.designFor("owl"), S.seededRng(5));
+  P0.cash = 100000;
+  var cash = P0.cash, a = Habitat.analyze(d);
+  var r = Park.buildDesign(P0, d, 0, 0);
+  assert.ok(r.ok && r.speciesId === "owl" && r.discovered && !r.newSpecies);
+  assert.strictEqual(P0.cash, cash - a.cost);
+  assert.ok(Park.isKnown(P0, "owl") && Park.canBuild(P0, "forest", 5, 0).ok);
+  assert.strictEqual(P0.book.designs.length, 1);
+  assert.strictEqual(Park.exhibitLabel(P0, r.exhibit), "Shor Owl habitat #1");
+  // The habitat holds the Owl, measuring the player's own checks.
+  var opts = Park.speciesOptions(P0, r.exhibit.id).filter(function (o) { return o.ok; });
+  assert.deepStrictEqual(opts.map(function (o) { return o.speciesId; }), ["owl"]);
+  assert.ok(Park.buyAnimal(P0, r.exhibit.id, "owl").ok);
+  assert.strictEqual(r.exhibit.animal.mem.checks.length, d.checks.length);
+  // Building it again: same book entry, nothing new discovered.
+  var r2 = Park.buildDesign(P0, d, 4, 4);
+  assert.ok(r2.ok && !r2.discovered && P0.book.designs.length === 1 && r2.exhibit.number === 2);
+});
+test("an uncatalogued code becomes a new species (once), with a computed placard; k animals are stocked together", function () {
+  var P0 = park(3);
+  P0.cash = 200000;
+  var ice6 = designOf(["XXXXXX", "ZZZZZZ"]);
+  var r = Park.buildDesign(P0, ice6, 0, 0, { name: "Six-pack Puffins" });
+  assert.ok(r.ok && r.newSpecies && r.discovered);
+  var sp = Park.speciesInfo(P0, r.speciesId);
+  assert.strictEqual(sp.name, "Six-pack Puffins");
+  assert.strictEqual(sp.params, "[[6,4,2]] (4 animals)");
+  assert.strictEqual(sp.appeal, Habitat.customAppeal(2));
+  assert.ok(Placard.html(sp).indexOf("4 animals") >= 0);
+  var cash = P0.cash;
+  assert.ok(Park.buyAnimal(P0, r.exhibit.id, r.speciesId).ok);
+  assert.strictEqual(cash - P0.cash, sp.cost * 4);
+  assert.strictEqual(r.exhibit.animal.k, 4);
+  var v = Park.exhibitVisitors(P0, r.exhibit);
+  assert.ok(Math.abs(v - Z.ECONOMY.visitorsPerAppeal * sp.appeal * 4 * (P0.reputation / 100 + 0.5)) < 1e-9);
+  // The same code built another way round is the same species.
+  var r2 = Park.buildDesign(P0, scramble(ice6, S.seededRng(9)), 4, 0);
+  assert.ok(r2.ok && r2.speciesId === r.speciesId && !r2.newSpecies && !r2.discovered);
+  assert.strictEqual(P0.book.designs.length, 2);
+});
+test("broken designs can't be built", function () {
+  var P0 = park(4);
+  var r = Park.buildDesign(P0, designOf(["ZZI", "XII"]), 0, 0);
+  assert.ok(!r.ok && /anticommute/.test(r.reason));
+  assert.ok(!Park.buildDesign(P0, designOf(["ZI", "IZ"]), 0, 0).ok);
+  assert.ok(!Park.buildDesign(P0, Habitat.designFor("giant"), 9, 0).ok, "5×5 doesn't fit at x = 9");
+});
+test("save/load keeps designed habitats and new species, and play continues identically", function () {
+  var A = park(5);
+  A.cash = 200000;
+  var r = Park.buildDesign(A, designOf(["XXXXXX", "ZZZZZZ"]), 0, 0);
+  Park.buyAnimal(A, r.exhibit.id, r.speciesId); Park.hireKeeper(A, r.exhibit.id);
+  var o = Park.buildDesign(A, Habitat.designFor("pangolin"), 4, 0);
+  Park.buyAnimal(A, o.exhibit.id, "pangolin"); Park.hireKeeper(A, o.exhibit.id);
+  runDays(A, 2);
+  var B = Park.load(Park.save(A), { rng: S.seededRng(77) });
+  A.rng = S.seededRng(77);
+  [A, B].forEach(function (Q) { Q.order.forEach(function (id) { var an = Q.exhibits[id].animal; an.rng = an.mem.rng = Q.rng; }); });
+  assert.strictEqual(Park.speciesInfo(B, r.speciesId).name, Park.speciesInfo(A, r.speciesId).name);
+  runDays(A, 3); runDays(B, 3);
+  assert.strictEqual(B.cash, A.cash);
+  assert.deepStrictEqual(B.exhibits[r.exhibit.id].animal.healths, A.exhibits[r.exhibit.id].animal.healths);
+});
+test("version 2 saves load, with the five species of the time already known", function () {
+  var A = park(6);
+  var rec = Park.build(A, "forest", 0, 0).exhibit;
+  Park.buyAnimal(A, rec.id, "owl");
+  var data = JSON.parse(Park.save(A));
+  data.version = 2; delete data.book;
+  delete data.exhibits[rec.id].animal.healths;
+  var B = Park.load(data);
+  assert.ok(Park.isKnown(B, "axolotl") && !Park.isKnown(B, "giant"));
+  assert.deepStrictEqual(B.exhibits[rec.id].animal.healths, [B.exhibits[rec.id].animal.health]);
+});
+test("below threshold a space-time keeper makes the Giant Axolotl (d = 5) beat the Axolotl (d = 3); a single-shot one doesn't", function () {
+  function sick(sp, level) {
+    var n = 0;
+    for (var seed = 1; seed <= 3; seed++) n += runTicks(exhibit(sp, level, BASE, seed), 24 * 30).sick;
+    return n;
+  }
+  var st = [sick("axolotl", 4), sick("giant", 4)], ss = [sick("axolotl", 1), sick("giant", 1)];
+  assert.ok(st[1] * 2 < st[0], "space-time: d=3 " + st[0] + " vs d=5 " + st[1]);
+  assert.ok(ss[1] > ss[0], "single-shot: d=3 " + ss[0] + " vs d=5 " + ss[1]);
+});
+
 console.log("Balance (seeded bot players, one year max)");
 // Simple scripted players: each morning, buy the priciest animal they can
 // afford (plus its habitat, keeping a $3k buffer), staffed per strategy.
-function freeSpot(P, b) {
-  var fp = Z.BIOMES[b].footprint;
+function freeSpot(P, fp) {
   for (var y = 0; y + fp[1] <= P.height; y++) for (var x = 0; x + fp[0] <= P.width; x++) {
     var free = true;
     for (var dy = 0; dy < fp[1] && free; dy++) for (var dx = 0; dx < fp[0] && free; dx++) if (P.grid[(y + dy) * P.width + x + dx] !== null) free = false;
@@ -495,20 +710,24 @@ function freeSpot(P, b) {
 }
 var HOME = {};
 Object.keys(Z.BIOMES).forEach(function (b) { HOME[Z.BIOMES[b].native] = b; });
+// The bot discovers a species by building the reference design
+// (ZooData.DESIGNS) the first time, then uses the catalogue habitat.
 // strategy: { keepers, train, research: bool; reserve: cash kept back before investing }
 function botWinDay(strategy, seed) {
-  var P = park(seed), prefs = ["axolotl", "pangolin", "peacock", "owl", "tortoise"];
+  var P = Park.createPark({ rng: S.seededRng(seed) }), prefs = ["axolotl", "pangolin", "peacock", "owl", "tortoise"];
   var dials = ["readout", "coherence", "gates"];
   for (var d = 0; d < 365; d++) {
     for (var i = 0; i < prefs.length; i++) {
-      var sp = prefs[i], b = HOME[sp], cost = Z.BIOMES[b].cost + Z.SPECIES[sp].cost;
+      var sp = prefs[i], b = HOME[sp], known = Park.isKnown(P, sp);
+      var design = known ? null : Habitat.designFor(sp), a = design && Habitat.analyze(design);
+      var cost = (known ? Z.BIOMES[b].cost : a.cost) + Z.SPECIES[sp].cost;
       if (P.cash < cost + 3000) continue;
       // Like a player, keep some variety: at most 3 of each species.
-      if (P.order.filter(function (id) { var a = P.exhibits[id].animal; return a && a.speciesId === sp; }).length >= 3) continue;
-      var spot = freeSpot(P, b);
+      if (P.order.filter(function (id) { var an = P.exhibits[id].animal; return an && an.speciesId === sp; }).length >= 3) continue;
+      var spot = freeSpot(P, known ? Z.BIOMES[b].footprint : a.footprint);
       if (!spot) continue;
-      var rec = Park.build(P, b, spot[0], spot[1]).exhibit;
-      Park.buyAnimal(P, rec.id, sp);
+      var rec = known ? Park.build(P, b, spot[0], spot[1]).exhibit : Park.buildDesign(P, design, spot[0], spot[1]).exhibit;
+      assert.ok(Park.buyAnimal(P, rec.id, sp).ok);
       if (strategy.keepers) Park.hireKeeper(P, rec.id);
       break;
     }

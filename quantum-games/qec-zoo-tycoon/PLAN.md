@@ -333,9 +333,19 @@ supersedes the matching items in the roadmap below.
    keeper falls back to the best decoder they can run in real time rather than building a
    backlog (in a pure memory, backlog only delays corrections, so it would be wrong to make it
    cause logical errors).
-4. **M7: freeform builder.** Grid placement of qubits and ancillas, wiring, X/Z toggle, live
-   validity readout, discovery and the blueprint book, computed placards, multi-animal enclosures.
-   Anticommuting checks are simulated as fair-coin outcomes (exact for sequential measurement).
+4. ✅ **M7: freeform builder.** `habitat.js` (designs, analysis, price, identification up to
+   qubit relabelling and per-qubit Pauli swaps) and `workshop.js` (editor); discovery, the
+   blueprint book and uncatalogued species in `park.js`; k animals per exhibit in
+   `exhibit-sim.js`; two discoverable species (Iceberg Penguins [[4,2,2]], Giant Axolotl
+   [[25,1,5]]). Changes from the draft, flagged to the owner for playtesting:
+   - the workshop is a dialog with its own 11×11 grid rather than the park grid; a built habitat
+     takes half a tile per qubit (data or ancilla) of park space;
+   - only the Tortoise is known at the start; the other catalogue habitats unlock when their
+     species is discovered;
+   - checks that anticommute block building (no fair-coin simulation yet); that arrives with
+     subsystem codes;
+   - space-time decoding work now scales with checks/8 instead of checks/4 so a maxed keeper can
+     run the d = 5 surface code in real time (the bots' balance was unchanged).
 5. **M8: circuit-level noise** (option B) as an advanced-lab unlock.
 
 ## Later roadmap (not in v0)

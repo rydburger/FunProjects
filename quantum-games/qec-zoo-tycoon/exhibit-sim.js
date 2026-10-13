@@ -1,10 +1,11 @@
 // =========================================================
 // Error Correction Zoo Tycoon — single-exhibit simulation.
 //
-// One animal (code) in one enclosure, measured round after round
+// One code in one enclosure, measured round after round
 // (../detectors.js), optionally tended by one keeper (a decoder). No UI,
 // no money: the park (park.js) and the sandbox page both drive exhibits
-// through this.
+// through this. Each logical qubit is one animal: a code with k logical
+// qubits holds k animals, each with its own health.
 //
 // A round has three phases, advanced one at a time so the sandbox can
 // narrate them:
@@ -24,9 +25,10 @@
 // The vet. When the keeper commits a round, the vet takes the true error
 // as it was in that round times the Pauli frame, and asks whether a
 // perfect-information minimum-weight decoder (weight ≤ 2) would still
-// recover it. If not, the animal is sick: vet bill, −30 health, and it
-// is re-prepared from scratch. A leftover that is itself a stabilizer is
-// harmless and is folded into the frame.
+// recover it. If not, every animal (logical qubit) the leftover flips is
+// sick: a vet bill each, −30 health each, and the code is re-prepared
+// from scratch. A leftover that is itself a stabilizer is harmless and is
+// folded into the frame.
 //
 // Browser: load after ../stabilizer.js, ../detectors.js and zoo-data.js;
 // exposes `window.ExhibitSim`. Node: require("./exhibit-sim.js").
@@ -41,10 +43,10 @@
   var SICK_HEALTH_HIT = 30;
   var RECOVERY_PER_TICK = 0.5;
 
-  var vetCache = {};
-  function vetFor(speciesId) {
-    if (!vetCache[speciesId]) vetCache[speciesId] = S.buildLookupDecoder(Z.SPECIES[speciesId].code, VET_WEIGHT);
-    return vetCache[speciesId];
+  var vetCache = new WeakMap();
+  function vetFor(code) {
+    if (!vetCache.has(code)) vetCache.set(code, S.buildLookupDecoder(code, VET_WEIGHT));
+    return vetCache.get(code);
   }
 
   // ---------- noise ----------
@@ -71,16 +73,32 @@
   // keeper: { level, speed } (the park's keeper record works).
   function workPerRound(ex, level) {
     var L = Z.KEEPER_LEVELS[level];
-    return L.algorithm === "spacetime" ? L.work * Math.max(1, ex.mem.checks.length / 4) : L.work;
+    return L.algorithm === "spacetime" ? L.work * Math.max(1, ex.mem.checks.length / 8) : L.work;
   }
   function roundsPerTick(ex) { return ex.lab.cycle; }
   // The best level this keeper can run here in real time (at least 1).
   function effectiveLevel(ex, keeper) {
     if (!keeper) return 0;
     for (var L = keeper.level; L > 1; L--) {
-      if (workPerRound(ex, L) * roundsPerTick(ex) <= keeper.speed) return L;
+      if (canRun(ex, L) && workPerRound(ex, L) * roundsPerTick(ex) <= keeper.speed) return L;
     }
     return 1;
+  }
+  // Space-time decoding needs matching (CSS, every fault lighting ≤ 2
+  // detectors) or a lookup table over checks × window ≤ 32 detectors.
+  function spacetimeOK(ex, window) {
+    var mem = ex.mem;
+    if (mem.checks.length * window <= 32) return true;
+    var css = mem.checks.every(function (c) { return c.x === 0 || c.z === 0; });
+    return css && D.isMatchable(mem.impl.dem(mem, 2, { openTop: true, decompose: true }));
+  }
+  // Can this algorithm be run on this code at all (at any speed)?
+  function canRun(ex, level) {
+    var L = Z.KEEPER_LEVELS[level];
+    if (L.algorithm !== "spacetime") return true;
+    if (!ex.stOK) ex.stOK = {};
+    if (!(L.window in ex.stOK)) ex.stOK[L.window] = spacetimeOK(ex, L.window);
+    return ex.stOK[L.window];
   }
   function makeDecoder(ex, level) {
     var L = Z.KEEPER_LEVELS[level];
@@ -97,17 +115,21 @@
     ex.Ehist = []; // rounds the old decoder had not committed are forgotten
   }
 
-  // opts: { speciesId, channel, lab: { coherence, gates, readout, cycle },
-  //   keeper: null | { level, speed }, rng }
+  // opts: { speciesId, code, checks, channel, lab: { coherence, gates,
+  //   readout, cycle }, keeper: null | { level, speed }, rng }
+  // code defaults to the species' code and checks (what is measured) to
+  // the code's generators; a player-built habitat passes its own.
   function createExhibit(opts) {
-    var code = Z.SPECIES[opts.speciesId].code, rng = opts.rng || Math.random;
-    var lab = opts.lab || labValues(null);
+    var code = opts.code || Z.SPECIES[opts.speciesId].code, rng = opts.rng || Math.random;
+    var checks = opts.checks || code.stabilizers;
+    var lab = opts.lab || labValues(null), k = code.logicalX.length, healths = [];
+    for (var i = 0; i < k; i++) healths.push(100);
     var ex = {
-      speciesId: opts.speciesId, code: code, channel: opts.channel || "depolarizing", lab: lab, rng: rng,
-      mem: D.createMemory({ code: code, model: noiseModel(code, code.stabilizers, opts.channel, lab), rng: rng }),
+      speciesId: opts.speciesId, code: code, k: k, channel: opts.channel || "depolarizing", lab: lab, rng: rng,
+      mem: D.createMemory({ code: code, checks: checks, model: noiseModel(code, checks, opts.channel, lab), rng: rng }),
       keeper: null, level: 0, dec: null, Ehist: [],
       phase: "idle", roundInTick: 0, pending: null,
-      ticks: 0, rounds: 0, decoded: 0, sick: 0, health: 100,
+      ticks: 0, rounds: 0, decoded: 0, sick: 0, health: 100, healths: healths,
       lastNoise: null, lastRound: null, lastCorrection: null,
       // Most recent round in which anything happened, for inspectors that
       // can't follow every round: { tick, before, syndrome, flips, correction, sick }.
@@ -122,6 +144,7 @@
   }
   function setLab(ex, lab) {
     ex.lab = lab;
+    ex.stOK = null;
     D.setModel(ex.mem, noiseModel(ex.code, ex.mem.checks, ex.channel, lab));
     ex.roundInTick = 0;
     refreshDecoder(ex, true); // weights come from the noise model
@@ -140,7 +163,10 @@
   //   { phase: "noise", noise }
   //   { phase: "measure", syndrome, flips, detectors } (all null without a keeper)
   //   { phase: "correct", keeper, level, syndrome, flips, correction, shrug,
-  //     before, committed, sick: null | { kind, cause }, leftover, clean, tickDone }
+  //     before, committed, sick: null | { kind, cause, animals: [{ index, kind }] },
+  //     leftover, clean, tickDone }
+  // kind is "X̄", "Z̄" or "Ȳ" (with the animal's number when k > 1); the
+  // event's kind is the first sick animal's.
   function advancePhase(ex) {
     var code = ex.code, mem = ex.mem, keeper = ex.level > 0;
     if (ex.phase === "idle" || ex.phase === "correct") {
@@ -185,16 +211,22 @@
 
     if (judge) {
       var R = S.multiply(judge, mem.frame), s = S.syndrome(code, R);
-      var vetRes = S.multiply(R, vetFor(ex.speciesId).decode(s));
+      var vetRes = S.multiply(R, vetFor(code).decode(s));
       if (S.isLogicalError(code, vetRes)) {
-        var act = S.logicalAction(code, vetRes);
+        var act = S.logicalAction(code, vetRes), animals = [];
+        for (var j = 0; j < ex.k; j++) {
+          if (!act.x[j] && !act.z[j]) continue;
+          var sub = ex.k > 1 ? String(j + 1) : "";
+          animals.push({ index: j, kind: (act.x[j] && act.z[j] ? "Ȳ" : act.x[j] ? "X̄" : "Z̄") + sub });
+          ex.healths[j] = Math.max(0, ex.healths[j] - SICK_HEALTH_HIT);
+        }
         ev.sick = {
-          kind: act.x[0] && act.z[0] ? "Ȳ" : act.x[0] ? "X̄" : "Z̄",
+          kind: animals[0].kind, animals: animals,
           cause: !keeper || s !== 0 ? "overwhelmed"
             : ex.lastCorrection && !S.isIdentity(ex.lastCorrection) ? "miscorrected" : "undetectable"
         };
-        ex.sick++;
-        ex.health = Math.max(0, ex.health - SICK_HEALTH_HIT);
+        ex.sick += animals.length;
+        ex.health = meanHealth(ex);
         reprepare(ex);
       } else if (!S.isIdentity(R) && S.inGroup(code.stabilizers, R)) {
         // A stabilizer acts trivially on the encoded state: fold it away.
@@ -213,19 +245,23 @@
     if (ex.roundInTick >= roundsPerTick(ex)) {
       ex.roundInTick = 0;
       ex.ticks++;
-      ex.health = Math.min(100, ex.health + RECOVERY_PER_TICK);
+      for (var a = 0; a < ex.k; a++) ex.healths[a] = Math.min(100, ex.healths[a] + RECOVERY_PER_TICK);
+      ex.health = meanHealth(ex);
       ev.tickDone = true;
     }
     return ev;
   }
 
+  function meanHealth(ex) { return ex.healths.reduce(function (a, b) { return a + b; }, 0) / ex.k; }
+
   // Run phases until the current tick completes (from wherever the
-  // exhibit is mid-round). Returns the sick events that occurred.
+  // exhibit is mid-round). Returns one { kind, cause, animal } per animal
+  // that got sick.
   function runTick(ex) {
     var sick = [], ev;
     do {
       ev = advancePhase(ex);
-      if (ev.sick) sick.push(ev.sick);
+      if (ev.sick) ev.sick.animals.forEach(function (a) { sick.push({ kind: a.kind, cause: ev.sick.cause, animal: a.index }); });
     } while (!(ev.phase === "correct" && ev.tickDone));
     return sick;
   }
@@ -237,14 +273,18 @@
     return {
       speciesId: ex.speciesId, channel: ex.channel, E: ex.mem.E, frame: ex.mem.frame, last: ex.mem.last,
       round: ex.mem.round, ticks: ex.ticks, rounds: ex.rounds, decoded: ex.decoded, sick: ex.sick,
-      health: ex.health, roundInTick: ex.roundInTick, incident: ex.incident
+      health: ex.health, healths: ex.healths.slice(), roundInTick: ex.roundInTick, incident: ex.incident
     };
   }
-  // opts: { lab, keeper, rng }
+  // opts: { lab, keeper, rng, code, checks } (code and checks as for
+  // createExhibit; a snapshot doesn't store them).
   function restore(snap, opts) {
-    var ex = createExhibit({ speciesId: snap.speciesId, channel: snap.channel, lab: opts.lab, keeper: null, rng: opts.rng });
+    var ex = createExhibit({ speciesId: snap.speciesId, code: opts.code, checks: opts.checks, channel: snap.channel,
+      lab: opts.lab, keeper: null, rng: opts.rng });
     ex.mem.E = snap.E; ex.mem.frame = snap.frame; ex.mem.last = snap.last; ex.mem.round = snap.round;
     ["ticks", "rounds", "decoded", "sick", "health", "roundInTick", "incident"].forEach(function (k) { ex[k] = snap[k]; });
+    ex.healths = Array.isArray(snap.healths) && snap.healths.length === ex.k ? snap.healths.slice()
+      : ex.healths.map(function () { return snap.health; });
     setKeeper(ex, opts.keeper || null);
     return ex;
   }
@@ -252,7 +292,7 @@
   var ExhibitSim = {
     VET_WEIGHT: VET_WEIGHT, SICK_HEALTH_HIT: SICK_HEALTH_HIT, RECOVERY_PER_TICK: RECOVERY_PER_TICK,
     labValues: labValues, noiseModel: noiseModel, workPerRound: workPerRound, roundsPerTick: roundsPerTick,
-    effectiveLevel: effectiveLevel, createExhibit: createExhibit, setKeeper: setKeeper, setLab: setLab,
+    effectiveLevel: effectiveLevel, canRun: canRun, createExhibit: createExhibit, setKeeper: setKeeper, setLab: setLab,
     residual: residual, advancePhase: advancePhase, runTick: runTick, snapshot: snapshot, restore: restore
   };
   if (isNode) module.exports = ExhibitSim;
