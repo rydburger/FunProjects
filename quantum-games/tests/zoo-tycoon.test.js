@@ -6,6 +6,7 @@ var S = require("../stabilizer.js");
 var Z = require("../qec-zoo-tycoon/zoo-data.js");
 var X = require("../qec-zoo-tycoon/exhibit-sim.js");
 var Park = require("../qec-zoo-tycoon/park.js");
+var Placard = require("../qec-zoo-tycoon/placard.js");
 
 var passed = 0, failed = 0;
 function test(name, fn) {
@@ -298,6 +299,60 @@ test("load rejects foreign or corrupted saves", function () {
   var bad = JSON.parse(Park.save(park()));
   bad.exhibits = { 1: { biomeId: "volcano" } };
   assert.throws(function () { Park.load(bad); });
+});
+
+console.log("Placards (claims checked against the codes)");
+Object.keys(Z.SPECIES).forEach(function (id) {
+  var sp = Z.SPECIES[id];
+  test(sp.name + ": placard is complete and its params match the computed code", function () {
+    var pl = sp.placard;
+    assert.ok(pl.summary && pl.origin && pl.facts.length && pl.lab.length && /^[a-z0-9_]+$/.test(pl.zoo));
+    var f = Placard.computedFacts(sp.code);
+    assert.strictEqual(sp.params.split(" ")[0], Placard.paramsString(f));
+    var html = Placard.html(sp);
+    assert.ok(html.indexOf(Placard.ZOO_URL + pl.zoo) >= 0);
+    assert.ok(html.indexOf(Placard.paramsString(f)) >= 0);
+  });
+});
+test("Tortoise: every single bit flip is caught, every single phase flip is logical", function () {
+  var c = Z.SPECIES.tortoise.code;
+  for (var q = 0; q < 3; q++) {
+    assert.notStrictEqual(S.syndrome(c, S.single(3, q, "X")), 0);
+    var e = S.single(3, q, "Z");
+    assert.ok(S.syndrome(c, e) === 0 && S.isLogicalError(c, e));
+  }
+});
+test("Owl: Z0 and Z1 differ by a stabilizer (degenerate)", function () {
+  var c = Z.SPECIES.owl.code;
+  assert.ok(S.inGroup(c.stabilizers, S.multiply(S.single(9, 0, "Z"), S.single(9, 1, "Z"))));
+});
+test("Peacock: the Z checks read as binary give the flipped qubit's position from 1", function () {
+  var c = Z.SPECIES.peacock.code, zChecks = c.stabilizers.filter(function (g) { return g.x === 0; });
+  for (var q = 0; q < 7; q++) {
+    var E = S.single(7, q, "X"), v = 0;
+    zChecks.forEach(function (g) { v = 2 * v + (S.commutes(E, g) ? 0 : 1); });
+    assert.strictEqual(v, q + 1);
+  }
+});
+test("Pangolin: the 16 syndromes are exactly no error + the 15 single-qubit errors", function () {
+  var c = Z.SPECIES.pangolin.code, seen = { 0: true }, count = 1;
+  S.forEachPauliOfWeight(5, 1, function (E) {
+    var s = S.syndrome(c, E);
+    assert.ok(!seen[s], "two single-qubit errors share a syndrome");
+    seen[s] = true; count++;
+  });
+  assert.strictEqual(count, 16);
+  assert.strictEqual(Math.pow(2, c.stabilizers.length), 16);
+});
+test("Axolotl: X̄ is a column and Z̄ a row of the 3×3 grid", function () {
+  var c = Z.SPECIES.axolotl.code;
+  assert.strictEqual(S.toString(c.logicalX[0]), "XIIXIIXII");
+  assert.strictEqual(S.toString(c.logicalZ[0]), "ZZZIIIIII");
+});
+test("Placard.html works for a computed code with two animals", function () {
+  var a = S.analyzeChecks(4, [S.fromString("XXXX"), S.fromString("ZZZZ")]);
+  var html = Placard.html({ name: "custom", code: a.code });
+  assert.ok(html.indexOf("[[4,2,2]]") >= 0 && html.indexOf("2 animals") >= 0 && html.indexOf("X̄2") >= 0);
 });
 
 console.log("Balance (seeded bot players, one year max)");

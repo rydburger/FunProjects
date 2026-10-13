@@ -8,8 +8,10 @@ errors) cost you money and reputation.
 
 The name is a nod to the [Error Correction Zoo](https://errorcorrectionzoo.org).
 
-This document scopes the **barebones v0** only. Park design, tour guides, gift shops, food stands,
-and guest/investor needs are in the [roadmap](#later-roadmap-not-in-v0) at the end.
+Sections 1–7 scope the **barebones v0** (complete). The agreed **[v1 plan](#v1-plan-habitats-you-design-keepers-who-learn-a-lab-that-improves)**
+(freeform habitats, learning keepers, lab research, noisy measurements) follows them. Park design,
+tour guides, gift shops, food stands, and guest/investor needs are in the
+[roadmap](#later-roadmap-not-in-v0) at the end.
 
 ---
 
@@ -247,6 +249,89 @@ Node, so game logic is covered by `tests/zoo-tycoon.test.js` alongside `tests/st
    event ticker, placement validation messages.
 4. ✅ **M3 — Game loop.** Revenue/expenses, investor updates, win/lose, balance pass, save/load to
    `localStorage`, README with rules + "under the hood", link from `quantum-games/README.md`.
+
+## v1 plan: habitats you design, keepers who learn, a lab that improves
+
+Agreed with the owner on 2026-10-13. v0 above is complete and stays the baseline; this section
+supersedes the matching items in the roadmap below.
+
+### Decisions
+
+1. **Freeform habitats and discovery.** The player places data qubits and ancillas on the park
+   grid, wires each ancilla to its data qubits, and sets it to an X or Z check. Every qubit takes
+   a tile, so bigger codes cost space. The first time a valid code is built freeform it is
+   *discovered*: a textbook code unlocks its placard, an unknown one becomes a new species with a
+   computed placard. Discovered codes go into a **blueprint book** and can then be built directly.
+   - **k = the number of animals** in the enclosure. Each logical qubit gets sick independently.
+   - Validity is shown instantly (commuting? k? d? redundant checks?) *and* experienced: a check
+     that anticommutes with another gives a random outcome every round, so its detectors flicker
+     and the keeper is swamped. k = 0 means no room for an animal; d = 1 means it gets sick at
+     the bare error rate. Redundant checks are allowed (they help against measurement errors).
+   - Size cap: n ≤ 32 data qubits and ≤ 32 checks (the bitmask limit; covers the d = 5 surface
+     code and the d = 5 color code).
+   - Later: subsystem codes (Bacon–Shor) measure anticommuting checks *on purpose*, which turns
+     "anticommuting = broken" into an advanced species.
+2. **Detector-paradigm engine** (`../detectors.js`). The first round projects the state into a
+   syndrome subspace and sets the reference; a detector is a check's outcome XOR its previous
+   outcome. Corrections go into a software Pauli frame. The vet judges the true error times the
+   frame with a perfect-information decoder, as now.
+3. **Placards are factual**, like the encyclopedia in the original Zoo Tycoon: summary, computed
+   parameters, properties, origin, lab history, and a link to the Error Correction Zoo entry. No
+   game fluff. Every checkable claim is checked by a test.
+4. **Lab research lowers physical error rates**, on a timer. Three dials:
+   - idle / coherence error (every data qubit, every round),
+   - two-qubit gate error (charged once per check a qubit is wired to, so dense, high-weight
+     wiring is genuinely costly),
+   - readout error (the measurement flip probability q).
+   With the phenomenological model these combine as p_data ≈ p_idle + (checks touching the qubit)
+   × p_2q and q ≈ p_meas + (check weight) × p_2q; the UI must label this as an approximation.
+   Milestone to celebrate: the first time a d = 5 exhibit beats a d = 3 one (below threshold).
+5. **Keepers learn.** One hiring tier (Intern and Head Keeper go away). Keepers are named, tracked
+   individually, reassignable, one per exhibit. Skill = **algorithm + speed + window**:
+   - mistakes come from approximation and **backlog** (decoding slower than syndromes arrive),
+     never from random dice, as on real hardware;
+   - experience accrues from rounds decoded; training courses take time and money, and the
+     exhibit is unattended meanwhile;
+   - later: experience per code family (decoders really are specialised).
+
+   Draft ladder (to be balanced in M6):
+
+   | Level | Decoder | What it adds |
+   |---|---|---|
+   | 1 | Single-shot lookup, weight 1 | Single errors, one round at a time |
+   | 2 | Single-shot minimum-weight lookup | Weight-2 explanations |
+   | 3 | Space-time decoding, short window | Sees measurement errors (matching for matchable codes, DEM lookup for small others) |
+   | 4 | Longer window | Full space-time distance |
+   | 5 | Correlated matching | Uses the X–Z correlation of Y errors |
+   | 6 | Maximum likelihood | Degeneracy-aware; exponential cost, so slow on big codes |
+
+### Noise models
+
+- **Option A: phenomenological** (implemented in M5). Data qubits get Pauli noise each round and
+  each outcome is flipped with probability q. The measurement circuit is not modelled.
+- **Option B: circuit-level** (scaffolded, a late-game "advanced lab" unlock). Simulate the CNOTs
+  between ancilla and data in their scheduled order; a fault on the ancilla part way through
+  spreads to the data qubits not yet touched (hook errors), so a bad CNOT order lowers the
+  effective distance. Plug-in points already exist in `detectors.js`: `createMemory` takes a
+  `schedule` (CNOT order per check), and a model supplies `sampleRound` and `dem`. Decoders read
+  only the detector error model, so they work unchanged. The freeform builder should record wire
+  order from the start, so B needs no UI migration.
+
+### Milestones
+
+1. ✅ **M4: factual placards.** `placard.js` renders structured placards with computed
+   parameters for both pages; claims checked in `tests/zoo-tycoon.test.js`.
+2. ✅ **M5: engine.** Code analysis in `stabilizer.js` (`findLogicals`, `isCSS`, `codeDistance`,
+   `analyzeChecks`, `rotatedSurface`, `repetition`); `detectors.js` with phenomenological noise,
+   DEMs, single-shot lookup and sliding-window matching; circuit-level scaffold;
+   `tests/detectors.test.js`. Not yet wired into the game.
+3. **M6: keepers and the lab.** Exhibits run on `Detectors` (each exhibit is a memory). Keeper
+   roster, experience, ladder, speed and backlog; space-time lookup decoder for small
+   non-matchable codes; lab dials with research timers; rebalance with seeded bots.
+4. **M7: freeform builder.** Grid placement of qubits and ancillas, wiring, X/Z toggle, live
+   validity readout, discovery and the blueprint book, computed placards, multi-animal enclosures.
+   Anticommuting checks are simulated as fair-coin outcomes (exact for sequential measurement).
+5. **M8: circuit-level noise** (option B) as an advanced-lab unlock.
 
 ## Later roadmap (not in v0)
 
