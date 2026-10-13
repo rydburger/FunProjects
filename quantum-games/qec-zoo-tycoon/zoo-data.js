@@ -2,7 +2,7 @@
 // Error Correction Zoo Tycoon — static game data.
 //
 // Species (codes), biomes (enclosure check sets + climate), keeper
-// levels (decoders) and the lab (error rates). Pure data plus Stabilizer.makeCode calls;
+// levels (decoders), the lab (error rates) and the habitat workshop. Pure data plus Stabilizer.makeCode calls;
 // no game state or UI. Loaded by index.html after ../stabilizer.js
 // (exposes `window.ZooData`), and by the Node tests via require().
 //
@@ -183,6 +183,61 @@
           "Google Quantum AI: d = 5 beat d = 3 (Nature 2023); then d = 3, 5, 7 below threshold on the Willow chip, the logical error rate falling about 2× per step in distance (Nature 2025)."
         ]
       }
+    },
+    // Discoverable in the habitat workshop (no one starts out knowing them).
+    penguins: {
+      name: "Iceberg Penguins", glyph: "🐧", tier: 1, cost: 4000, appeal: 50,
+      code: Stabilizer.makeCode({
+        name: "[[4,2,2]] code", n: 4,
+        stabilizers: ["XXXX", "ZZZZ"],
+        logicalX: ["XXII", "XIXI"], logicalZ: ["ZIZI", "ZZII"]
+      }),
+      params: "[[4,2,2]] (two animals)",
+      layout: [[0, 0], [1, 0], [0, 1], [1, 1]],
+      placard: {
+        zoo: "stab_4_2_2",
+        summary: "Four qubits and two checks, X on all four and Z on all four, holding two logical qubits. " +
+          "Any single-qubit error flips at least one check, so it is always noticed. But an X on any of the " +
+          "four qubits flips the same check, so the keeper can't tell which qubit to fix: distance 2 detects " +
+          "one error and corrects none.",
+        facts: [
+          "No smaller code detects an arbitrary single-qubit error: there is no [[3,1,2]] stabilizer code.",
+          "Meets the quantum Singleton bound n − k ≥ 2(d − 1) with equality: 4 − 2 = 2.",
+          "The smallest iceberg code: [[m, m − 2, 2]] for even m, with one X check and one Z check on every qubit.",
+          "Detection is still useful: runs in which a check fires can be thrown away (postselection), which suppresses errors at the cost of retries."
+        ],
+        origin: "L. Vaidman, L. Goldenberg and S. Wiesner, Phys. Rev. A 54, R1745 (1996); " +
+          "M. Grassl, Th. Beth and T. Pellizzari, Phys. Rev. A 56, 33 (1997).",
+        lab: [
+          "Trapped ions: fault-tolerant error detection (Linke et al., Science Advances 2017).",
+          "Superconducting qubits: fault-tolerant state preparation at IBM (Takita et al., PRL 2017).",
+          "Quantinuum used larger iceberg codes to protect whole algorithms on trapped ions (Self, Benedetti and Amaro, Nature Physics 2024)."
+        ]
+      }
+    },
+    giant: {
+      name: "Giant Axolotl", glyph: "🐉", tier: 4, cost: 45000, appeal: 320,
+      code: (function () { var c = Stabilizer.rotatedSurface(5); c.name = "Rotated surface code (d=5)"; return c; })(),
+      params: "[[25,1,5]]",
+      layout: range(0, 25).map(function (q) { return [q % 5, Math.floor(q / 5)]; }),
+      placard: {
+        zoo: "rotated_surface",
+        summary: "The distance-5 member of the Surface Axolotl's family: 25 data qubits on a 5×5 grid with " +
+          "12 X checks and 12 Z checks, weight 4 inside and weight 2 on the edges. Logical X̄ runs down a " +
+          "column and Z̄ along a row, five qubits each, so any two errors can be corrected.",
+        facts: [
+          "Corrects any two single-qubit errors; it takes three in the wrong places to cause a logical error.",
+          "Below threshold the logical error rate falls roughly as (p / p_th)^((d + 1)/2), so going from d = 3 to d = 5 helps; above threshold the bigger code does worse.",
+          "With one measurement ancilla per check it uses 25 + 24 = 49 qubits.",
+          "Matching decoders pair up detection events along the likeliest error chains in space and time."
+        ],
+        origin: "A. Yu. Kitaev (1997); S. B. Bravyi and A. Yu. Kitaev (1998); H. Bombín and M. A. Martín-Delgado (2007): " +
+          "the rotated layout.",
+        lab: [
+          "Google Quantum AI: the first time a bigger surface code beat a smaller one, d = 5 against d = 3 on 72 superconducting qubits (Nature 2023).",
+          "Willow chip: d = 3, 5 and 7, with logical errors falling about 2× per step in distance (Nature 2025)."
+        ]
+      }
     }
   };
 
@@ -235,6 +290,26 @@
         sup(9, "Z", [1, 2, 4, 5]), sup(9, "Z", [3, 4, 6, 7]), sup(9, "Z", [0, 3]), sup(9, "Z", [5, 8])
       ],
       blurb: "Square ponds in a checkerboard, each checked only by its nearest neighbours."
+    },
+    floe: {
+      name: "Iceberg Floe", native: "penguins", cost: 5000, upkeep: 40, footprint: [2, 2],
+      climate: { channel: "depolarizing" },
+      // YYYY is XXXX × ZZZZ (up to a phase): same group, different generators.
+      checks: ["XXXX", "YYYY"],
+      blurb: "One slab of ice, four qubits, two checks on every one of them."
+    },
+    marsh: {
+      name: "Grand Marsh", native: "giant", cost: 40000, upkeep: 250, footprint: [5, 5],
+      climate: { channel: "depolarizing" },
+      // The species' checks, except that the first two X plaquettes are
+      // measured as one and their product.
+      checks: (function () {
+        var st = Stabilizer.rotatedSurface(5).stabilizers.slice();
+        var xs = st.map(function (P, i) { return P.z === 0 ? i : -1; }).filter(function (i) { return i >= 0; });
+        st[xs[0]] = Stabilizer.multiply(st[xs[0]], st[xs[1]]);
+        return st.map(Stabilizer.toString);
+      })(),
+      blurb: "A wide checkerboard of ponds, five by five, still checked only between neighbours."
     }
   };
   Object.keys(BIOMES).forEach(function (id) {
@@ -295,6 +370,67 @@
   // Cost of each research step, by the level being reached.
   var RESEARCH = [null, { fee: 5000, days: 2 }, { fee: 12000, days: 4 }, { fee: 25000, days: 6 }];
 
+  // ---------- The habitat workshop (freeform building) ----------
+  // A design places data qubits and check ancillas on a grid and wires each
+  // check to data qubits (habitat.js). Every qubit, data or ancilla, costs
+  // the same and takes half a tile of park; every wire (one CNOT per round)
+  // costs extra. The textbook species start out unknown, except those in
+  // START_KNOWN: building a working design of one in the workshop discovers
+  // it, which also unlocks its catalogue habitat above.
+  var BUILD = {
+    grid: 11,               // the workshop grid is grid × grid cells
+    maxData: 32, maxChecks: 32,
+    perQubit: 1000, perWire: 100,
+    upkeepPerQubit: 5, upkeepPerWire: 1,
+    qubitsPerTile: 2
+  };
+  var START_KNOWN = ["tortoise"];
+  // Reference designs of the textbook species: data qubit and check
+  // positions on the workshop grid; check i measures the species' i-th
+  // stabilizer. Used by the tests (and the seeded bots) to discover
+  // species; players find their own.
+  function surfacePositions(d, code) {
+    var qubits = [], checkAt = [];
+    for (var q = 0; q < d * d; q++) qubits.push([2 * (q % d) + 1, 2 * Math.floor(q / d) + 1]);
+    code.stabilizers.forEach(function (P) {
+      var sx = 0, sy = 0, w = 0, rows = [], cols = [];
+      for (var j = 0; j < d * d; j++) {
+        if (((P.x | P.z) >>> j) & 1) { sx += qubits[j][0]; sy += qubits[j][1]; w++; rows.push(Math.floor(j / d)); cols.push(j % d); }
+      }
+      var x = sx / w, y = sy / w;
+      if (w === 2) {
+        // Edge checks sit just outside the grid of data qubits.
+        if (rows[0] === rows[1]) y += rows[0] === 0 ? -1 : 1;
+        else x += cols[0] === 0 ? -1 : 1;
+      }
+      checkAt.push([x, y]);
+    });
+    return { qubits: qubits, checkAt: checkAt };
+  }
+  var DESIGNS = {
+    tortoise: { qubits: [[3, 5], [5, 5], [7, 5]], checkAt: [[4, 4], [6, 4]] },
+    owl: {
+      qubits: [[2, 2], [4, 2], [6, 2], [2, 5], [4, 5], [6, 5], [2, 8], [4, 8], [6, 8]],
+      checkAt: [[3, 2], [5, 2], [3, 5], [5, 5], [3, 8], [5, 8], [8, 3], [8, 7]]
+    },
+    peacock: {
+      qubits: [[9, 8], [1, 8], [5, 8], [5, 1], [7, 4], [3, 4], [5, 6]],
+      checkAt: [[5, 3], [3, 6], [7, 6], [5, 4], [3, 7], [7, 7]]
+    },
+    pangolin: { qubits: [[5, 1], [9, 4], [7, 8], [3, 8], [1, 4]], checkAt: [[7, 5], [5, 7], [3, 5], [4, 3]] },
+    axolotl: surfacePositions(3, SPECIES.axolotl.code),
+    penguins: { qubits: [[3, 3], [5, 3], [3, 5], [5, 5]], checkAt: [[4, 1], [4, 7]] },
+    giant: surfacePositions(5, SPECIES.giant.code)
+  };
+  // Species nobody has catalogued: appeal per animal by distance (beyond
+  // the table, +40 per step), price per animal = appeal × costPerAppeal.
+  var CUSTOM = {
+    appealByDistance: [0, 25, 60, 120, 160, 210],
+    costPerAppeal: 100,
+    glyphs: ["🦊", "🦦", "🦥", "🦡", "🦫", "🦩", "🦜", "🐸", "🦭", "🦓", "🦒", "🐙", "🦋", "🐞", "🦑", "🐌",
+      "🦘", "🦬", "🐿️", "🦨", "🐳", "🦈", "🐠", "🦀"]
+  };
+
   // ---------- Economy constants ----------
   var ECONOMY = {
     startingCash: 50000, startingReputation: 50,
@@ -339,6 +475,7 @@
     SPECIES: SPECIES, BIOMES: BIOMES, ECONOMY: ECONOMY,
     KEEPER_LEVELS: KEEPER_LEVELS, MAX_KEEPER_LEVEL: MAX_KEEPER_LEVEL, TRAINING: TRAINING,
     KEEPER_SPEED: KEEPER_SPEED, KEEPER_NAMES: KEEPER_NAMES, LAB: LAB, RESEARCH: RESEARCH,
+    BUILD: BUILD, START_KNOWN: START_KNOWN, DESIGNS: DESIGNS, CUSTOM: CUSTOM,
     checkPlacement: checkPlacement
   };
   if (typeof module !== "undefined" && module.exports) module.exports = ZooData;

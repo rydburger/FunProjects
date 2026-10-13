@@ -81,7 +81,7 @@
   .enc.sel { box-shadow: 0 0 0 3px var(--accent); }
   .enc.sick { animation: sickflash 1.2s ease; }
   @keyframes sickflash { 0%, 60% { box-shadow: 0 0 0 4px var(--sick); background: var(--sick-soft); } }
-  .enc .g { font-size: clamp(18px, 3.2vw, 36px); line-height: 1.1; }
+  .enc .g { font-size: clamp(18px, 3.2vw, 36px); line-height: 1.1; white-space: nowrap; }
   .enc .g.empty { opacity: 0.45; font-size: clamp(14px, 2vw, 22px); }
   .enc .nm { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   @media (max-width: 600px) { .enc .nm { display: none; } }
@@ -188,6 +188,62 @@
   .modal p { margin: 8px 0; }
   .neg-t { color: var(--sick); }
   .pos-t { color: var(--accent); }
+  .modal .card.wide { width: min(980px, 100%); }
+
+  /* ---- build menu extras ---- */
+  .build-top { margin: 0 0 10px; }
+  .build-top .btn { flex: 1 1 auto; }
+  .locked-note { margin: 2px 0 4px; }
+  .b-floe   { --bc: rgba(120, 180, 220, 0.22); --bb: rgba(90, 150, 200, 0.85); }
+  .b-marsh  { --bc: rgba(20, 130, 120, 0.26); --bb: rgba(15, 110, 100, 0.9); }
+  .b-design { --bc: rgba(150, 110, 200, 0.2); --bb: rgba(130, 90, 190, 0.85); }
+
+  /* ---- habitat workshop ---- */
+  .ws { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 10px; }
+  @media (max-width: 760px) { .ws { grid-template-columns: minmax(0, 1fr); } }
+  .ws-tools { margin-bottom: 8px; }
+  .ws-tools button { flex: 1 1 auto; }
+  .ws-grid { display: block; width: 100%; aspect-ratio: 1; background: var(--bg-panel-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; touch-action: manipulation; }
+  .ws-dot { fill: var(--ink-dim); opacity: 0.35; }
+  .ws-wire { stroke-width: 2.5; stroke-linecap: round; }
+  .ws-wire.sel { stroke-width: 4; }
+  .ws-wire.dim { opacity: 0.3; }
+  .ws-qubit { fill: var(--qubit); stroke: var(--ink); stroke-width: 2; }
+  .ws-qubit.idle { stroke-dasharray: 3 3; stroke: var(--ink-dim); }
+  .ws-qubit.wired { stroke: var(--accent); stroke-width: 3.5; }
+  .ws-qlabel { font: 600 11px var(--font-mono); fill: var(--ink); pointer-events: none; }
+  .ws-check { fill: var(--bg-panel); stroke-width: 3; }
+  .ws-check.sel { fill: var(--accent-soft); stroke-width: 4.5; }
+  .ws-check.clash { fill: var(--sick-soft); stroke-dasharray: 5 3; }
+  .ws-clabel { font: 700 11px var(--font-mono); fill: var(--ink); pointer-events: none; }
+  .ws-letter { font: 700 11px var(--font-mono); pointer-events: none; }
+  .ws-read { font-size: 13.5px; }
+  .ws-read .facts { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 8px 0; font-size: 13px; }
+  .ws-read .facts dt { color: var(--ink-dim); }
+  .ws-read .facts dd { margin: 0; font-family: var(--font-mono); font-size: 12.5px; }
+  .ws-id { font-size: 15px; }
+  .ws-id.new { color: var(--accent); }
+  .ws-name { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 13px; flex-wrap: wrap; }
+  .ws-name input { font: inherit; flex: 1 1 160px; min-width: 0; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-panel-2); color: var(--ink); }
+  .ws-checkbox { margin-top: 14px; }
+  .ws-chead { font-size: 13.5px; margin-bottom: 6px; }
+  .ws-letters { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ws-l { font: 700 13px var(--font-mono); min-width: 34px; padding: 2px 4px 4px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--bg-panel-2); color: var(--ink-dim); cursor: pointer; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+  .ws-l span { font-size: 9.5px; font-weight: 500; color: var(--ink-dim); }
+  .ws-l.l-X { color: var(--check-x); border-color: var(--check-x); }
+  .ws-l.l-Z { color: var(--check-z); border-color: var(--check-z); }
+  .ws-l.l-Y { color: var(--check-mix); border-color: var(--check-mix); }
+  .ws-load { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-panel-2); color: var(--ink); max-width: 100%; }
+
+  /* ---- field guide ---- */
+  .guide { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .guide li { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg-panel-2); font-size: 14px; }
+  .guide summary { cursor: pointer; }
+  .guide .g { font-size: 20px; }
+  .guide .mono { font-size: 12px; color: var(--ink-dim); }
+  .guide li.unknown { opacity: 0.9; border-style: dashed; }
+  .guide .placard { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -228,6 +284,10 @@
     <div>
       <div class="panel">
         <h2>Build an enclosure</h2>
+        <div class="btn-row build-top">
+          <button class="btn" id="workshopBtn" type="button">🛠 Habitat workshop</button>
+          <button class="btn quiet" id="guideBtn" type="button">📖 Field guide</button>
+        </div>
         <div class="tools" id="tools"></div>
         <div class="hint" id="toolHint">Pick a habitat, then click the park to place it. <span class="kbd">Esc</span> cancels.</div>
       </div>
@@ -266,10 +326,12 @@
 <script src="../stabilizer.js"></script>
 <script src="../detectors.js"></script>
 <script src="zoo-data.js"></script>
+<script src="habitat.js"></script>
 <script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
 <script src="exhibit-view.js"></script>
 <script src="park.js"></script>
+<script src="workshop.js"></script>
 <script>
 (function () {
   var S = window.Stabilizer, Z = window.ZooData, V = window.ExhibitView, Park = window.Park, X = window.ExhibitSim;
@@ -287,9 +349,15 @@
   function clock(tick) { return "Day " + (Math.floor(tick / ECO.ticksPerDay) + 1) + " " + pad2(tick % ECO.ticksPerDay) + ":00"; }
   function healthClass(v) { return v < 40 ? "low" : v < 75 ? "mid" : ""; }
   function popcount(v) { var c = 0; while (v) { c += v & 1; v >>>= 1; } return c; }
-  function channelName(c) {
-    return { depolarizing: "depolarizing", bitFlip: "bit flips only", phaseFlip: "phase flips only", biasedZ: "Z-biased" }[c.channel];
+  function channelName(ch) {
+    return { depolarizing: "depolarizing", bitFlip: "bit flips only", phaseFlip: "phase flips only", biasedZ: "Z-biased" }[ch];
   }
+  function spOf(id) { return Park.speciesInfo(park, id); }
+  function habOf(rec) { return Park.habitatOf(park, rec); }
+  function label(rec) { return Park.exhibitLabel(park, rec); }
+  // Glyphs for an exhibit's animals: one per logical qubit (up to three).
+  function glyphs(sp, k) { var g = ""; for (var i = 0; i < Math.min(k, 3); i++) g += sp.glyph; return g + (k > 3 ? "×" + k : ""); }
+  function shortName(sp) { var w = sp.name.split(" "); return w.length > 1 ? w[w.length - 1] : sp.name; }
   function pct(v) { return (v * 100).toFixed(v < 0.01 ? 2 : 1) + "%"; }
   function labValueText(dial, v) { return dial === "cycle" ? v + " round" + (v === 1 ? "" : "s") + "/hour" : pct(v); }
   function keeperTitle(k) { return LEVELS[k.level].title; }
@@ -299,7 +367,8 @@
   var park = Park.createPark();
   var ui = {
     speed: 1,          // 0 = paused; otherwise multiplier
-    tool: null,        // biome id being placed, or null
+    tool: null,        // what's being placed: null | { kind: "biome", id } | { kind: "design", design, name, speciesName }
+    draft: null,       // the design open in the workshop
     hover: null,       // { x, y } cell under the pointer
     selected: null,    // exhibit id
     armedDemolish: false,
@@ -329,45 +398,77 @@
   }
 
   // ---------- palette ----------
+  function toolInfo(t) {
+    if (t.kind === "biome") { var b = BIOMES[t.id]; return { fp: b.footprint, cost: b.cost, name: b.name }; }
+    return { fp: Habitat.footprint(t.design.qubits.length + t.design.checks.length), cost: Habitat.price(t.design).cost, name: t.name };
+  }
+  function sameTool(a, b) {
+    return !!a && !!b && a.kind === b.kind && (a.kind === "biome" ? a.id === b.id : a.entryId === b.entryId && a.entryId !== undefined);
+  }
   function renderTools() {
     var box = $("tools");
     box.innerHTML = "";
+    var locked = Object.keys(BIOMES).filter(function (id) { return !Park.isKnown(park, BIOMES[id].native); });
     Object.keys(BIOMES).forEach(function (id) {
-      var b = BIOMES[id], sp = SPECIES[b.native];
-      var btn = h("button", "tool b-" + id + (ui.tool === id ? " on" : ""));
+      var b = BIOMES[id], sp = spOf(b.native), known = Park.isKnown(park, b.native), t = { kind: "biome", id: id };
+      if (!known) return;
+      var btn = h("button", "tool b-" + id + (sameTool(ui.tool, t) ? " on" : "") + (known ? "" : " locked"));
       btn.type = "button";
-      btn.dataset.biome = id;
-      btn.innerHTML = '<span class="sw"></span><span class="nm">' + b.name + "</span>" +
-        '<span class="meta">' + money(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + sp.glyph + "</span>";
-      btn.disabled = park.cash < b.cost;
-      btn.title = b.blurb;
-      btn.addEventListener("click", function () { setTool(ui.tool === id ? null : id); });
+      btn.dataset.cost = b.cost;
+      btn.dataset.known = known ? "1" : "";
+      btn.innerHTML = '<span class="sw"></span><span class="nm">' + (known ? "" : "🔒 ") + b.name + "</span>" +
+        '<span class="meta">' + (known ? money(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + sp.glyph
+          : "") + "</span>";
+      btn.disabled = !known || park.cash < b.cost;
+      btn.title = known ? b.blurb : "Build a working habitat for the " + sp.name + " in the workshop to discover it. The field guide has a hint.";
+      btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
+      box.appendChild(btn);
+    });
+    if (locked.length) {
+      box.appendChild(h("div", "hint locked-note", "🔒 " + locked.length + " more catalogue habitat" + (locked.length === 1 ? "" : "s") +
+        " unlock as you discover their species: " + locked.map(function (id) { return spOf(BIOMES[id].native).glyph; }).join(" ") +
+        ". See the field guide."));
+    }
+    park.book.designs.forEach(function (e) {
+      var sp = spOf(e.speciesId), t = { kind: "design", design: e.layout, name: e.name, entryId: e.id };
+      var info = toolInfo(t);
+      var btn = h("button", "tool b-design" + (sameTool(ui.tool, t) ? " on" : ""));
+      btn.type = "button";
+      btn.dataset.cost = info.cost;
+      btn.dataset.known = "1";
+      btn.innerHTML = '<span class="sw"></span><span class="nm">' + esc(e.name) + "</span>" +
+        '<span class="meta">' + money(info.cost) + " · " + info.fp[0] + "×" + info.fp[1] + " · " + sp.glyph + "</span>";
+      btn.disabled = park.cash < info.cost;
+      btn.title = "Your design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks.";
+      btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
       box.appendChild(btn);
     });
   }
   function updateToolAffordability() {
     Array.prototype.forEach.call(document.querySelectorAll(".tool"), function (btn) {
-      btn.disabled = park.cash < BIOMES[btn.dataset.biome].cost;
+      btn.disabled = !btn.dataset.known || park.cash < Number(btn.dataset.cost);
     });
   }
-  function setTool(id) {
-    ui.tool = id;
-    $("park").classList.toggle("building", !!id);
+  function setTool(t) {
+    ui.tool = t;
+    $("park").classList.toggle("building", !!t);
     renderTools();
     renderPark();
-    $("toolHint").innerHTML = id
-      ? "Placing <b>" + BIOMES[id].name + "</b> (" + BIOMES[id].footprint.join("×") + "). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
+    var info = t && toolInfo(t);
+    $("toolHint").innerHTML = t
+      ? "Placing <b>" + esc(info.name) + "</b> (" + info.fp.join("×") + "). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
       : "Pick a habitat, then click the park to place it. <span class=\"kbd\">Esc</span> cancels.";
   }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   // ---------- park grid ----------
   var parkEl = $("park");
   parkEl.style.setProperty("--cols", park.width);
   parkEl.style.setProperty("--rows", park.height);
 
-  function anchorFor(biomeId, cell) {
+  function anchorFor(t, cell) {
     // Centre the footprint on the pointer.
-    var fp = BIOMES[biomeId].footprint;
+    var fp = toolInfo(t).fp;
     return { x: cell.x - Math.floor((fp[0] - 1) / 2), y: cell.y - Math.floor((fp[1] - 1) / 2) };
   }
   function place(elm, x, y, w, hh) {
@@ -380,17 +481,17 @@
     encEls = {};
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
-      var e = h("div", "enc b-" + rec.biomeId);
+      var e = h("div", "enc b-" + (rec.biomeId || "design"));
       place(e, rec.x, rec.y, rec.w, rec.h);
       e.dataset.id = id;
       e.innerHTML = '<span class="g"></span><span class="nm"></span><span class="kp"></span><span class="hb"><i></i></span>';
-      e.title = Park.exhibitLabel(rec);
+      e.title = label(rec);
       parkEl.appendChild(e);
       encEls[id] = e;
     });
     if (ui.tool && ui.hover) {
-      var a = anchorFor(ui.tool, ui.hover), fp = BIOMES[ui.tool].footprint;
-      var ok = Park.canBuild(park, ui.tool, a.x, a.y).ok;
+      var a = anchorFor(ui.tool, ui.hover), fp = toolInfo(ui.tool).fp;
+      var ok = (ui.tool.kind === "biome" ? Park.canBuild(park, ui.tool.id, a.x, a.y) : Park.canBuildDesign(park, ui.tool.design, a.x, a.y)).ok;
       // Clamp the preview into the grid so it stays visible at the edges.
       var px = Math.max(0, Math.min(park.width - fp[0], a.x)), py = Math.max(0, Math.min(park.height - fp[1], a.y));
       var pv = h("div", "preview" + (ok ? "" : " bad"));
@@ -406,15 +507,15 @@
       if (!e) return;
       var g = e.querySelector(".g"), nm = e.querySelector(".nm"), kp = e.querySelector(".kp"), hb = e.querySelector(".hb i");
       if (rec.animal) {
-        var sp = SPECIES[rec.animal.speciesId];
-        g.textContent = sp.glyph; g.className = "g";
-        nm.textContent = sp.name.split(" ")[1];
+        var sp = spOf(rec.animal.speciesId);
+        g.textContent = glyphs(sp, rec.animal.k); g.className = "g";
+        nm.textContent = shortName(sp);
         hb.parentNode.style.display = "";
         hb.style.width = Math.round(rec.animal.health) + "%";
         hb.className = healthClass(rec.animal.health);
       } else {
         g.textContent = "empty"; g.className = "g empty";
-        nm.textContent = BIOMES[rec.biomeId].name;
+        nm.textContent = habOf(rec).name;
         hb.parentNode.style.display = "none";
       }
       var kk = rec.keeperId ? park.keepers[rec.keeperId] : null;
@@ -443,10 +544,16 @@
     var c = cellFromEvent(ev);
     if (!c) return;
     if (ui.tool) {
-      var a = anchorFor(ui.tool, c);
-      var r = Park.build(park, ui.tool, a.x, a.y);
+      var a = anchorFor(ui.tool, c), cost = toolInfo(ui.tool).cost;
+      var r = ui.tool.kind === "biome" ? Park.build(park, ui.tool.id, a.x, a.y)
+        : Park.buildDesign(park, ui.tool.design, a.x, a.y, { name: ui.tool.speciesName });
       if (!r.ok) { post("Can't build there: " + r.reason, "sick"); return; }
-      post("Built the <b>" + Park.exhibitLabel(r.exhibit) + "</b> for " + money(BIOMES[ui.tool].cost) + ".");
+      post("Built the <b>" + label(r.exhibit) + "</b> for " + money(cost) + ".");
+      if (r.discovered) {
+        var dsp = spOf(r.speciesId);
+        post("✨ New species discovered: the <b>" + esc(dsp.name) + "</b> " + dsp.glyph + "!");
+        setTimeout(function () { showDiscovery(r); }, 0);
+      }
       ui.selected = r.exhibit.id;
       ui.armedDemolish = false;
       setTool(null);
@@ -469,13 +576,13 @@
     insp.innerHTML = "";
     var rec = ui.selected !== null ? park.exhibits[ui.selected] : null;
     if (!rec) { renderOverview(); return; }
-    var biome = BIOMES[rec.biomeId];
+    var biome = habOf(rec);
 
     var head = h("div", "insp-head");
     var title = h("div", "");
-    var sp = rec.animal ? SPECIES[rec.animal.speciesId] : null;
-    title.appendChild(h("h3", "", (sp ? sp.glyph + " " + sp.name : "Empty enclosure")));
-    title.appendChild(h("div", "sub", Park.exhibitLabel(rec) + (sp ? " · " + sp.params : "")));
+    var sp = rec.animal ? spOf(rec.animal.speciesId) : null;
+    title.appendChild(h("h3", "", (sp ? glyphs(sp, rec.animal.k) + " " + esc(sp.name) : "Empty enclosure")));
+    title.appendChild(h("div", "sub", label(rec) + (sp ? " · " + sp.params : "")));
     head.appendChild(title);
     var close = h("button", "x-btn", "×");
     close.type = "button"; close.title = "Close"; close.setAttribute("aria-label", "Close inspector");
@@ -485,8 +592,10 @@
 
     if (rec.animal) {
       var hb = h("div", "health",
-        '<div class="row"><span>Health</span><span class="mono" id="iHealth"></span></div>' +
-        '<div class="bar"><div class="fill" id="iHealthFill"></div></div>');
+        '<div class="row"><span>Health' + (rec.animal.k > 1 ? " (average of " + rec.animal.k + " animals)" : "") +
+        '</span><span class="mono" id="iHealth"></span></div>' +
+        '<div class="bar"><div class="fill" id="iHealthFill"></div></div>' +
+        (rec.animal.k > 1 ? '<div class="hint mono" id="iHealths"></div>' : ""));
       insp.appendChild(hb);
 
       var sec = h("div", "section");
@@ -515,10 +624,12 @@
       var ps = h("div", "section");
       ps.appendChild(h("span", "label", "Buy an animal"));
       var ul = h("ul", "species-list");
-      Park.speciesOptions(park, rec.id).forEach(function (o) {
-        var s = SPECIES[o.speciesId];
+      // A designed habitat holds just the species it was built for.
+      Park.speciesOptions(park, rec.id).filter(function (o) { return o.ok || !rec.designId; }).forEach(function (o) {
+        var s = spOf(o.speciesId);
         var li = h("li", o.ok ? "" : "no");
-        var row = h("div", "row", '<span class="g">' + s.glyph + '</span><span class="who"><b>' + s.name + "</b><span>" + s.params + " · " + money(o.cost) + "</span></span>");
+        var row = h("div", "row", '<span class="g">' + s.glyph + '</span><span class="who"><b>' + esc(s.name) + "</b><span>" + s.params + " · " +
+          money(o.cost) + (o.animals > 1 ? " for " + o.animals : "") + "</span></span>");
         var buy = h("button", "btn", "Buy");
         buy.type = "button";
         buy.dataset.cost = o.cost;
@@ -527,7 +638,8 @@
         buy.addEventListener("click", function () {
           var r = Park.buyAnimal(park, rec.id, o.speciesId);
           if (!r.ok) { post(r.reason, "sick"); return; }
-          post("A <b>" + s.name + "</b> " + s.glyph + " moved into the " + Park.exhibitLabel(rec) + " (" + money(o.cost) + ").");
+          post((o.animals > 1 ? o.animals + " <b>" + esc(s.name) + "</b> " + glyphs(s, o.animals) + " moved"
+            : "A <b>" + esc(s.name) + "</b> " + s.glyph + " moved") + " into the " + label(rec) + " (" + money(o.cost) + ").");
           refreshAll();
         });
         row.appendChild(buy);
@@ -536,6 +648,7 @@
         ul.appendChild(li);
       });
       ps.appendChild(ul);
+      if (!ul.children.length) ps.appendChild(h("div", "hint", "No species you know lives here."));
       insp.appendChild(ps);
     }
 
@@ -553,7 +666,7 @@
       noiseText = "<br>Per round: data error " + range(pd) + " per qubit, misread " + range(qs) + " per check" +
         " (lab hardware; more wires mean more gate errors).";
     }
-    hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.climate) + ". Upkeep $" + biome.upkeep + "/day." + noiseText));
+    hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.channel) + ". Upkeep $" + biome.upkeep + "/day." + noiseText));
     insp.appendChild(hs);
     if (sp) {
       var d = h("details", "placard-d section");
@@ -562,10 +675,10 @@
     }
 
     var foot = h("div", "insp-foot");
-    if (rec.animal) {
+    if (rec.animal && rec.biomeId) {
       var q = new URLSearchParams({
         species: rec.animal.speciesId, keeper: String(rec.animal.level || "none"),
-        channel: biome.climate.channel, p: String(Park.labValues(park).coherence), q: String(Park.labValues(park).readout)
+        channel: biome.channel, p: String(Park.labValues(park).coherence), q: String(Park.labValues(park).readout)
       });
       var a = h("a", "ghost", "Watch closely in the sandbox →");
       a.href = "sandbox.html?" + q.toString();
@@ -579,8 +692,8 @@
     dem.type = "button";
     dem.addEventListener("click", function () {
       if (!ui.armedDemolish) { ui.armedDemolish = true; renderInspector(); return; }
-      var label = Park.exhibitLabel(rec);
-      var lost = rec.animal ? " The " + SPECIES[rec.animal.speciesId].name + " was rehomed." : "";
+      var label = label(rec);
+      var lost = rec.animal ? " The " + esc(spOf(rec.animal.speciesId).name) + (rec.animal.k > 1 ? " were" : " was") + " rehomed." : "";
       Park.demolish(park, rec.id);
       post("Demolished the " + label + " (refund " + money(refund) + ")." + lost);
       ui.selected = null; ui.armedDemolish = false;
@@ -603,7 +716,7 @@
       hire.type = "button";
       hire.addEventListener("click", function () {
         var r = Park.hireKeeper(park, rec.id);
-        post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper, for the " + Park.exhibitLabel(rec) + ".");
+        post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper, for the " + label(rec) + ".");
         refreshAll();
       });
       row.appendChild(hire);
@@ -618,7 +731,7 @@
           b.type = "button";
           b.addEventListener("click", function () {
             Park.assignKeeper(park, fk.id, rec.id);
-            post("<b>" + fk.name + "</b> now looks after the " + Park.exhibitLabel(rec) + ".");
+            post("<b>" + fk.name + "</b> now looks after the " + label(rec) + ".");
             refreshAll();
           });
           li.appendChild(b);
@@ -647,7 +760,7 @@
     away.type = "button";
     away.addEventListener("click", function () {
       Park.assignKeeper(park, k.id, null);
-      post("<b>" + k.name + "</b> left the " + Park.exhibitLabel(rec) + " for the staff room.");
+      post("<b>" + k.name + "</b> left the " + label(rec) + " for the staff room.");
       refreshAll();
     });
     row2.appendChild(away);
@@ -698,7 +811,7 @@
     park.keeperOrder.forEach(function (id) {
       var k = park.keepers[id], rec = k.exhibitId ? park.exhibits[k.exhibitId] : null;
       var li = h("li", "", "<span><b>" + k.name + "</b> " + (k.training ? "📚" : "") + '<br><span class="s">' + keeperTitle(k) + " · " +
-        (rec ? Park.exhibitLabel(rec) : "staff room") + "</span></span>");
+        (rec ? label(rec) : "staff room") + "</span></span>");
       if (rec) { li.style.cursor = "pointer"; li.addEventListener("click", function () { select(rec.id); }); }
       else {
         var f = h("button", "btn quiet", "Let go");
@@ -756,9 +869,11 @@
     if (!park.order.length) {
       insp.appendChild(h("div", "placard",
         "<p><b>Welcome, founder.</b> You have " + money(park.cash) + " in pre-seed funding and an empty lot.</p>" +
-        "<p>1. Pick a habitat on the left and place it in the park.<br>" +
-        "2. Click it to buy an animal — each animal is a quantum error-correcting code, and it can only live in a habitat that measures exactly its stabilizers.<br>" +
-        "3. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
+        "<p>1. Build a Parity Riverbank and buy its Repetition Tortoise, the one species everybody knows how to keep. " +
+        "Each animal is a logical qubit protected by a quantum error-correcting code, and it lives only in a habitat that measures exactly its stabilizers.<br>" +
+        "2. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
+        "3. Discover more species in the <b>habitat workshop</b>: place qubits and checks, wire them up, and build a habitat whose checks make a working code. " +
+        "The field guide has hints.<br>" +
         "4. Fund the lab to lower the hardware's error rates.</p>" +
         "<p class=\"hint\">Healthy, rare animals draw visitors. Sick ones cost vet bills and reputation. " +
         "The <a href=\"sandbox.html\">exhibit sandbox</a> shows one enclosure round by round.</p>"));
@@ -767,10 +882,10 @@
     var ul = h("ul", "overview");
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
-      var sp = rec.animal ? SPECIES[rec.animal.speciesId] : null;
+      var sp = rec.animal ? spOf(rec.animal.speciesId) : null;
       var li = h("li", "",
-        '<span class="g">' + (sp ? sp.glyph : "·") + '</span><span class="nm">' + (sp ? sp.name : "Empty") +
-        '<br><span class="h">' + Park.exhibitLabel(rec) + '</span></span><span class="h" data-ov="' + id + '"></span>');
+        '<span class="g">' + (sp ? sp.glyph : "·") + '</span><span class="nm">' + (sp ? esc(sp.name) : "Empty") +
+        '<br><span class="h">' + label(rec) + '</span></span><span class="h" data-ov="' + id + '"></span>');
       li.addEventListener("click", function () { select(id); });
       ul.appendChild(li);
     });
@@ -797,6 +912,7 @@
     var fill = $("iHealthFill");
     fill.style.width = hv + "%";
     fill.className = "fill " + healthClass(an.health);
+    if ($("iHealths")) $("iHealths").textContent = an.healths.map(function (v, i) { return "#" + (i + 1) + " " + Math.round(v) + "%"; }).join(" · ");
     updateKeeperSection(rec);
     var inc = an.incident, hasKeeper = an.level > 0;
     var view = inc ? { errors: inc.before, pulse: null, syndrome: inc.syndrome, correction: inc.correction, keeper: hasKeeper }
@@ -804,8 +920,9 @@
     var key = inc ? inc.tick + ":" + an.rounds : "none";
     if (insp.dataset.drawn !== key + ":" + hasKeeper) {
       insp.dataset.drawn = key + ":" + hasKeeper;
-      V.draw($("iGod"), an.speciesId, view, "god");
-      V.draw($("iKeeper"), an.speciesId, view, "keeper");
+      var src = rec.designId ? V.designLayout(habOf(rec).entry.layout) : an.speciesId;
+      V.draw($("iGod"), src, view, "god");
+      V.draw($("iKeeper"), src, view, "keeper");
       var born = rec.animalTick || 0;
       $("iIncident").textContent = inc ? "· " + clock(born + inc.tick) + (inc.sick ? " · logical " + inc.sick.kind + "!" : "") : "· none yet";
       $("iFired").textContent = inc && hasKeeper && inc.syndrome !== null ? popcount(inc.syndrome) + " lit" +
@@ -862,8 +979,19 @@
 
   // ---------- dialogs ----------
   // buttons: [{ label, cls, onClick }]; the game pauses while a dialog is open.
-  function openModal(html, buttons) {
+  // Show the dialog (pausing the game) and return its card, emptied.
+  function openCard(cls) {
     var card = $("modalCard");
+    card.className = "card" + (cls ? " " + cls : "");
+    card.innerHTML = "";
+    if (!ui.modalOpen) { ui.speedBeforeModal = ui.speed || ui.speedBeforeModal; setSpeed(0); }
+    ui.modalOpen = true;
+    $("modal").hidden = false;
+    return card;
+  }
+  function openModal(html, buttons, cls) {
+    var card = $("modalCard");
+    card.className = "card" + (cls ? " " + cls : "");
     card.innerHTML = html;
     var actions = h("div", "actions");
     buttons.forEach(function (b, i) {
@@ -871,7 +999,7 @@
       btn.type = "button";
       btn.addEventListener("click", b.onClick);
       actions.appendChild(btn);
-      if (i === buttons.length - 1) setTimeout(function () { btn.focus(); }, 0);
+      if (i === buttons.length - 1) setTimeout(function () { btn.focus({ preventScroll: true }); card.scrollTop = 0; }, 0);
     });
     card.appendChild(actions);
     if (!ui.modalOpen) { ui.speedBeforeModal = ui.speed || ui.speedBeforeModal; setSpeed(0); }
@@ -907,8 +1035,8 @@
       "</table>" +
       "<p>" + (e.runwayDays === null ? "Runway: <b>profitable</b> — you're not burning cash."
         : "Runway: <b>" + Math.floor(e.runwayDays) + " days</b> at this month's burn.") + "</p>" +
-      (sick ? "<p>Sickest exhibit: <b>" + (sick.animal ? SPECIES[sick.animal.speciesId].name : "The animal") + "</b> in the " +
-        Park.exhibitLabel(sick) + " (" + e.sickest.count + " logical error" + (e.sickest.count === 1 ? "" : "s") + ")." +
+      (sick ? "<p>Sickest exhibit: <b>" + (sick.animal ? spOf(sick.animal.speciesId).name : "The animal") + "</b> in the " +
+        label(sick) + " (" + e.sickest.count + " logical error" + (e.sickest.count === 1 ? "" : "s") + ")." +
         (sick.keeperId ? "" : " It has no keeper!") + "</p>" : "") +
       '<p class="hint">Series A needs ' + money(ECO.goal.cash) + " in the bank and reputation " + ECO.goal.reputation +
       ". You're at " + money(park.cash) + " and " + Math.round(park.reputation) + ".</p>";
@@ -917,7 +1045,7 @@
   function zooSummary() {
     var counts = {};
     park.order.forEach(function (id) { var a = park.exhibits[id].animal; if (a) counts[a.speciesId] = (counts[a.speciesId] || 0) + 1; });
-    var animals = Object.keys(counts).map(function (k) { return SPECIES[k].glyph + "×" + counts[k]; }).join("  ") || "none";
+    var animals = Object.keys(counts).map(function (k) { return spOf(k).glyph + "×" + counts[k]; }).join("  ") || "none";
     return "<table>" + row("Days in business", park.endDay) + row("Funding", money(park.cash)) +
       row("Reputation", Math.round(park.reputation)) + row("Animals", animals) +
       row("Logical errors, all time", park.totalSick) + "</table>";
@@ -940,10 +1068,66 @@
     }
   }
 
+  // ---------- workshop, field guide, discoveries ----------
+  function openWorkshop() {
+    if (ui.tool) setTool(null);
+    var card = openCard("wide");
+    Workshop.mount(card, {
+      park: park, design: ui.draft,
+      onPlace: function (design, name) {
+        ui.draft = design;
+        closeModal(true);
+        setTool({ kind: "design", design: design, name: "your new design", speciesName: name });
+        saveGame();
+      },
+      onClose: function (design) { ui.draft = design; closeModal(true); saveGame(); }
+    });
+  }
+  function openFieldGuide() {
+    var html = '<span class="eyebrow">Field guide</span><h2 class="title" id="modalTitle">Species</h2>' +
+      '<p class="hint">Each species is a quantum error-correcting code. Discover one by building a working habitat for it in the ' +
+      "workshop: its qubits may be numbered any way you like, and any qubit's checks may swap X, Y and Z consistently.</p>" +
+      '<ul class="guide">';
+    Object.keys(SPECIES).forEach(function (id) {
+      var sp = SPECIES[id], known = Park.isKnown(park, id), f = Placard.computedFacts(sp.code);
+      if (known) {
+        html += '<li><details><summary><span class="g">' + sp.glyph + "</span> <b>" + sp.name + "</b> " +
+          '<span class="mono">' + Placard.paramsString(f) + "</span></summary><div class=\"placard\">" + Placard.html(sp) + "</div></details></li>";
+      } else {
+        html += '<li class="unknown"><div><span class="g">❔</span> <b>' + sp.name + '</b> <span class="mono">' + Placard.paramsString(f) +
+          "</span> · not yet discovered</div><div class=\"hint\">" + sp.placard.summary + "</div></li>";
+      }
+    });
+    Object.keys(park.book.custom).forEach(function (id) {
+      var sp = spOf(id);
+      html += '<li><details><summary><span class="g">' + sp.glyph + "</span> <b>" + esc(sp.name) + '</b> <span class="mono">' + sp.params +
+        "</span></summary><p class=\"hint\">Discovered in your zoo on day " + (Math.floor(sp.discoveredTick / ECO.ticksPerDay) + 1) +
+        '. Not in any catalogue: everything below is computed from its checks.</p><div class="placard">' + Placard.html(sp) + "</div>" +
+        '<label class="ws-name">Rename <input type="text" maxlength="40" data-rename="' + id + '" value="' + esc(sp.name) + '"></label></details></li>';
+    });
+    html += "</ul>";
+    openModal(html, [{ label: "Close", onClick: function () { closeModal(true); refreshAll(); } }], "wide");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-rename]"), function (inp) {
+      inp.addEventListener("change", function () { Park.renameSpecies(park, inp.dataset.rename, inp.value); saveGame(); });
+    });
+  }
+  function showDiscovery(r) {
+    var sp = spOf(r.speciesId), b = Park.nativeBiome(r.speciesId);
+    var html = '<span class="eyebrow">New species</span><h2 class="title" id="modalTitle">' + sp.glyph + " " + esc(sp.name) + "</h2>" +
+      (r.newSpecies
+        ? "<p>Nobody has catalogued this code. It's in your field guide now, with a placard computed from its checks, and its habitat is in your blueprint book.</p>"
+        : "<p>You built a working habitat for the " + esc(sp.name) + ". It's in your field guide now" +
+          (b ? ", and its catalogue habitat, the <b>" + BIOMES[b].name + "</b>, is in the build menu" : "") + ".</p>") +
+      '<div class="placard">' + Placard.html(sp) + "</div>";
+    openModal(html, [{ label: "Back to the zoo", onClick: function () { closeModal(true); } }]);
+  }
+  $("workshopBtn").addEventListener("click", openWorkshop);
+  $("guideBtn").addEventListener("click", openFieldGuide);
+
   // ---------- save / load ----------
   var SAVE_KEY = "qecZooSave";
   function saveGame() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ park: Park.save(park), news: news.slice(0, 40) })); }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ park: Park.save(park), news: news.slice(0, 40), draft: ui.draft })); }
     catch (e) { /* storage unavailable: the game still works, it just won't persist */ }
   }
   function loadGame() {
@@ -953,13 +1137,14 @@
       var data = JSON.parse(raw);
       park = Park.load(data.park);
       news = Array.isArray(data.news) ? data.news : [];
+      ui.draft = data.draft && !Habitat.malformed(data.draft) ? data.draft : null;
       return true;
     } catch (e) { return false; }
   }
   function newGame() {
     park = Park.createPark();
     news = [];
-    ui.selected = null; ui.tool = null; ui.armedDemolish = false; ui.sickFlash = {};
+    ui.selected = null; ui.tool = null; ui.draft = null; ui.armedDemolish = false; ui.sickFlash = {};
     try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
     setTool(null);
     refreshAll();
@@ -985,7 +1170,8 @@
         var why = e.cause === "undetectable" ? "errors slipped past the checks"
           : e.cause === "miscorrected" ? "the keeper's correction backfired"
           : rec && rec.animal && rec.animal.level ? "too many errors at once to tell apart" : "nobody was measuring the checks";
-        post("The " + SPECIES[e.speciesId].name + " in the " + Park.exhibitLabel(rec) + " caught a logical " + e.kind +
+        var esp = spOf(e.speciesId), many = rec && rec.animal && rec.animal.k > 1;
+        post((many ? "Animal #" + (e.animal + 1) + " of the " : "The ") + esc(esp.name) + " in the " + label(rec) + " caught a logical " + e.kind +
           " — " + why + ". Vet bill −" + money(e.bill).slice(1) + ".", "sick");
       } else if (e.type === "day") {
         if (park.order.length) {

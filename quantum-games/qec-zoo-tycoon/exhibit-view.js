@@ -84,10 +84,38 @@
     return layoutCache[speciesId];
   }
 
+  // Pixel layout for a habitat design (habitat.js): qubits and check
+  // ancillas where the player put them, half a unit per grid cell.
+  var designCache = {};
+  function designLayout(design) {
+    var key = JSON.stringify(design);
+    if (designCache[key]) return designCache[key];
+    var cells = design.qubits.concat(design.checks.map(function (c) { return c.at; }));
+    var minX = Math.min.apply(null, cells.map(function (p) { return p[0]; }));
+    var minY = Math.min.apply(null, cells.map(function (p) { return p[1]; }));
+    var maxX = Math.max.apply(null, cells.map(function (p) { return p[0]; }));
+    var maxY = Math.max.apply(null, cells.map(function (p) { return p[1]; }));
+    var u = UNIT / 2;
+    function px(v, min) { return PAD + (v - min) * u; }
+    var out = {
+      qubits: design.qubits.map(function (p) { return { x: px(p[0], minX), y: px(p[1], minY) }; }),
+      checks: design.checks.map(function (c) {
+        var hasX = false, hasZ = false;
+        c.wires.forEach(function (w) { if (w[1] !== "Z") hasX = true; if (w[1] !== "X") hasZ = true; });
+        return { x: px(c.at[0], minX), y: px(c.at[1], minY), type: hasX && hasZ ? "mix" : hasX ? "x" : "z",
+          support: c.wires.map(function (w) { return w[0]; }) };
+      }),
+      width: 2 * PAD + (maxX - minX) * u, height: 2 * PAD + (maxY - minY) * u
+    };
+    designCache[key] = out;
+    return out;
+  }
+
+  // src: a species id (its catalogue layout) or a designLayout().
   // view: { errors: Pauli, pulse: Pauli|null (just landed), syndrome: int|null,
   //         correction: Pauli|null, keeper: bool }
-  function draw(svg, speciesId, view, mode) {
-    var d = layout(speciesId);
+  function draw(svg, src, view, mode) {
+    var d = typeof src === "string" ? layout(src) : src;
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     svg.setAttribute("viewBox", "0 0 " + d.width + " " + d.height);
     var syn = view.syndrome;
@@ -130,5 +158,5 @@
     });
   }
 
-  root.ExhibitView = { layout: layout, draw: draw, describe: describe };
+  root.ExhibitView = { layout: layout, designLayout: designLayout, draw: draw, describe: describe };
 })(window);

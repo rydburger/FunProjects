@@ -26,13 +26,24 @@
 // (zoo-data.js) by a level: lower error rates, or a faster syndrome
 // cycle. Every exhibit picks up the new hardware when it completes.
 //
-// Browser: load after ../stabilizer.js, ../detectors.js, zoo-data.js, exhibit-sim.js;
-// exposes `window.Park`. Node: require("./park.js").
+// Discovery and the blueprint book. Only the species in START_KNOWN are
+// known at first. Building a working habitat in the workshop
+// (buildDesign; designs are described in habitat.js) discovers the
+// species it holds: a textbook one, recognised whatever the qubit
+// numbering, unlocks its catalogue habitat; a code nobody has
+// catalogued becomes a new species with a computed placard. Every design
+// built goes into the book (park.book.designs) and can be built again.
+// A habitat holds one animal per logical qubit (k of them).
+//
+// Browser: load after ../stabilizer.js, ../detectors.js, zoo-data.js, habitat.js,
+// exhibit-sim.js; exposes `window.Park`. Node: require("./park.js").
 // =========================================================
 (function (root) {
   var isNode = typeof module !== "undefined" && module.exports;
   var Z = isNode ? require("./zoo-data.js") : root.ZooData;
   var X = isNode ? require("./exhibit-sim.js") : root.ExhibitSim;
+  var S = isNode ? require("../stabilizer.js") : root.Stabilizer;
+  var Hab = isNode ? require("./habitat.js") : root.Habitat;
   var ECO = Z.ECONOMY;
 
   function createPark(opts) {
@@ -59,8 +70,16 @@
       keeperOrder: [],
       nextKeeperId: 1,
       lab: { levels: { coherence: 0, gates: 0, readout: 0, cycle: 0 }, project: null },
+      book: freshBook(opts.known || Z.START_KNOWN),
       rng: opts.rng || Math.random
     };
+  }
+  // known: species id -> tick discovered; designs: [{ id, name,
+  // speciesId, layout }]; custom: species id -> uncatalogued species.
+  function freshBook(known) {
+    var b = { known: {}, designs: [], custom: {}, nextDesign: 1, nextCustom: 1 };
+    known.forEach(function (id) { b.known[id] = 0; });
+    return b;
   }
 
   function freshMonth() { return { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0, sickBy: {} }; }
@@ -71,31 +90,177 @@
 
   function footprint(biomeId) { return Z.BIOMES[biomeId].footprint; }
 
+  // ---------- species and habitats ----------
+  function isKnown(park, speciesId) { return Object.prototype.hasOwnProperty.call(park.book.known, speciesId); }
+  // Attach a value that save() leaves out (it's rebuilt on load).
+  function hidden(obj, key, value) {
+    Object.defineProperty(obj, key, { value: value, enumerable: false, configurable: true, writable: true });
+    return value;
+  }
+  // A catalogue species, or one discovered in this park.
+  function speciesInfo(park, id) {
+    if (Z.SPECIES[id]) return Z.SPECIES[id];
+    var sp = park.book.custom[id];
+    if (!sp) return null;
+    if (!sp.code) {
+      var ops = sp.checks.map(S.fromString);
+      hidden(sp, "code", S.analyzeChecks(sp.n, ops).code);
+      sp.code.name = sp.name;
+    }
+    return sp;
+  }
+  // A book design's analysis (cached on the entry).
+  function designSim(entry) {
+    if (!entry.sim) {
+      var a = Hab.analyze(entry.layout, { budget: 1 }); // the distance isn't needed to simulate
+      if (!a.code) throw new Error("Design " + entry.id + " doesn't hold an animal");
+      hidden(entry, "sim", { code: a.code, checks: a.ops });
+    }
+    return entry.sim;
+  }
+  function designEntry(park, id) {
+    for (var i = 0; i < park.book.designs.length; i++) if (park.book.designs[i].id === id) return park.book.designs[i];
+    return null;
+  }
+  // What every enclosure has, catalogue or designed: { name, cost,
+  // upkeep, footprint, channel, blurb, designed, entry }.
+  function habitatOf(park, rec) {
+    if (rec.biomeId) {
+      var b = Z.BIOMES[rec.biomeId];
+      return { name: b.name, cost: b.cost, upkeep: b.upkeep, footprint: b.footprint, channel: b.climate.channel, blurb: b.blurb, designed: false };
+    }
+    var e = designEntry(park, rec.designId);
+    return { name: e.name, cost: rec.cost, upkeep: rec.upkeep, footprint: [rec.w, rec.h], channel: "depolarizing", designed: true, entry: e,
+      blurb: "Your own design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks, " +
+        Hab.wireCount(e.layout) + " wires." };
+  }
+  // Every species the park knows about, as identify() candidates.
+  function knownCandidates(park) {
+    var c = Hab.textbook();
+    Object.keys(park.book.custom).forEach(function (id) { c.push({ id: id, code: speciesInfo(park, id).code }); });
+    return c;
+  }
+
   // ---------- building ----------
-  function canBuild(park, biomeId, x, y) {
-    var fp = footprint(biomeId), biome = Z.BIOMES[biomeId];
+  function fits(park, x, y, fp) {
     if (x < 0 || y < 0 || x + fp[0] > park.width || y + fp[1] > park.height) return { ok: false, reason: "Doesn't fit inside the park." };
     for (var dy = 0; dy < fp[1]; dy++) for (var dx = 0; dx < fp[0]; dx++) {
       if (park.grid[(y + dy) * park.width + (x + dx)] !== null) return { ok: false, reason: "Overlaps another enclosure." };
     }
+    return { ok: true, reason: null };
+  }
+  function canBuild(park, biomeId, x, y) {
+    var biome = Z.BIOMES[biomeId];
+    if (!biome) return { ok: false, reason: "No such habitat." };
+    if (!isKnown(park, biome.native)) {
+      return { ok: false, reason: "Nobody here knows how to keep the " + Z.SPECIES[biome.native].name +
+        " yet. Discover it by building a working habitat for it in the workshop." };
+    }
+    var f = fits(park, x, y, footprint(biomeId));
+    if (!f.ok) return f;
     if (park.cash < biome.cost) return { ok: false, reason: "Not enough funding ($" + biome.cost.toLocaleString() + " needed)." };
     return { ok: true, reason: null };
+  }
+  function occupy(park, rec, cost) {
+    for (var dy = 0; dy < rec.h; dy++) for (var dx = 0; dx < rec.w; dx++) park.grid[(rec.y + dy) * park.width + (rec.x + dx)] = rec.id;
+    park.exhibits[rec.id] = rec;
+    park.order.push(rec.id);
+    park.cash -= cost;
   }
   function build(park, biomeId, x, y) {
     var check = canBuild(park, biomeId, x, y);
     if (!check.ok) return check;
     var fp = footprint(biomeId), id = park.nextId++;
-    var biome = Z.BIOMES[biomeId];
     var rec = {
       id: id, biomeId: biomeId, x: x, y: y, w: fp[0], h: fp[1],
       number: park.order.filter(function (o) { return park.exhibits[o].biomeId === biomeId; }).length + 1,
       keeperId: null, animal: null, builtTick: park.tick
     };
-    for (var dy = 0; dy < fp[1]; dy++) for (var dx = 0; dx < fp[0]; dx++) park.grid[(y + dy) * park.width + (x + dx)] = id;
-    park.exhibits[id] = rec;
-    park.order.push(id);
-    park.cash -= biome.cost;
+    occupy(park, rec, Z.BIOMES[biomeId].cost);
     return { ok: true, exhibit: rec };
+  }
+
+  // What a design would hold: { analysis, speciesId (null: a species
+  // nobody has catalogued), known (already discovered here), entry (the
+  // same design already in the book, or null) }.
+  var studyCache = {};
+  function studyDesign(park, design) {
+    var key = JSON.stringify(design);
+    var hit = studyCache[key];
+    if (!hit) {
+      if (Object.keys(studyCache).length > 200) studyCache = {};
+      var a = Hab.analyze(design);
+      hit = { analysis: a, textbook: a.valid ? Hab.identify(a.code, Hab.textbook()) : null };
+      studyCache[key] = hit;
+    }
+    var match = hit.textbook;
+    if (!match && hit.analysis.valid) {
+      var custom = Object.keys(park.book.custom).map(function (id) { return { id: id, code: speciesInfo(park, id).code }; });
+      match = Hab.identify(hit.analysis.code, custom);
+    }
+    var entry = null;
+    park.book.designs.forEach(function (e) { if (JSON.stringify(e.layout) === key) entry = e; });
+    return { analysis: hit.analysis, speciesId: match ? match.id : null, known: !!match && isKnown(park, match.id), entry: entry };
+  }
+  function canBuildDesign(park, design, x, y) {
+    var bad = Hab.malformed(design);
+    if (bad) return { ok: false, reason: bad };
+    var st = studyDesign(park, design), a = st.analysis;
+    if (!a.valid) return { ok: false, reason: a.problems[0], study: st };
+    var f = fits(park, x, y, a.footprint);
+    if (!f.ok) return { ok: false, reason: f.reason, study: st };
+    if (park.cash < a.cost) return { ok: false, reason: "Not enough funding ($" + a.cost.toLocaleString() + " needed).", study: st };
+    return { ok: true, reason: null, study: st };
+  }
+  // Build a design at (x, y). opts: { name } for a species nobody has
+  // catalogued. Returns { ok, exhibit, speciesId, discovered (first time
+  // here), newSpecies (uncatalogued), entry (its book entry) }.
+  function buildDesign(park, design, x, y, opts) {
+    opts = opts || {};
+    var c = canBuildDesign(park, design, x, y);
+    if (!c.ok) return c;
+    var st = c.study, a = st.analysis, speciesId = st.speciesId, newSpecies = false;
+    if (!speciesId) {
+      newSpecies = true;
+      speciesId = "c" + park.book.nextCustom++;
+      var gl = Z.CUSTOM.glyphs, num = park.book.nextCustom - 1;
+      var d = a.d !== null ? a.d : a.dAtLeast;
+      var sp = {
+        id: speciesId, custom: true,
+        name: (opts.name && String(opts.name).trim().slice(0, 40)) || "Wild code no. " + num,
+        glyph: gl[(num - 1) % gl.length], appeal: Hab.customAppeal(d), cost: Hab.customCost(d),
+        n: a.n, k: a.k, d: a.d, dAtLeast: a.dAtLeast,
+        params: "[[" + a.n + "," + a.k + "," + (a.d !== null ? a.d : "≥" + a.dAtLeast) + "]]" + (a.k > 1 ? " (" + a.k + " animals)" : ""),
+        checks: a.code.stabilizers.map(S.toString), discoveredTick: park.tick
+      };
+      park.book.custom[speciesId] = sp;
+      hidden(sp, "code", a.code);
+    }
+    var discovered = !isKnown(park, speciesId);
+    if (discovered) park.book.known[speciesId] = park.tick;
+    var entry = st.entry;
+    if (!entry) {
+      var spName = speciesInfo(park, speciesId).name, same = park.book.designs.filter(function (e) { return e.speciesId === speciesId; }).length;
+      entry = { id: park.book.nextDesign++, name: spName + " habitat" + (same ? " " + (same + 1) : ""), speciesId: speciesId, layout: Hab.clone(design) };
+      park.book.designs.push(entry);
+    }
+    var id = park.nextId++;
+    var rec = {
+      id: id, biomeId: null, designId: entry.id, x: x, y: y, w: a.footprint[0], h: a.footprint[1],
+      number: park.order.filter(function (o) { return park.exhibits[o].designId === entry.id; }).length + 1,
+      cost: a.cost, upkeep: a.upkeep, keeperId: null, animal: null, builtTick: park.tick
+    };
+    occupy(park, rec, a.cost);
+    return { ok: true, exhibit: rec, speciesId: speciesId, discovered: discovered, newSpecies: newSpecies, entry: entry };
+  }
+  // Rename a species discovered here (catalogued ones keep their names).
+  function renameSpecies(park, id, name) {
+    var sp = park.book.custom[id];
+    name = String(name || "").trim().slice(0, 40);
+    if (!sp || !name) return { ok: false, reason: "Can't rename that." };
+    sp.name = name;
+    if (sp.code) sp.code.name = name;
+    return { ok: true };
   }
   function exhibitAt(park, x, y) {
     if (x < 0 || y < 0 || x >= park.width || y >= park.height) return null;
@@ -111,32 +276,56 @@
     for (var i = 0; i < park.grid.length; i++) if (park.grid[i] === id) park.grid[i] = null;
     delete park.exhibits[id];
     park.order = park.order.filter(function (o) { return o !== id; });
-    var refund = Math.round(Z.BIOMES[rec.biomeId].cost * ECO.demolishRefund);
+    var refund = Math.round(habitatOf(park, rec).cost * ECO.demolishRefund);
     park.cash += refund;
     return { ok: true, refund: refund };
   }
 
   // ---------- animals & keepers ----------
-  // Every species, with whether it can live in this enclosure and why not.
+  // Animals per enclosure: one per logical qubit.
+  function animalCount(park, speciesId) { return speciesInfo(park, speciesId).code.logicalX.length; }
+  // Price of stocking an enclosure with this species (every animal).
+  function stockCost(park, speciesId) { return speciesInfo(park, speciesId).cost * animalCount(park, speciesId); }
+  // Can this species live here? A designed habitat holds exactly the
+  // species it was identified as; a catalogue one, its native species.
+  function placement(park, rec, speciesId) {
+    if (!isKnown(park, speciesId)) return { ok: false, reason: "Not discovered yet." };
+    if (rec.designId) {
+      var e = designEntry(park, rec.designId);
+      return e.speciesId === speciesId ? { ok: true, reason: null }
+        : { ok: false, reason: "This habitat measures the stabilizers of the " + speciesInfo(park, e.speciesId).name + ", a different code." };
+    }
+    if (!Z.SPECIES[speciesId]) return { ok: false, reason: "It only lives in habitats built from its own design." };
+    return Z.checkPlacement(speciesId, rec.biomeId);
+  }
+  // Every known species, with whether it can live in this enclosure and why not.
   function speciesOptions(park, id) {
     var rec = park.exhibits[id];
-    return Object.keys(Z.SPECIES).map(function (sid) {
-      var pl = Z.checkPlacement(sid, rec.biomeId), cost = Z.SPECIES[sid].cost;
-      return { speciesId: sid, ok: pl.ok, reason: pl.reason, cost: cost, affordable: park.cash >= cost };
+    var ids = Object.keys(Z.SPECIES).concat(Object.keys(park.book.custom)).filter(function (sid) { return isKnown(park, sid); });
+    return ids.map(function (sid) {
+      var pl = placement(park, rec, sid), cost = stockCost(park, sid);
+      return { speciesId: sid, ok: pl.ok, reason: pl.reason, cost: cost, animals: animalCount(park, sid), affordable: park.cash >= cost };
     });
+  }
+  // How an exhibit's animal is simulated: the catalogue species' own
+  // generators, or a designed habitat's checks.
+  function simFor(park, rec) {
+    return rec.designId ? designSim(designEntry(park, rec.designId)) : { code: null, checks: null };
   }
   function buyAnimal(park, id, speciesId) {
     var rec = park.exhibits[id];
     if (!rec) return { ok: false, reason: "No such enclosure." };
     if (rec.animal) return { ok: false, reason: "This enclosure already has a resident." };
-    var pl = Z.checkPlacement(speciesId, rec.biomeId);
+    if (!speciesInfo(park, speciesId)) return { ok: false, reason: "No such species." };
+    var pl = placement(park, rec, speciesId);
     if (!pl.ok) return pl;
-    var cost = Z.SPECIES[speciesId].cost;
+    var cost = stockCost(park, speciesId);
     if (park.cash < cost) return { ok: false, reason: "Not enough funding ($" + cost.toLocaleString() + " needed)." };
     park.cash -= cost;
     rec.animalTick = park.tick;
+    var sim = simFor(park, rec);
     rec.animal = X.createExhibit({
-      speciesId: speciesId, channel: Z.BIOMES[rec.biomeId].climate.channel,
+      speciesId: speciesId, code: sim.code, checks: sim.checks, channel: habitatOf(park, rec).channel,
       lab: labValues(park), keeper: keeperOnDuty(park, rec), rng: park.rng
     });
     return { ok: true };
@@ -239,14 +428,15 @@
 
   // ---------- money ----------
   function reputationFactor(park) { return 0.5 + park.reputation / 100; }
-  // Visitors per day drawn by one exhibit right now.
+  // Visitors per day drawn by one exhibit (all its animals) right now.
   function exhibitVisitors(park, rec) {
     if (!rec.animal) return 0;
-    return ECO.visitorsPerAppeal * Z.SPECIES[rec.animal.speciesId].appeal * (rec.animal.health / 100) * reputationFactor(park);
+    return ECO.visitorsPerAppeal * speciesInfo(park, rec.animal.speciesId).appeal * rec.animal.k * (rec.animal.health / 100) *
+      reputationFactor(park);
   }
   // Upkeep plus the salary of the keeper assigned here.
   function exhibitCosts(park, rec) {
-    return Z.BIOMES[rec.biomeId].upkeep + (rec.keeperId ? keeperSalary(park.keepers[rec.keeperId]) : 0);
+    return habitatOf(park, rec).upkeep + (rec.keeperId ? keeperSalary(park.keepers[rec.keeperId]) : 0);
   }
   // Current daily rates (what the top bar shows).
   function rates(park) {
@@ -254,7 +444,7 @@
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
       visitors += exhibitVisitors(park, rec);
-      costs += Z.BIOMES[rec.biomeId].upkeep;
+      costs += habitatOf(park, rec).upkeep;
     });
     park.keeperOrder.forEach(function (id) { costs += keeperSalary(park.keepers[id]); });
     var revenue = visitors * ECO.ticketPrice;
@@ -263,7 +453,7 @@
 
   // ---------- time ----------
   // Advance the whole park by one tick (one hour). Returns events:
-  //   { type: "sick", exhibitId, speciesId, kind, cause, bill }
+  //   { type: "sick", exhibitId, speciesId, animal, kind, cause, bill }
   //   { type: "day", day, revenue, expenses, vet, visitors, sick, reputation }
   //   { type: "debt", daysInDebt, daysLeft }       (end of a day spent in debt)
   //   { type: "investor", month, revenue, expenses, vet, visitors, sick,
@@ -300,7 +490,7 @@
         park.totalSick++;
         park.month.sickBy[id] = (park.month.sickBy[id] || 0) + 1;
         park.reputation = Math.max(0, park.reputation - ECO.sickReputationHit);
-        events.push({ type: "sick", exhibitId: id, speciesId: rec.animal.speciesId, kind: s.kind, cause: s.cause, bill: ECO.vetBill });
+        events.push({ type: "sick", exhibitId: id, speciesId: rec.animal.speciesId, animal: s.animal, kind: s.kind, cause: s.cause, bill: ECO.vetBill });
       });
       if (rec.keeperId) park.keepers[rec.keeperId].xp += rec.animal.decoded - before;
     });
@@ -380,7 +570,7 @@
   function continueAfterWin(park) { if (park.status === "won") park.freePlay = true; }
 
   // ---------- save / load ----------
-  var SAVE_VERSION = 2;
+  var SAVE_VERSION = 3;
   // Plain JSON. Animals are stored as ExhibitSim snapshots (decoders, noise
   // models and RNGs are rebuilt on load).
   function save(park) {
@@ -400,32 +590,47 @@
   function load(json, opts) {
     opts = opts || {};
     var data = typeof json === "string" ? JSON.parse(json) : json;
-    if (!data || data.version !== SAVE_VERSION) throw new Error("Unsupported save version");
+    if (!data || (data.version !== SAVE_VERSION && data.version !== 2)) throw new Error("Unsupported save version");
+    if (data.version === 2) {
+      // Before the workshop, all five species of the time were known.
+      data.book = freshBook(["tortoise", "owl", "peacock", "pangolin", "axolotl"]);
+    }
     delete data.version;
     var park = data;
     park.rng = opts.rng || Math.random;
+    if (!park.book || !park.book.known || !Array.isArray(park.book.designs) || !park.book.custom) throw new Error("Corrupted save: no book");
+    park.book.designs.forEach(function (e) {
+      if (Hab.malformed(e.layout)) throw new Error("Corrupted design in save: " + e.id);
+      if (!Z.SPECIES[e.speciesId] && !park.book.custom[e.speciesId]) throw new Error("Unknown species in save: " + e.speciesId);
+    });
     Object.keys(park.exhibits).forEach(function (id) {
       var rec = park.exhibits[id];
-      if (!Z.BIOMES[rec.biomeId]) throw new Error("Unknown biome in save: " + rec.biomeId);
+      if (rec.designId ? !designEntry(park, rec.designId) : !Z.BIOMES[rec.biomeId]) throw new Error("Unknown habitat in save: " + (rec.biomeId || rec.designId));
       if (rec.keeperId && !park.keepers[rec.keeperId]) throw new Error("Unknown keeper in save: " + rec.keeperId);
     });
     Object.keys(park.exhibits).forEach(function (id) {
       var rec = park.exhibits[id];
       if (rec.animal) {
-        if (!Z.SPECIES[rec.animal.speciesId]) throw new Error("Unknown species in save: " + rec.animal.speciesId);
-        rec.animal = X.restore(rec.animal, { lab: labValues(park), keeper: keeperOnDuty(park, rec), rng: park.rng });
+        if (!speciesInfo(park, rec.animal.speciesId)) throw new Error("Unknown species in save: " + rec.animal.speciesId);
+        var sim = simFor(park, rec);
+        rec.animal = X.restore(rec.animal, { lab: labValues(park), keeper: keeperOnDuty(park, rec), rng: park.rng, code: sim.code, checks: sim.checks });
       }
     });
     return park;
   }
 
-  function exhibitLabel(rec) {
-    return Z.BIOMES[rec.biomeId].name + " #" + rec.number;
+  function nativeBiome(speciesId) {
+    for (var b in Z.BIOMES) if (Z.BIOMES[b].native === speciesId) return b;
+    return null;
   }
+  function exhibitLabel(park, rec) { return habitatOf(park, rec).name + " #" + rec.number; }
 
   var Park = {
     createPark: createPark, day: day, hour: hour, footprint: footprint,
+    isKnown: isKnown, speciesInfo: speciesInfo, habitatOf: habitatOf, nativeBiome: nativeBiome, knownCandidates: knownCandidates,
     canBuild: canBuild, build: build, exhibitAt: exhibitAt, demolish: demolish,
+    studyDesign: studyDesign, canBuildDesign: canBuildDesign, buildDesign: buildDesign, renameSpecies: renameSpecies,
+    designEntry: designEntry, animalCount: animalCount, stockCost: stockCost,
     speciesOptions: speciesOptions, buyAnimal: buyAnimal,
     keeperSpeed: keeperSpeed, keeperSalary: keeperSalary, keeperOnDuty: keeperOnDuty,
     hireKeeper: hireKeeper, assignKeeper: assignKeeper, fireKeeper: fireKeeper,

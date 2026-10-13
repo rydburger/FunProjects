@@ -422,7 +422,7 @@
     return [id, SPECIES[id].glyph + " " + SPECIES[id].name + " — " + SPECIES[id].params];
   }));
   fillSelect($("biomeSel"), Object.keys(BIOMES).map(function (id) {
-    return [id, BIOMES[id].name + " (" + SPECIES[BIOMES[id].native].name.split(" ")[1] + " habitat)"];
+    return [id, BIOMES[id].name + " (" + SPECIES[BIOMES[id].native].name + " habitat)"];
   }));
   fillSelect($("keeperSel"), [["none", "— none —"]].concat([1, 2, 3, 4].map(function (l) {
     return [String(l), "🧑‍🌾 " + LEVELS[l].title + " (level " + l + ")"];

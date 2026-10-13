@@ -79,7 +79,7 @@ test("validateCode catches a broken code", function () {
 });
 
 console.log("Species (codes)");
-var EXPECTED = { tortoise: [3, 1], owl: [9, 1], peacock: [7, 1], pangolin: [5, 1], axolotl: [9, 1] };
+var EXPECTED = { tortoise: [3, 1], owl: [9, 1], peacock: [7, 1], pangolin: [5, 1], axolotl: [9, 1], penguins: [4, 2], giant: [25, 1] };
 SPECIES_IDS.forEach(function (id) {
   var sp = Zoo.SPECIES[id], code = sp.code;
   test(sp.name + " is a valid [[" + EXPECTED[id].join(",") + "]] code", function () {
@@ -209,7 +209,8 @@ test("under-measuring habitat reports the missing check", function () {
 
 console.log("Code analysis");
 // Textbook parameters, verified independently of each species' `params` string.
-var EXPECT = { tortoise: [3, 1, 1], owl: [9, 1, 3], peacock: [7, 1, 3], pangolin: [5, 1, 3], axolotl: [9, 1, 3] };
+var EXPECT = { tortoise: [3, 1, 1], owl: [9, 1, 3], peacock: [7, 1, 3], pangolin: [5, 1, 3], axolotl: [9, 1, 3],
+  penguins: [4, 2, 2], giant: [25, 1, 5] };
 SPECIES_IDS.forEach(function (id) {
   test(Zoo.SPECIES[id].name + ": computed [[n,k,d]] = " + JSON.stringify(EXPECT[id]), function () {
     var a = S.analyzeChecks(Zoo.SPECIES[id].code.n, Zoo.SPECIES[id].code.stabilizers);
@@ -231,7 +232,7 @@ test("computed logicals are valid pairs for every species and biome", function (
     var a = S.analyzeChecks(n, b.checkOps);
     var v = S.validateCode(a.code);
     assert.ok(v.ok, id + ": " + v.errors.join("; "));
-    assert.strictEqual(a.k, 1);
+    assert.strictEqual(a.k, EXPECT[b.native][1]);
   });
 });
 test("the vet's view: a biome's computed code has the species' distance", function () {
