@@ -6,18 +6,20 @@ Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan*
 
 ## Where things stand
 
-**v0 is complete (M0–M3). v1 is under way: M4 (factual placards) and M5 (engine) are done.**
+**v0 is complete (M0–M3). v1 is under way: M4 (placards), M5 (engine) and M6 (learning keepers
+and the lab) are done.**
 The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan" before continuing.
 
 - **PR history:**
   - [#2](https://github.com/rydburger/FunProjects/pull/2) merged the plan.
   - [#3](https://github.com/rydburger/FunProjects/pull/3) merged M0–M3.
   - [#4](https://github.com/rydburger/FunProjects/pull/4) added CLAUDE.md and this file.
-  - M4 + M5 are on branch `claude/epic-ride-l7e51i`.
-- **Tests:** 68 in `tests/stabilizer.test.js`, 16 in `tests/detectors.test.js` and 43 in
+  - [#5](https://github.com/rydburger/FunProjects/pull/5) merged M4 + M5.
+  - M6 is on branch `claude/epic-ride-l7e51i` (restarted from `main` after #5).
+- **Tests:** 64 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 51 in
   `tests/zoo-tycoon.test.js`, all passing.
-- **Browser checks:** placards verified in headless Chromium in light and dark themes and at
-  390px width, with no console errors.
+- **Browser checks:** park (staff, lab, training, research, misreads) and sandbox verified in
+  headless Chromium in light and dark themes and at 390px width, with no console errors.
 
 | Milestone | Delivered |
 |---|---|
@@ -27,9 +29,7 @@ The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
 | M3 game loop | win/lose, monthly investor dialog, localStorage autosave, balance pass, README |
 | M4 placards | `placard.js`; structured, factual placards in `zoo-data.js` with computed parameters |
 | M5 engine | code analysis in `../stabilizer.js`; `../detectors.js` (option A, option B scaffold); `tests/detectors.test.js` |
-
-**Important:** the game itself still runs the v0 simulation (`exhibit-sim.js`, perfect
-measurements, three keeper tiers). `detectors.js` is tested but not wired in yet; that is M6.
+| M6 keepers + lab | `exhibit-sim.js` on `Detectors`; staff roster, training and the lab in `park.js`; `KEEPER_LEVELS`, `TRAINING`, `LAB`, `RESEARCH` in `zoo-data.js`; UI panels; rebalanced |
 
 ## Architecture in one breath
 
@@ -50,10 +50,15 @@ measurements, three keeper tiers). `detectors.js` is tested but not wired in yet
   (outcome XOR previous outcome). Noise models: `phenomenological(rates, q)`; `circuitLevel` is a
   scaffold that throws "not implemented".
 - `phenoDEM`: the detector error model over a window of rounds.
+- Noise can vary per qubit (`rates` array) and per check (`q` array); `setModel` swaps it.
 - Decoders with `push(round)` / `flush(round)` / `reset()`: `lookupDecoder` (single-shot, raw
-  syndromes) and `matchingDecoder` (sliding window; exact matching by DP over subsets of lit
-  detectors, greedy past `maxDefects`; needs every fault to light ≤ 2 detectors, so surface,
-  repetition and Shor yes, Steane and five-qubit no).
+  syndromes), `matchingDecoder` (sliding window; exact matching by DP over subsets of lit
+  detectors, greedy past `maxDefects`; needs every fault to light ≤ 2 detectors), and
+  `spacetimeLookupDecoder` (table of the likeliest ≤ 3-fault explanation of each window
+  pattern; for small codes). `spacetimeDecoder` picks matching only for CSS + matchable checks
+  (surface, repetition, Shor) and the table otherwise (Steane, five-qubit: splitting Y into X
+  and Z parts is wrong for non-CSS codes, and matching the five-qubit code that way did worse
+  than a single-shot lookup).
 - `runMemory`: a full memory experiment ending in a perfect round.
 - Measured behaviour (tests pin it): matching fixes every single fault (d = 3, windows 1–4) and
   every pair of X/measurement faults (d = 5, window 5). With p = 0.5% and q = 2% on d = 3, matching
@@ -62,13 +67,16 @@ measurements, three keeper tiers). `detectors.js` is tested but not wired in yet
 
 The game files build on it:
 - `zoo-data.js` holds the data: `SPECIES` (5 codes plus layout and placard), `BIOMES` (check
-  lists as *different generating sets* of each group, plus climate), `KEEPERS`, `ECONOMY`, and
-  `checkPlacement` (returns a physics-worded reason on mismatch).
-- `exhibit-sim.js` runs one exhibit. `advancePhase` steps noise → measure → correct and returns
-  an event; `runTick` runs a whole tick.
-- `park.js` runs the whole zoo: `createPark`, `build`/`buyAnimal`/`setKeeper`/`demolish`,
-  `tick` (which returns events: `sick`, `day`, `debt`, `investor`, `won`, `lost`), and
-  `save`/`load`.
+  lists as *different generating sets* of each group, plus a noise channel), `KEEPER_LEVELS`,
+  `TRAINING`, `KEEPER_SPEED`, `LAB`, `RESEARCH`, `ECONOMY`, and `checkPlacement`.
+- `exhibit-sim.js` runs one exhibit on a `Detectors` memory (it measures the species' own
+  generators). `noiseModel` turns lab values into per-qubit/per-check rates; `effectiveLevel`
+  is the best decoder the keeper can run in real time; `advancePhase` steps noise → measure →
+  correct; `snapshot`/`restore` for saves.
+- `park.js` runs the whole zoo: building, animals, staff (`hireKeeper`, `assignKeeper`,
+  `fireKeeper`, `canTrain`/`trainKeeper`), the lab (`canResearch`/`startResearch`), `tick`
+  (events: `sick`, `day`, `debt`, `investor`, `won`, `lost`, `trained`, `research`), and
+  `save`/`load` (version 2; v1 saves are rejected and the page starts fresh).
 - Everything above is DOM-free and loads in Node.
 - `exhibit-view.js` does the SVG drawing, and the two HTML pages are UI only.
 
@@ -79,40 +87,41 @@ The game files build on it:
 - **Habitat = stabilizer group.** An animal lives only where the checks generate its exact group.
   Placement compares GF(2) row spaces, and a mismatch message names a foreign check and the
   logical it clashes with, or the check that's missing.
-- **The vet.** After every round, if the best keeper (weight-2 table) couldn't decode what's left
-  without a logical flip, the animal is sick: vet bill, −30 health, error frame reset. A leftover
-  that is itself a stabilizer is cleared as harmless.
-- **Rounds split the noise.** A keeper with R rounds per tick sees p/R per round. Otherwise extra
-  rounds are useless with perfect measurements. This is what makes the Head Keeper meaningful.
-- **Syndrome measurement is perfect in the game (v0 sim).** `detectors.js` has noisy measurement;
-  wiring it into the game is M6.
+- **The vet.** When the keeper commits a round, the vet takes the true error *at that round*
+  times the Pauli frame and asks whether a perfect-information weight-2 table could still
+  decode it. If not: vet bill, −30 health, the animal is re-prepared. Judging the committed
+  round (not "now") keeps space-time keepers from being blamed for errors they haven't had the
+  chance to see yet. A leftover stabilizer is folded into the frame.
+- **Speed, not backlog.** In a pure memory a slow decoder only delays corrections (Pauli frames
+  commute), so letting backlog cause logical errors would be wrong physics. Instead a keeper who
+  can't keep up uses the best decoder they can run in real time.
+- **Training is on the job.** An earlier version sent keepers away; the unattended exhibits made
+  every course a net loss for the bots.
+- **Without a keeper nobody measures,** so there are no measurement errors either.
 
 ## Current numbers (zoo-data.js)
 
-- **Start:** $50k and reputation 50.
-- **Goal:** $250k with reputation ≥ 80 at the end of a day.
-- **Lose:** 7 consecutive days in debt.
-- **Time:** 24 ticks per day; 1× speed = 2 ticks per second.
-- **Climate:** 2% per qubit per tick everywhere (depolarizing; bit flips only at the Riverbank).
-- **Keepers:**
-
-  | Keeper | Salary | Lookup table | Rounds per tick |
-  |---|---|---|---|
-  | Intern | $100/day | weight 1 | 1 |
-  | Keeper | $220/day | weight 2 | 1 |
-  | Head Keeper | $400/day | weight 2 | 3 |
-
-- **Vet:** $2k and −1.5 reputation per logical error.
-- **Reputation:** drifts 15% per day toward average animal health.
-- **Revenue:** 0.8 visitors per appeal point per day × health × (0.5 + reputation/100), at $12 a
-  ticket.
-- **Balance result** (seeded bots, pinned by tests): keepers matched to the animal (Intern for
-  the Pangolin and Tortoise, Keeper otherwise) wins around day 65. Keepers everywhere takes
-  about 85 days, Head Keepers everywhere about 118, and no keepers goes bankrupt within about
-  10 days.
-- **Emergent physics:** the five-qubit code is perfect, so Intern = Keeper for it. The Steane
-  code gains little from the weight-2 table. Shor and surface roughly halve their sick days
-  with a Keeper.
+- **Start:** $50k and reputation 50. **Goal:** $250k with reputation ≥ 80 at the end of a day.
+  **Lose:** 7 consecutive days in debt. **Time:** 24 ticks per day; 1× speed = 2 ticks per second.
+- **Lab** (per level 0 → 3): coherence 0.8% → 0.55% → 0.35% → 0.2% per qubit per hour; gates
+  0.08% → 0.06% → 0.04% → 0.02% per CNOT; readout 1% → 0.7% → 0.45% → 0.25%; cycle 1 → 2 → 3
+  rounds/hour. Research costs $5k/2 days, $12k/4 days, $25k/6 days for levels 1/2/3. Channels:
+  depolarizing, except bit flips only at the Riverbank.
+- **Keepers:** salaries $120 / $150 / $190 / $240 per day for levels 1–4. Training to level
+  2/3/4 needs 150/500/1200 rounds of experience and costs $1k/1 day, $2.5k/2 days, $5k/3 days.
+  Speed = 4 + xp/300 work per hour, capped at 12. Work per round: 1, 1.5, then 2 and 3 × max(1,
+  checks/4) for the space-time levels.
+- **Vet:** $2.5k and −1.5 reputation per logical error. **Reputation** drifts 15% per day toward
+  average animal health. **Revenue:** 0.8 visitors per appeal point per day × health ×
+  (0.5 + reputation/100), at $12 a ticket.
+- **Sick days per 30 days at starting hardware** (unlimited speed; approximate): trainee →
+  head keeper: Owl ~8 → ~3.5, Peacock ~8 → ~2, Pangolin ~6 → ~1.5, Axolotl ~8 → ~5, Tortoise
+  ~1.5 → ~0. No keeper: ~20 for the d = 3 codes.
+- **Balance result** (seeded bots that keep variety, at most 3 of a species; pinned by tests):
+  training keepers where animals keep getting sick plus funding the lab closes the Series A
+  around day 90; never investing takes ~170–240 days or goes bankrupt; no keepers goes bankrupt
+  within ~25 days. One seed of three goes bankrupt on day ~31 whatever the strategy: the bot
+  buys the $45k Axolotl first and an early run of vet bills sinks it.
 
 ## Known quirks / small open items
 
@@ -122,18 +131,21 @@ The game files build on it:
   earn your way to the flagship) but worth revisiting.
 - The Steane Peacock's X/Z check pairs sit close together in the drawing (readable, but busy).
 - The Pangolin uses 🦔 because there is no pangolin emoji.
-- Revenue/appeal ROI is similar across species (~33-day payback). Could differentiate further.
+- **Tortoise spam.** A bot allowed unlimited copies fills the park with ~20 Tortoises: cheap,
+  rarely sick, quick payback. The balance bots cap each species at 3. Worth a real mechanic
+  (e.g. visitors get bored of duplicates) once playtesting confirms it.
+- Level 2 (weight-2 lookup) barely beats level 1 with noisy readout: trusting outcomes harder
+  doesn't help. The real jump is to space-time decoding at level 3.
+- The Axolotl gains least from space-time keepers at d = 3 in the phenomenological model.
+- Levels 5–6 of the ladder (correlated matching, maximum likelihood) aren't implemented.
 
 ## Next steps
 
 Follow the v1 milestones in PLAN.md:
-1. **M6: keepers and the lab.** Wire `Detectors` into `exhibit-sim.js` (each exhibit is a memory;
-   the vet judges E·frame). Replace the three keeper tiers with a named roster that learns
-   (algorithm + speed + window; backlog, not random mistakes). Add a space-time lookup decoder
-   for small non-matchable codes (Steane, five-qubit). Lab dials with research timers. Rebalance
-   with the seeded bots in `tests/zoo-tycoon.test.js`.
+1. **Playtest M6** and adjust numbers (all in `zoo-data.js`; rerun the balance tests).
 2. **M7: freeform habitat builder** with discovery, blueprint book, k animals per enclosure.
 3. **M8: circuit-level noise** (option B).
+4. Keeper levels 5–6 (correlated matching, maximum likelihood) when bigger codes arrive.
 
 Still open from v0: guests with needs (funding agencies, investors, academics, press), park design
 (paths, guest flow, tour guides, shops), climates (biased noise, erasure, leakage).

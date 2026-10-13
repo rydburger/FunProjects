@@ -139,6 +139,24 @@
   .overview .g { font-size: 20px; width: 26px; text-align: center; }
   .overview .nm { flex: 1; min-width: 0; }
   .overview .h { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  .keeper-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg-panel-2); font-size: 13.5px; }
+  .keeper-card .who { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .keeper-card .who b { font-size: 15px; }
+  .keeper-card .meta { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  .keeper-card .algo { margin: 6px 0; }
+  .keeper-card .warn { color: var(--sick); font-size: 12.5px; margin: 6px 0; }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 3px 0 6px; }
+  .meter i { display: block; height: 100%; background: var(--accent); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .staff-list, .lab-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .staff-list li { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); }
+  .staff-list .s { font-size: 12px; color: var(--ink-dim); }
+  .lab-list li { padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); }
+  .lab-list .top { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+  .lab-list .v { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  .lab-list .pips { letter-spacing: 2px; color: var(--accent); font-size: 11px; }
+  .lab-list .btn { margin-top: 6px; font-size: 12px; padding: 4px 9px; width: 100%; white-space: normal; text-align: left; }
+  .lab-list .busy { font-size: 12px; color: var(--ink-dim); margin-top: 4px; }
   details.placard-d summary { cursor: pointer; font-size: 13px; font-weight: 600; }
   details.placard-d .placard { margin-top: 8px; }
   .insp-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
@@ -214,6 +232,17 @@
         <div class="hint" id="toolHint">Pick a habitat, then click the park to place it. <span class="kbd">Esc</span> cancels.</div>
       </div>
       <div class="panel">
+        <h2>Staff</h2>
+        <ul class="staff-list" id="staff"></ul>
+        <div class="btn-row"><button class="btn quiet" id="hireBtn" type="button">Hire a trainee</button></div>
+        <div class="hint" id="staffHint"></div>
+      </div>
+      <div class="panel">
+        <h2>Lab</h2>
+        <ul class="lab-list" id="lab"></ul>
+        <div class="hint">One project at a time. New hardware reaches every enclosure when it's done.</div>
+      </div>
+      <div class="panel">
         <h2>Zoo news</h2>
         <ul class="log" id="log"></ul>
       </div>
@@ -235,6 +264,7 @@
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="card" id="modalCard"></div></div>
 
 <script src="../stabilizer.js"></script>
+<script src="../detectors.js"></script>
 <script src="zoo-data.js"></script>
 <script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
@@ -242,8 +272,8 @@
 <script src="park.js"></script>
 <script>
 (function () {
-  var S = window.Stabilizer, Z = window.ZooData, V = window.ExhibitView, Park = window.Park;
-  var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, KEEPERS = Z.KEEPERS, ECO = Z.ECONOMY;
+  var S = window.Stabilizer, Z = window.ZooData, V = window.ExhibitView, Park = window.Park, X = window.ExhibitSim;
+  var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, LEVELS = Z.KEEPER_LEVELS, LAB = Z.LAB, ECO = Z.ECONOMY;
 
   function $(id) { return document.getElementById(id); }
   function h(tag, cls, html) {
@@ -258,9 +288,12 @@
   function healthClass(v) { return v < 40 ? "low" : v < 75 ? "mid" : ""; }
   function popcount(v) { var c = 0; while (v) { c += v & 1; v >>>= 1; } return c; }
   function channelName(c) {
-    return { depolarizing: "Depolarizing", bitFlip: "Bit flips only", phaseFlip: "Phase flips only", biasedZ: "Z-biased" }[c.channel] +
-      ", " + (c.p * 100).toFixed(1) + "% per qubit per hour";
+    return { depolarizing: "depolarizing", bitFlip: "bit flips only", phaseFlip: "phase flips only", biasedZ: "Z-biased" }[c.channel];
   }
+  function pct(v) { return (v * 100).toFixed(v < 0.01 ? 2 : 1) + "%"; }
+  function labValueText(dial, v) { return dial === "cycle" ? v + " round" + (v === 1 ? "" : "s") + "/hour" : pct(v); }
+  function keeperTitle(k) { return LEVELS[k.level].title; }
+  function whenText(untilTick) { return clock(untilTick).replace(":00", "h"); }
 
   // ---------- state ----------
   var park = Park.createPark();
@@ -384,8 +417,9 @@
         nm.textContent = BIOMES[rec.biomeId].name;
         hb.parentNode.style.display = "none";
       }
-      kp.textContent = rec.keeperId ? KEEPERS[rec.keeperId].glyph : (rec.animal ? "⚠️" : "");
-      kp.title = rec.keeperId ? KEEPERS[rec.keeperId].name : "No keeper";
+      var kk = rec.keeperId ? park.keepers[rec.keeperId] : null;
+      kp.textContent = kk ? (kk.training ? "📚" : "🧑‍🌾") + kk.level : (rec.animal ? "⚠️" : "");
+      kp.title = kk ? kk.name + ", " + keeperTitle(kk) + (kk.training ? " (studying)" : "") : "No keeper";
       e.classList.toggle("sel", ui.selected === id);
       e.classList.toggle("sick", (ui.sickFlash[id] || 0) > now);
     });
@@ -461,7 +495,7 @@
       views.innerHTML =
         '<div class="view"><div class="cap"><span>Really there</span></div><svg id="iGod" role="img" aria-label="Errors in the last incident"></svg></div>' +
         '<div class="view"><div class="cap"><span>Keeper sees</span><span class="mono" id="iFired"></span></div><svg id="iKeeper" role="img" aria-label="Checks fired in the last incident"></svg>' +
-        '<div class="overlay" id="iNoKeeper"' + (rec.keeperId ? " hidden" : "") + "><span>No keeper on duty.</span></div></div>";
+        '<div class="overlay" id="iNoKeeper"' + (rec.keeperId ? " hidden" : "") + "><span>No keeper: nobody is measuring.</span></div></div>";
       sec.appendChild(views);
       insp.appendChild(sec);
 
@@ -474,28 +508,7 @@
     }
 
     // Keeper
-    var ks = h("div", "section");
-    ks.appendChild(h("span", "label", "Zookeeper"));
-    var seg = h("div", "seg");
-    [[null, "None"]].concat(Object.keys(KEEPERS).map(function (k) { return [k, KEEPERS[k].glyph + " " + KEEPERS[k].name]; }))
-      .forEach(function (opt) {
-        var b = h("button", rec.keeperId === opt[0] ? "on" : "", opt[1]);
-        b.type = "button";
-        b.title = opt[0] ? KEEPERS[opt[0]].blurb + " $" + KEEPERS[opt[0]].salary + "/day" : "No keeper";
-        b.addEventListener("click", function () {
-          if (rec.keeperId === opt[0]) return;
-          Park.setKeeper(park, rec.id, opt[0]);
-          post(opt[0] ? "Hired a <b>" + KEEPERS[opt[0]].name + "</b> for the " + Park.exhibitLabel(rec) + " ($" + KEEPERS[opt[0]].salary + "/day)."
-            : "Let the keeper at the " + Park.exhibitLabel(rec) + " go.");
-          refreshAll();
-        });
-        seg.appendChild(b);
-      });
-    ks.appendChild(seg);
-    ks.appendChild(h("div", "hint", rec.keeperId
-      ? KEEPERS[rec.keeperId].blurb + " $" + KEEPERS[rec.keeperId].salary + "/day."
-      : rec.animal ? "⚠️ Nobody is measuring the checks — errors will pile up." : "You can hire a keeper before the animal arrives."));
-    insp.appendChild(ks);
+    insp.appendChild(renderKeeperSection(rec));
 
     // Animal purchase
     if (!rec.animal) {
@@ -529,7 +542,18 @@
     // Habitat info + placard
     var hs = h("div", "section");
     hs.appendChild(h("span", "label", "Habitat"));
-    hs.appendChild(h("div", "hint", biome.blurb + "<br>Climate: " + channelName(biome.climate) + ". Upkeep $" + biome.upkeep + "/day."));
+    var nm = rec.animal ? rec.animal.mem.noise : null;
+    var noiseText = "";
+    if (nm) {
+      var pd = nm.rates.map(function (r) { return r.pX + r.pY + r.pZ; }), qs = nm.q;
+      var range = function (a) {
+        var lo = pct(Math.min.apply(null, a)), hi = pct(Math.max.apply(null, a));
+        return lo === hi ? lo : lo + "–" + hi;
+      };
+      noiseText = "<br>Per round: data error " + range(pd) + " per qubit, misread " + range(qs) + " per check" +
+        " (lab hardware; more wires mean more gate errors).";
+    }
+    hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.climate) + ". Upkeep $" + biome.upkeep + "/day." + noiseText));
     insp.appendChild(hs);
     if (sp) {
       var d = h("details", "placard-d section");
@@ -540,8 +564,8 @@
     var foot = h("div", "insp-foot");
     if (rec.animal) {
       var q = new URLSearchParams({
-        species: rec.animal.speciesId, keeper: rec.keeperId || "none",
-        channel: biome.climate.channel, p: String(biome.climate.p)
+        species: rec.animal.speciesId, keeper: String(rec.animal.level || "none"),
+        channel: biome.climate.channel, p: String(Park.labValues(park).coherence), q: String(Park.labValues(park).readout)
       });
       var a = h("a", "ghost", "Watch closely in the sandbox →");
       a.href = "sandbox.html?" + q.toString();
@@ -568,6 +592,165 @@
     updateInspector();
   }
 
+  function renderKeeperSection(rec) {
+    var ks = h("div", "section");
+    ks.appendChild(h("span", "label", "Zookeeper"));
+    var k = rec.keeperId ? park.keepers[rec.keeperId] : null;
+    if (!k) {
+      ks.appendChild(h("div", "hint", rec.animal ? "⚠️ Nobody is measuring the checks: errors will pile up." : "You can hire a keeper before the animal arrives."));
+      var row = h("div", "btn-row");
+      var hire = h("button", "btn", "Hire a trainee (" + money(LEVELS[1].salary) + "/day)");
+      hire.type = "button";
+      hire.addEventListener("click", function () {
+        var r = Park.hireKeeper(park, rec.id);
+        post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper, for the " + Park.exhibitLabel(rec) + ".");
+        refreshAll();
+      });
+      row.appendChild(hire);
+      ks.appendChild(row);
+      var free = park.keeperOrder.map(function (id) { return park.keepers[id]; }).filter(function (x) { return !x.exhibitId; });
+      if (free.length) {
+        var ul = h("ul", "staff-list");
+        ul.style.marginTop = "8px";
+        free.forEach(function (fk) {
+          var li = h("li", "", "<span><b>" + fk.name + "</b> <span class=\"s\">" + keeperTitle(fk) + " · in the staff room</span></span>");
+          var b = h("button", "btn quiet", "Assign");
+          b.type = "button";
+          b.addEventListener("click", function () {
+            Park.assignKeeper(park, fk.id, rec.id);
+            post("<b>" + fk.name + "</b> now looks after the " + Park.exhibitLabel(rec) + ".");
+            refreshAll();
+          });
+          li.appendChild(b);
+          ul.appendChild(li);
+        });
+        ks.appendChild(ul);
+      }
+      return ks;
+    }
+    var card = h("div", "keeper-card");
+    card.innerHTML = '<div class="who"><span><b>' + k.name + "</b> · " + keeperTitle(k) + '</span><span class="meta">' + money(Park.keeperSalary(k)) + "/day</span></div>" +
+      '<div class="algo" id="kAlgo"></div><div class="warn" id="kWarn" hidden></div>' +
+      '<div class="meta">Speed <span id="kSpeed"></span> work/hour</div><div class="meter"><i id="kSpeedBar"></i></div>' +
+      '<div class="meta" id="kXpText"></div><div class="meter"><i id="kXpBar"></i></div>';
+    var row2 = h("div", "btn-row");
+    var train = h("button", "btn", "Train");
+    train.type = "button"; train.id = "kTrain";
+    train.addEventListener("click", function () {
+      var r = Park.trainKeeper(park, k.id);
+      if (!r.ok) { post(r.reason, "sick"); return; }
+      post("<b>" + k.name + "</b> enrolled in " + LEVELS[k.level + 1].title.toLowerCase() + " training, done " + whenText(r.until) + ".");
+      refreshAll();
+    });
+    row2.appendChild(train);
+    var away = h("button", "btn quiet", "To staff room");
+    away.type = "button";
+    away.addEventListener("click", function () {
+      Park.assignKeeper(park, k.id, null);
+      post("<b>" + k.name + "</b> left the " + Park.exhibitLabel(rec) + " for the staff room.");
+      refreshAll();
+    });
+    row2.appendChild(away);
+    card.appendChild(row2);
+    ks.appendChild(card);
+    return ks;
+  }
+  function updateKeeperSection(rec) {
+    var k = rec.keeperId ? park.keepers[rec.keeperId] : null, algo = $("kAlgo");
+    if (!k || !algo) return;
+    var eff = rec.animal ? rec.animal.level : k.level;
+    algo.innerHTML = LEVELS[eff].blurb;
+    var warn = $("kWarn");
+    if (rec.animal && eff < k.level) {
+      var need = X.workPerRound(rec.animal, k.level) * X.roundsPerTick(rec.animal);
+      warn.hidden = false;
+      warn.textContent = "⚠️ Knows " + LEVELS[k.level].title.toLowerCase() + " decoding, but can't keep up with it here (needs " +
+        need.toFixed(1) + " work/hour at " + X.roundsPerTick(rec.animal) + " round(s)/hour), so uses " + LEVELS[eff].title.toLowerCase() + " decoding. Speed grows with experience.";
+    } else warn.hidden = true;
+    var sp = Park.keeperSpeed(k), SPD = Z.KEEPER_SPEED;
+    $("kSpeed").textContent = sp.toFixed(1) + " / " + SPD.max;
+    $("kSpeedBar").style.width = (100 * sp / SPD.max) + "%";
+    var tb = $("kTrain");
+    if (k.training) {
+      $("kXpText").textContent = "Studying for " + LEVELS[k.training.toLevel].title.toLowerCase() + ": done " + whenText(k.training.untilTick);
+      var t0 = k.training.untilTick - Z.TRAINING[k.training.toLevel].days * ECO.ticksPerDay;
+      $("kXpBar").style.width = Math.min(100, 100 * (park.tick - t0) / (k.training.untilTick - t0)) + "%";
+      tb.disabled = true; tb.textContent = "Studying…"; tb.title = "";
+    } else if (k.level >= Z.MAX_KEEPER_LEVEL) {
+      $("kXpText").textContent = "Experience " + Math.floor(k.xp) + " rounds · fully trained";
+      $("kXpBar").style.width = "100%";
+      tb.disabled = true; tb.textContent = "Fully trained"; tb.title = "";
+    } else {
+      var c = Park.canTrain(park, k.id), next = Z.TRAINING[k.level + 1];
+      $("kXpText").textContent = "Experience " + Math.floor(k.xp) + " / " + next.xp + " rounds for the next course";
+      $("kXpBar").style.width = Math.min(100, 100 * k.xp / next.xp) + "%";
+      tb.disabled = !c.ok;
+      tb.textContent = "Train → " + LEVELS[k.level + 1].title + " (" + money(next.fee) + ", " + next.days + " day" + (next.days === 1 ? "" : "s") + ")";
+      tb.title = c.ok ? LEVELS[k.level + 1].blurb : c.reason;
+    }
+  }
+
+  // ---------- staff & lab panels ----------
+  function renderStaff() {
+    var ul = $("staff");
+    ul.innerHTML = "";
+    if (!park.keeperOrder.length) ul.appendChild(h("li", "", '<span class="s">No keepers yet.</span>'));
+    park.keeperOrder.forEach(function (id) {
+      var k = park.keepers[id], rec = k.exhibitId ? park.exhibits[k.exhibitId] : null;
+      var li = h("li", "", "<span><b>" + k.name + "</b> " + (k.training ? "📚" : "") + '<br><span class="s">' + keeperTitle(k) + " · " +
+        (rec ? Park.exhibitLabel(rec) : "staff room") + "</span></span>");
+      if (rec) { li.style.cursor = "pointer"; li.addEventListener("click", function () { select(rec.id); }); }
+      else {
+        var f = h("button", "btn quiet", "Let go");
+        f.type = "button";
+        f.addEventListener("click", function () { Park.fireKeeper(park, k.id); post("Let <b>" + k.name + "</b> go."); refreshAll(); });
+        li.appendChild(f);
+      }
+      ul.appendChild(li);
+    });
+    var payroll = park.keeperOrder.reduce(function (a, id) { return a + Park.keeperSalary(park.keepers[id]); }, 0);
+    $("staffHint").textContent = park.keeperOrder.length ? "Payroll " + money(payroll) + "/day (keepers in the staff room are paid too)." : "";
+  }
+  function renderLab() {
+    var ul = $("lab");
+    ul.innerHTML = "";
+    var proj = park.lab.project;
+    Object.keys(LAB).forEach(function (dial) {
+      var d = LAB[dial], lvl = park.lab.levels[dial], v = d.values[lvl];
+      var pips = ""; for (var i = 1; i < d.values.length; i++) pips += i <= lvl ? "●" : "○";
+      var li = h("li", "", '<div class="top"><b>' + d.name + '</b><span class="pips">' + pips + "</span></div>" +
+        '<div class="v">' + labValueText(dial, v) + " " + (dial === "cycle" ? "" : d.unit) + "</div>");
+      li.title = d.blurb;
+      if (proj && proj.dial === dial) {
+        li.appendChild(h("div", "busy", "Researching → " + labValueText(dial, d.values[lvl + 1]) + ", done " + whenText(proj.untilTick)));
+      } else if (lvl + 1 < d.values.length) {
+        var step = Z.RESEARCH[lvl + 1];
+        var b = h("button", "btn quiet", "Research → " + labValueText(dial, d.values[lvl + 1]) + " · " + money(step.fee) + " · " + step.days + "d");
+        b.type = "button";
+        b.dataset.dial = dial;
+        b.disabled = !Park.canResearch(park, dial).ok;
+        b.addEventListener("click", function () {
+          var r = Park.startResearch(park, dial);
+          if (!r.ok) { post(r.reason, "sick"); return; }
+          post("The lab started work on <b>" + d.name.toLowerCase() + "</b>, done " + whenText(r.until) + ".");
+          refreshAll();
+        });
+        li.appendChild(b);
+      } else li.appendChild(h("div", "busy", "Fully upgraded."));
+      ul.appendChild(li);
+    });
+  }
+  function updateLabButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll("#lab .btn"), function (b) {
+      b.disabled = !Park.canResearch(park, b.dataset.dial).ok;
+    });
+  }
+  $("hireBtn").addEventListener("click", function () {
+    var r = Park.hireKeeper(park, null);
+    post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper. They're waiting in the staff room.");
+    refreshAll();
+  });
+
   function renderOverview() {
     insp.appendChild(h("h2", "", "Your zoo"));
     if (!park.order.length) {
@@ -575,7 +758,8 @@
         "<p><b>Welcome, founder.</b> You have " + money(park.cash) + " in pre-seed funding and an empty lot.</p>" +
         "<p>1. Pick a habitat on the left and place it in the park.<br>" +
         "2. Click it to buy an animal — each animal is a quantum error-correcting code, and it can only live in a habitat that measures exactly its stabilizers.<br>" +
-        "3. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors.</p>" +
+        "3. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
+        "4. Fund the lab to lower the hardware's error rates.</p>" +
         "<p class=\"hint\">Healthy, rare animals draw visitors. Sick ones cost vet bills and reputation. " +
         "The <a href=\"sandbox.html\">exhibit sandbox</a> shows one enclosure round by round.</p>"));
       return;
@@ -607,15 +791,16 @@
     Array.prototype.forEach.call(insp.querySelectorAll(".species-list .btn"), function (b) {
       b.disabled = !b.dataset.ok || park.cash < Number(b.dataset.cost);
     });
-    if (!rec.animal) return;
+    if (!rec.animal) { updateKeeperSection(rec); return; }
     var an = rec.animal, hv = Math.round(an.health);
     $("iHealth").textContent = hv + "%";
     var fill = $("iHealthFill");
     fill.style.width = hv + "%";
     fill.className = "fill " + healthClass(an.health);
-    var inc = an.incident, hasKeeper = !!rec.keeperId;
+    updateKeeperSection(rec);
+    var inc = an.incident, hasKeeper = an.level > 0;
     var view = inc ? { errors: inc.before, pulse: null, syndrome: inc.syndrome, correction: inc.correction, keeper: hasKeeper }
-      : { errors: an.E, pulse: null, syndrome: null, correction: null, keeper: hasKeeper };
+      : { errors: X.residual(an), pulse: null, syndrome: null, correction: null, keeper: hasKeeper };
     var key = inc ? inc.tick + ":" + an.rounds : "none";
     if (insp.dataset.drawn !== key + ":" + hasKeeper) {
       insp.dataset.drawn = key + ":" + hasKeeper;
@@ -623,11 +808,12 @@
       V.draw($("iKeeper"), an.speciesId, view, "keeper");
       var born = rec.animalTick || 0;
       $("iIncident").textContent = inc ? "· " + clock(born + inc.tick) + (inc.sick ? " · logical " + inc.sick.kind + "!" : "") : "· none yet";
-      $("iFired").textContent = inc && hasKeeper && inc.syndrome !== null ? popcount(inc.syndrome) + " fired" : "";
+      $("iFired").textContent = inc && hasKeeper && inc.syndrome !== null ? popcount(inc.syndrome) + " lit" +
+        (inc.flips ? " · " + popcount(inc.flips) + " misread" : "") : "";
     }
     $("iSick").textContent = an.sick;
     $("iVis").textContent = Math.round(Park.exhibitVisitors(park, rec));
-    $("iCost").textContent = money(Park.exhibitCosts(rec));
+    $("iCost").textContent = money(Park.exhibitCosts(park, rec));
   }
 
   // ---------- top bar ----------
@@ -667,6 +853,8 @@
   function refreshAll() {
     renderTopbar();
     renderTools();
+    renderStaff();
+    renderLab();
     renderPark();
     renderInspector();
     saveGame();
@@ -745,8 +933,8 @@
       openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Ran out of runway</h2>' +
         "<p>After " + ECO.bankruptDays + " days in the red, the board pulled the plug.</p>" + zooSummary() +
         '<p class="hint">Tips: every animal needs a keeper — unkept codes are worse than a bare qubit. ' +
-        "Match the keeper to the animal: the Perfect Pangolin is a perfect code, so an Intern already knows every syndrome it can produce, " +
-        "while the Owl and Axolotl roughly halve their sick days with a Keeper. Don't build enclosures you can't stock yet.</p>",
+        "Train keepers whose animals keep getting sick: space-time decoders see through misread checks. " +
+        "The lab lowers error rates for every enclosure at once. Don't build enclosures you can't stock yet.</p>",
         [{ label: "Look around", cls: "quiet", onClick: function () { closeModal(false); } },
          { label: "New game", onClick: function () { closeModal(false); newGame(); } }]);
     }
@@ -795,7 +983,8 @@
         var rec = park.exhibits[e.exhibitId];
         ui.sickFlash[e.exhibitId] = performance.now() + 1200;
         var why = e.cause === "undetectable" ? "errors slipped past the checks"
-          : e.cause === "miscorrected" ? "the keeper's correction backfired" : "nobody kept up with the errors";
+          : e.cause === "miscorrected" ? "the keeper's correction backfired"
+          : rec && rec.animal && rec.animal.level ? "too many errors at once to tell apart" : "nobody was measuring the checks";
         post("The " + SPECIES[e.speciesId].name + " in the " + Park.exhibitLabel(rec) + " caught a logical " + e.kind +
           " — " + why + ". Vet bill −" + money(e.bill).slice(1) + ".", "sick");
       } else if (e.type === "day") {
@@ -804,6 +993,13 @@
             ", running costs " + money(e.expenses) + (e.vet ? ", vet bills " + money(e.vet) : "") + ".");
         }
         saveGame();
+      } else if (e.type === "trained") {
+        post("🎓 <b>" + e.name + "</b> finished training and is now a " + LEVELS[e.level].title.toLowerCase() + ".");
+        refreshAll();
+      } else if (e.type === "research") {
+        post("🔬 Lab breakthrough: <b>" + LAB[e.dial].name.toLowerCase() + "</b> is now " + labValueText(e.dial, e.value) +
+          ". Every enclosure has the new hardware.");
+        refreshAll();
       } else if (e.type === "debt") {
         post("⚠️ The zoo ended the day in debt. " + e.daysLeft + " more day" + (e.daysLeft === 1 ? "" : "s") +
           " in the red and the board pulls the plug.", "sick");
@@ -830,7 +1026,7 @@
         handleEvents(Park.tick(park));
         if (ui.selected !== null && !park.exhibits[ui.selected]) ui.selected = null;
       }
-      if (n) { renderTopbar(); updateToolAffordability(); updateInspector(); }
+      if (n) { renderTopbar(); updateToolAffordability(); updateLabButtons(); updateInspector(); }
     }
     updatePark(); // sick flashes fade with wall-clock time
     requestAnimationFrame(frame);

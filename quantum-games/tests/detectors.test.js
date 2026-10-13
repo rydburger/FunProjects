@@ -74,7 +74,9 @@ test("circuit-level noise is scaffolded but not implemented yet", function () {
 
 console.log("Decoders, fault by fault");
 // Run an experiment with exactly the listed faults: [{ round, E } | { round, flips }].
-function scripted(code, decoderFn, rounds, faults, q) {
+// noFlush: the decoder has no flush (continuous operation): after the last
+// faulty round, run quiet perfect rounds until the window has drained.
+function scripted(code, decoderFn, rounds, faults, q, noFlush) {
   var mem = D.createMemory({ code: code, model: D.phenomenological({ pX: 1e-3, pY: 1e-3, pZ: 1e-3 }, q === undefined ? 1e-3 : q), rng: function () { return 1; } });
   var dec = decoderFn(mem);
   for (var t = 0; t <= rounds; t++) {
@@ -86,8 +88,9 @@ function scripted(code, decoderFn, rounds, faults, q) {
     });
     var last = t === rounds;
     var r = D.measureRound(mem, { inject: inj, perfect: last });
-    D.applyCorrection(mem, last ? dec.flush(r) : dec.push(r));
+    D.applyCorrection(mem, last && !noFlush ? dec.flush(r) : dec.push(r));
   }
+  if (noFlush) for (var k = 0; k < 6; k++) D.applyCorrection(mem, dec.push(D.measureRound(mem, { perfect: true })));
   var R = D.residual(mem);
   return { syndrome: D.checkSyndrome(mem.checks, R), logical: S.logicalAction(code, R).any };
 }
@@ -147,6 +150,37 @@ test("matching (window 5) fixes every pair of X or measurement faults on d=5", f
   assert.strictEqual(bad, 0, bad + " of " + (faults.length * (faults.length - 1) / 2) + " pairs failed");
 });
 
+[2, 3].forEach(function (W) {
+  ["peacock", "pangolin"].forEach(function (id) {
+    test("space-time lookup (window " + W + ") fixes every single fault on the " + Zoo.SPECIES[id].name, function () {
+      var code = Zoo.SPECIES[id].code;
+      allSingleFaults(code, 4, ["X", "Y", "Z"]).forEach(function (f) {
+        var out = scripted(code, function (mem) { return D.spacetimeLookupDecoder(mem, { window: W }); }, 4, [f], 1e-3, true);
+        assert.ok(out.syndrome === 0 && !out.logical, JSON.stringify(f));
+      });
+    });
+  });
+});
+test("spacetimeDecoder: matching for surface and Shor, a table for Steane and the (non-CSS) five-qubit code", function () {
+  var model = D.phenomenological(S.channels.depolarizing(0.01), 0.01);
+  function pick(code) { return D.spacetimeDecoder(D.createMemory({ code: code, model: model })).name; }
+  assert.strictEqual(pick(S.rotatedSurface(3)), "matching");
+  assert.strictEqual(pick(Zoo.SPECIES.owl.code), "matching");
+  assert.strictEqual(pick(Zoo.SPECIES.peacock.code), "spacetime-lookup");
+  assert.strictEqual(pick(Zoo.SPECIES.pangolin.code), "spacetime-lookup");
+});
+test("per-qubit rates and per-check flip probabilities", function () {
+  var code = S.rotatedSurface(3), rates = [];
+  for (var q = 0; q < 9; q++) rates.push(q === 4 ? { pX: 1 } : {});
+  var q8 = [0, 0, 0, 0, 0, 0, 0, 1];
+  var mem = D.createMemory({ code: code, model: D.phenomenological(rates, q8), rng: S.seededRng(3) });
+  var r = D.measureRound(mem);
+  assert.strictEqual(S.toString(r.noise), "IIIIXIIII");
+  assert.strictEqual(r.flips, 1 << 7);
+  D.setModel(mem, D.phenomenological({}, 0));
+  assert.ok(S.isIdentity(D.measureRound(mem).noise));
+});
+
 console.log("Monte Carlo (seeded)");
 function failRate(code, decoderFn, p, q, shots, rounds, seed) {
   var rng = S.seededRng(seed), fails = 0;
@@ -162,6 +196,23 @@ test("when measurements are the noisy part, matching beats single-shot lookup (d
   var look = failRate(code, function (mem) { return D.lookupDecoder(mem, 2); }, 0.005, 0.02, 3000, 6, 11);
   var mat = failRate(code, matching(3), 0.005, 0.02, 3000, 6, 11);
   assert.ok(mat < look / 3, "matching " + mat + " vs lookup " + look);
+});
+test("space-time lookup beats single-shot lookup on the Steane code when measurements are noisy", function () {
+  var code = Zoo.SPECIES.peacock.code, rng = S.seededRng(31), model = D.phenomenological(S.channels.depolarizing(0.005), 0.02);
+  function run(make) {
+    var fails = 0;
+    for (var s = 0; s < 1500; s++) {
+      var mem = D.createMemory({ code: code, model: model, rng: rng }), dec = make(mem);
+      for (var t = 0; t < 6; t++) D.applyCorrection(mem, dec.push(D.measureRound(mem)));
+      for (t = 0; t < 4; t++) D.applyCorrection(mem, dec.push(D.measureRound(mem, { perfect: true, noNoise: true })));
+      var R = D.residual(mem);
+      if (D.checkSyndrome(mem.checks, R) !== 0 || S.logicalAction(code, R).any) fails++;
+    }
+    return fails / 1500;
+  }
+  var look = run(function (mem) { return D.lookupDecoder(mem, 1); });
+  var st = run(function (mem) { return D.spacetimeLookupDecoder(mem, { window: 3 }); });
+  assert.ok(st < look / 2, "space-time " + st + " vs lookup " + look);
 });
 test("below threshold, d=5 beats d=3; far above it, d=5 is worse", function () {
   var lo3 = failRate(S.rotatedSurface(3), matching(3), 0.01, 0.005, 1500, 5, 21);

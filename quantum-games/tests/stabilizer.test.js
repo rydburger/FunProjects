@@ -126,12 +126,11 @@ test("Pangolin is perfect: all 16 syndromes hit by exactly one weight-≤1 error
   counts.forEach(function (c) { assert.strictEqual(c, 1); });
 });
 
-console.log("Keepers (decoders)");
+console.log("Lookup decoders (the single-shot keepers)");
 ["owl", "peacock", "pangolin", "axolotl"].forEach(function (id) {
   var code = Zoo.SPECIES[id].code;
-  Object.keys(Zoo.KEEPERS).forEach(function (kid) {
-    var keeper = Zoo.KEEPERS[kid];
-    test(keeper.name + " corrects every single-qubit error on the " + Zoo.SPECIES[id].name, function () {
+  Zoo.KEEPER_LEVELS.filter(function (L) { return L && L.algorithm === "lookup"; }).forEach(function (keeper) {
+    test(keeper.title + " (weight " + keeper.maxWeight + ") corrects every single-qubit error on the " + Zoo.SPECIES[id].name, function () {
       var dec = S.buildLookupDecoder(code, keeper.maxWeight);
       S.forEachPauliOfWeight(code.n, 1, function (E) {
         var r = S.correct(code, dec, E).residual;
