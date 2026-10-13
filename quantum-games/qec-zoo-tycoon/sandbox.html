@@ -52,9 +52,14 @@
           </select>
         </div>
         <div class="field">
-          <label for="pSlider">Error rate per qubit per tick: <span class="mono" id="pLabel"></span></label>
+          <label for="pSlider">Data error per qubit per tick: <span class="mono" id="pLabel"></span></label>
           <input type="range" id="pSlider" min="0" max="100" step="1">
           <div class="hint">A bare, unprotected qubit would fail at this rate every tick.</div>
+        </div>
+        <div class="field">
+          <label for="qSlider">Misread chance per check: <span class="mono" id="qLabel"></span></label>
+          <input type="range" id="qSlider" min="0" max="100" step="1">
+          <div class="hint">A misread outcome reports the wrong parity but leaves the qubits alone. Far left = perfect measurements.</div>
         </div>
       </div>
 
@@ -147,6 +152,7 @@
 </div>
 
 <script src="../stabilizer.js"></script>
+<script src="../detectors.js"></script>
 <script src="zoo-data.js"></script>
 <script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
@@ -154,7 +160,7 @@
 <script>
 (function () {
   var S = window.Stabilizer, Z = window.ZooData, X = window.ExhibitSim, V = window.ExhibitView;
-  var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, KEEPERS = Z.KEEPERS;
+  var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, LEVELS = Z.KEEPER_LEVELS;
   var describe = V.describe;
 
   function $(id) { return document.getElementById(id); }
@@ -164,11 +170,14 @@
   var P_MIN = 0.001, P_MAX = 0.2;
   function sliderToP(v) { return P_MIN * Math.pow(P_MAX / P_MIN, v / 100); }
   function pToSlider(p) { return Math.round(100 * Math.log(p / P_MIN) / Math.log(P_MAX / P_MIN)); }
+  // Misread slider: 0 = perfect, then log-uniform 0.1% .. 20%.
+  function sliderToQ(v) { return v === 0 ? 0 : sliderToP(v); }
+  function qToSlider(q) { return q <= 0 ? 0 : Math.max(1, pToSlider(q)); }
 
   // ---------- state ----------
   var state = {
-    speciesId: "axolotl", biomeId: "wetlands", keeperId: "keeper",
-    channel: "depolarizing", p: 0.02,
+    speciesId: "axolotl", biomeId: "wetlands", keeper: "3",
+    channel: "depolarizing", p: 0.01, q: 0.01,
     speed: "watch", running: false, pauseOnSick: true
   };
   // The park's "Watch closely" link opens this page with the exhibit's settings.
@@ -180,10 +189,12 @@
       state.channel = BIOMES[state.biomeId].climate.channel;
     }
     if (BIOMES[q.get("biome")]) state.biomeId = q.get("biome");
-    if (q.get("keeper") === "none" || KEEPERS[q.get("keeper")]) state.keeperId = q.get("keeper");
+    if (q.get("keeper") === "none" || LEVELS[Number(q.get("keeper"))]) state.keeper = q.get("keeper");
     if (S.channels[q.get("channel")]) state.channel = q.get("channel");
     var p = parseFloat(q.get("p"));
     if (p >= P_MIN && p <= P_MAX) state.p = p;
+    var qq = parseFloat(q.get("q"));
+    if (qq === 0 || (qq >= P_MIN && qq <= P_MAX)) state.q = qq;
   })();
 
   var ex;          // the ExhibitSim exhibit
@@ -192,11 +203,14 @@
   var justSick = false;
 
   function placement() { return Z.checkPlacement(state.speciesId, state.biomeId); }
-  function keeperId() { return state.keeperId === "none" ? null : state.keeperId; }
+  // The sandbox keeper is always fast enough for their algorithm.
+  function keeperSpec() { return state.keeper === "none" ? null : { level: Number(state.keeper), speed: 99 }; }
+  function keeperName() { return state.keeper === "none" ? "" : "The " + LEVELS[Number(state.keeper)].title.toLowerCase(); }
+  function sandboxLab() { return { coherence: state.p, gates: 0, readout: state.q, cycle: 1 }; }
 
   function resetSim() {
-    ex = X.createExhibit({ speciesId: state.speciesId, keeperId: keeperId(), climate: { channel: state.channel, p: state.p } });
-    view = { errors: ex.E, pulse: null, syndrome: null, correction: null };
+    ex = X.createExhibit({ speciesId: state.speciesId, channel: state.channel, lab: sandboxLab(), keeper: keeperSpec() });
+    view = { errors: X.residual(ex), pulse: null, syndrome: null, correction: null };
     narration = { html: "Press <b>Play</b> or <b>Step</b> to let the climate do its work.", kind: "" };
     justSick = false;
     logLines = [];
@@ -206,29 +220,35 @@
 
   // ---------- narration of simulation events ----------
   function narrate(ev) {
-    var keeper = X.keeperOf(ex);
+    var keeper = ex.level > 0, name = keeperName();
     if (ev.phase === "noise") {
-      view = { errors: ex.E, pulse: ev.noise, syndrome: null, correction: null };
+      view = { errors: X.residual(ex), pulse: ev.noise, syndrome: null, correction: null };
       narration = S.isIdentity(ev.noise)
         ? { html: "A quiet moment — no new errors this round.", kind: "noise" }
         : { html: "The climate strikes: <b>" + describe(ev.noise) + "</b>.", kind: "noise" };
       return;
     }
     if (ev.phase === "measure") {
-      view = { errors: ex.E, pulse: null, syndrome: ev.syndrome, correction: null };
+      view = { errors: X.residual(ex), pulse: null, syndrome: ev.syndrome, correction: null };
       if (!keeper) { narration = { html: "No keeper on duty — nobody looks at the checks.", kind: "measure" }; return; }
-      var fired = popcount(ev.syndrome);
-      narration = { html: keeper.name + " measures all " + ex.code.stabilizers.length + " checks: " +
-        (fired ? "<b>" + fired + " fired</b>." : "all quiet."), kind: "measure" };
+      var fired = popcount(ev.syndrome), mis = popcount(ev.flips || 0);
+      narration = { html: name + " measures all " + ex.code.stabilizers.length + " checks: " +
+        (fired ? "<b>" + fired + " lit</b>" + (ev.detectors === 0 ? ", the same as last round." : ".") : "all quiet.") +
+        (mis ? " <b>" + mis + " outcome" + (mis === 1 ? " was" : "s were") + " misread</b> (only you can see that)." : ""), kind: "measure" };
+      if (mis) log(mis + " check outcome" + (mis === 1 ? "" : "s") + " misread.");
       return;
     }
     // correct
-    view = { errors: ex.E, pulse: null, syndrome: ev.syndrome, correction: ev.correction };
+    view = { errors: ev.before, pulse: null, syndrome: ev.syndrome, correction: ev.correction };
+    var W = keeper ? LEVELS[ex.level].window : 1;
+    var fix = ev.correction && !S.isIdentity(ev.correction);
     var note = !keeper ? "Errors are left to pile up."
-      : ev.shrug ? keeper.name + " doesn't recognise this pattern and shrugs."
-      : ev.syndrome === 0 ? "Nothing to fix."
-      : keeper.name + " applies <b>" + describe(ev.correction) + "</b>.";
-    if (ev.shrug) log(keeper.name + " saw an unfamiliar syndrome and did nothing.");
+      : ev.shrug ? name + " doesn't recognise this pattern and leaves it."
+      : fix ? name + " applies <b>" + describe(ev.correction) + "</b>" + (W > 1 ? " (for what happened " + (W - 1) + " round" + (W > 2 ? "s" : "") + " ago)." : ".")
+      : W > 1 && !ev.committed ? name + " waits for more rounds before deciding anything."
+      : W > 1 ? name + " decides that nothing needs fixing yet" + (ev.syndrome ? ": a lone flip is usually a misread, and the next rounds will tell." : ".")
+      : ev.syndrome === 0 ? "Nothing to fix." : name + " sees nothing to fix.";
+    if (ev.shrug) log(name + " saw an unfamiliar pattern and did nothing.");
     if (ev.sick) {
       var why = ev.sick.cause === "undetectable" ? "The errors formed a pattern the checks can't see."
         : ev.sick.cause === "miscorrected" ? "The keeper's correction completed a logical operator."
@@ -241,7 +261,7 @@
       : " Some mess remains, but the animal is fine."), kind: "correct" };
   }
   function logSick(s) {
-    log("Logical " + s.kind + " (" + describe(s.left) + " left on the qubits). Vet reset the animal.", "sick");
+    log("Logical " + s.kind + ". The vet re-prepared the animal.", "sick");
   }
   function stepPhase() {
     var ev = X.advancePhase(ex);
@@ -266,7 +286,7 @@
     // Show the last round that had anything in it.
     var inc = ex.incident;
     view = inc ? { errors: inc.before, pulse: null, syndrome: inc.syndrome, correction: inc.correction }
-      : { errors: ex.E, pulse: null, syndrome: null, correction: null };
+      : { errors: X.residual(ex), pulse: null, syndrome: null, correction: null };
     if (!(justSick && state.pauseOnSick)) {
       narration = { html: "Running at " + state.speed + "×. The views show the most recent incident" +
         (inc ? " (tick " + inc.tick + ")" : "") + ". Pause or switch to <b>Watch</b> to follow each round.", kind: "" };
@@ -293,7 +313,7 @@
   }
 
   function render() {
-    var sp = SPECIES[state.speciesId], code = ex.code, hasKeeper = !!keeperId();
+    var sp = SPECIES[state.speciesId], code = ex.code, hasKeeper = ex.level > 0;
     $("glyph").textContent = sp.glyph;
     $("glyph").classList.toggle("sick", justSick);
     $("exName").textContent = sp.name;
@@ -310,7 +330,7 @@
     $("keeperOverlay").hidden = hasKeeper;
     var w = S.weight(view.errors);
     $("godCount").textContent = w + " error" + (w === 1 ? "" : "s");
-    $("keeperCount").textContent = view.syndrome === null || !hasKeeper ? "" : popcount(view.syndrome) + " / " + code.stabilizers.length + " fired";
+    $("keeperCount").textContent = view.syndrome === null || !hasKeeper ? "" : popcount(view.syndrome) + " / " + code.stabilizers.length + " lit";
 
     var ph = $("phase");
     ph.className = "phase " + narration.kind;
@@ -337,11 +357,12 @@
     var msg = $("placementMsg");
     msg.className = "hint " + (pl.ok ? "good" : "bad");
     msg.textContent = pl.ok ? "✓ " + BIOMES[state.biomeId].blurb : "✗ " + pl.reason;
-    var k = keeperId() ? KEEPERS[state.keeperId] : null;
+    var k = keeperSpec() ? LEVELS[keeperSpec().level] : null;
     $("keeperMsg").textContent = !k
       ? "Nobody measures the checks — errors pile up until the animal gets sick."
-      : k.blurb + " (" + k.roundsPerTick + " round" + (k.roundsPerTick > 1 ? "s" : "") + " per tick, $" + k.salary + "/day)";
+      : k.blurb + (ex && ex.dec ? " (" + ex.dec.name.replace("-", " ") + " decoder)" : "");
     $("pLabel").textContent = pct(state.p);
+    $("qLabel").textContent = state.q ? pct(state.q) : "perfect";
     $("playBtn").textContent = state.running ? "⏸ Pause" : "▶ Play";
     $("playBtn").disabled = !pl.ok;
     $("stepBtn").disabled = !pl.ok || state.running;
@@ -403,16 +424,17 @@
   fillSelect($("biomeSel"), Object.keys(BIOMES).map(function (id) {
     return [id, BIOMES[id].name + " (" + SPECIES[BIOMES[id].native].name.split(" ")[1] + " habitat)"];
   }));
-  fillSelect($("keeperSel"), [["none", "— none —"]].concat(Object.keys(KEEPERS).map(function (id) {
-    return [id, KEEPERS[id].glyph + " " + KEEPERS[id].name];
+  fillSelect($("keeperSel"), [["none", "— none —"]].concat([1, 2, 3, 4].map(function (l) {
+    return [String(l), "🧑‍🌾 " + LEVELS[l].title + " (level " + l + ")"];
   })));
 
   function syncInputs() {
     $("speciesSel").value = state.speciesId;
     $("biomeSel").value = state.biomeId;
-    $("keeperSel").value = state.keeperId;
+    $("keeperSel").value = state.keeper;
     $("channelSel").value = state.channel;
     $("pSlider").value = pToSlider(state.p);
+    $("qSlider").value = qToSlider(state.q);
     $("pauseOnSick").checked = state.pauseOnSick;
   }
 
@@ -430,19 +452,25 @@
     if (!placement().ok) log("Tried the " + BIOMES[state.biomeId].name + ": " + placement().reason, "sick");
   });
   $("keeperSel").addEventListener("change", function (e) {
-    state.keeperId = e.target.value;
-    X.setKeeper(ex, keeperId());
-    log(!keeperId() ? "The keeper went home." : KEEPERS[state.keeperId].name + " is now on duty.");
+    state.keeper = e.target.value;
+    X.setKeeper(ex, keeperSpec());
+    log(!keeperSpec() ? "The keeper went home." : keeperName() + " is now on duty.");
     renderControls(); render();
   });
   $("channelSel").addEventListener("change", function (e) {
     state.channel = e.target.value;
-    ex.climate.channel = state.channel;
+    ex.channel = state.channel;
+    X.setLab(ex, sandboxLab());
     log("Climate changed: " + e.target.selectedOptions[0].textContent + ".");
   });
   $("pSlider").addEventListener("input", function (e) {
     state.p = sliderToP(Number(e.target.value));
-    ex.climate.p = state.p;
+    X.setLab(ex, sandboxLab());
+    renderControls();
+  });
+  $("qSlider").addEventListener("input", function (e) {
+    state.q = sliderToQ(Number(e.target.value));
+    X.setLab(ex, sandboxLab());
     renderControls();
   });
   $("pauseOnSick").addEventListener("change", function (e) { state.pauseOnSick = e.target.checked; });

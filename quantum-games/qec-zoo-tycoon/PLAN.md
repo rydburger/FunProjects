@@ -325,9 +325,14 @@ supersedes the matching items in the roadmap below.
    `analyzeChecks`, `rotatedSurface`, `repetition`); `detectors.js` with phenomenological noise,
    DEMs, single-shot lookup and sliding-window matching; circuit-level scaffold;
    `tests/detectors.test.js`. Not yet wired into the game.
-3. **M6: keepers and the lab.** Exhibits run on `Detectors` (each exhibit is a memory). Keeper
-   roster, experience, ladder, speed and backlog; space-time lookup decoder for small
-   non-matchable codes; lab dials with research timers; rebalance with seeded bots.
+3. ✅ **M6: keepers and the lab.** Exhibits run on `Detectors` (each exhibit is a memory). Keeper
+   roster with experience, speed and training courses (levels 1–4 of the ladder above; 5–6 are
+   still to come); space-time lookup decoder for small non-matchable codes; lab dials with
+   research timers; rebalanced with seeded bots. Changes from the draft, flagged to the owner
+   for playtesting: training happens on the job (an absent keeper made courses a net loss), and a slow
+   keeper falls back to the best decoder they can run in real time rather than building a
+   backlog (in a pure memory, backlog only delays corrections, so it would be wrong to make it
+   cause logical errors).
 4. **M7: freeform builder.** Grid placement of qubits and ancillas, wiring, X/Z toggle, live
    validity readout, discovery and the blueprint book, computed placards, multi-animal enclosures.
    Anticommuting checks are simulated as fair-coin outcomes (exact for sequential measurement).

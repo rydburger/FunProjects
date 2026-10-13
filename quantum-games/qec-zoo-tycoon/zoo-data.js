@@ -1,13 +1,13 @@
 // =========================================================
 // Error Correction Zoo Tycoon — static game data.
 //
-// Species (codes), biomes (enclosure check sets + climate), and
-// keepers (decoders). Pure data plus Stabilizer.makeCode calls;
+// Species (codes), biomes (enclosure check sets + climate), keeper
+// levels (decoders) and the lab (error rates). Pure data plus Stabilizer.makeCode calls;
 // no game state or UI. Loaded by index.html after ../stabilizer.js
 // (exposes `window.ZooData`), and by the Node tests via require().
 //
 // Stabilizer and logical operators are Pauli strings, qubit 0 first.
-// Costs and rates are v0 starting numbers, to be tuned in M3.
+// Costs and rates are tuned by the seeded bots in tests/zoo-tycoon.test.js.
 // =========================================================
 (function (root) {
   var Stabilizer = typeof module !== "undefined" && module.exports
@@ -191,18 +191,18 @@
   // deliberately NOT always the species' own generators — they are
   // different generating sets of the same group — so placement is a real
   // group comparison (Stabilizer.sameStabilizerGroup), not an ID match.
-  // climate: noise channel name (Stabilizer.channels) and total per-qubit
-  // error probability per tick.
+  // climate: the noise channel (Stabilizer.channels) of the enclosure's
+  // hardware; the error rates come from the lab (LAB above).
   var BIOMES = {
     riverbank: {
       name: "Parity Riverbank", native: "tortoise", cost: 5000, upkeep: 40, footprint: [2, 2],
-      climate: { channel: "bitFlip", p: 0.02 },
+      climate: { channel: "bitFlip" },
       checks: ["ZIZ", "IZZ"],
       blurb: "A calm, bit-flip-only stretch of river. Measures pairwise Z parities."
     },
     forest: {
       name: "Nine-Fold Forest", native: "owl", cost: 12000, upkeep: 120, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.02 },
+      climate: { channel: "depolarizing" },
       checks: [
         sup(9, "Z", [0, 2]), sup(9, "Z", [1, 2]), sup(9, "Z", [3, 5]),
         sup(9, "Z", [4, 5]), sup(9, "Z", [6, 8]), sup(9, "Z", [7, 8]),
@@ -212,7 +212,7 @@
     },
     glade: {
       name: "Hamming Glade", native: "peacock", cost: 14000, upkeep: 100, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.02 },
+      climate: { channel: "depolarizing" },
       // Row-reduced differently: rows (1+2), 2, 3 of the Hamming checks.
       checks: [
         sup(7, "X", [1, 2, 3, 4]), sup(7, "X", [1, 2, 5, 6]), sup(7, "X", [0, 2, 4, 6]),
@@ -222,14 +222,14 @@
     },
     dunes: {
       name: "Cyclic Dunes", native: "pangolin", cost: 16000, upkeep: 110, footprint: [3, 2],
-      climate: { channel: "depolarizing", p: 0.02 },
+      climate: { channel: "depolarizing" },
       // Four of the five cyclic shifts of XZZXI (the fifth is their product).
       checks: ["IXZZX", "XIXZZ", "ZXIXZ", "ZZXIX"],
       blurb: "Wind-sculpted ridges that repeat every five steps. Checks mix X and Z."
     },
     wetlands: {
       name: "Checkerboard Wetlands", native: "axolotl", cost: 20000, upkeep: 90, footprint: [3, 3],
-      climate: { channel: "depolarizing", p: 0.02 },
+      climate: { channel: "depolarizing" },
       checks: [
         sup(9, "X", [0, 2, 3, 4]), sup(9, "X", [4, 5, 7, 8]), sup(9, "X", [1, 2]), sup(9, "X", [6, 7]),
         sup(9, "Z", [1, 2, 4, 5]), sup(9, "Z", [3, 4, 6, 7]), sup(9, "Z", [0, 3]), sup(9, "Z", [5, 8])
@@ -243,21 +243,63 @@
   });
 
   // ---------- Keepers (decoders) ----------
-  // maxWeight: the lookup table covers errors up to this weight.
-  var KEEPERS = {
-    intern: { name: "Intern", glyph: "🧑‍🎓", salary: 100, roundsPerTick: 1, maxWeight: 1,
-      blurb: "Knows the single-error syndromes by heart. Shrugs at anything else." },
-    keeper: { name: "Keeper", glyph: "🧑‍🌾", salary: 220, roundsPerTick: 1, maxWeight: 2,
-      blurb: "Always picks the lowest-weight explanation for what they see." },
-    head: { name: "Head Keeper", glyph: "🧑‍🔬", salary: 400, roundsPerTick: 3, maxWeight: 2,
-      blurb: "Same instincts as a Keeper, but checks on the animals three times as often." }
+  // Every keeper is hired as a trainee and learns on the job. A level is a
+  // decoding algorithm. `work` is its effort per syndrome round, in table
+  // lookups; space-time decoders also scale with the number of checks
+  // (see ExhibitSim.workPerRound). A keeper decodes at most `speed` units
+  // per hour, and speed grows with experience. A keeper who can't keep up
+  // with an algorithm at an exhibit's measurement cycle falls back to the
+  // best one they can run in real time.
+  var KEEPER_LEVELS = [
+    null,
+    { level: 1, title: "Trainee", algorithm: "lookup", maxWeight: 1, window: 1, work: 1, salary: 120,
+      blurb: "Single-shot lookup: knows the syndrome of every single-qubit error and takes each round's outcomes at face value." },
+    { level: 2, title: "Keeper", algorithm: "lookup", maxWeight: 2, window: 1, work: 1.5, salary: 150,
+      blurb: "Single-shot minimum-weight lookup: also knows the likeliest weight-2 explanations, but still trusts every outcome." },
+    { level: 3, title: "Senior keeper", algorithm: "spacetime", window: 2, work: 2, salary: 190,
+      blurb: "Space-time decoding over 2 rounds: a check that flips and then flips back was a misread measurement, not an error." },
+    { level: 4, title: "Head keeper", algorithm: "spacetime", window: 3, work: 3, salary: 240,
+      blurb: "Space-time decoding over 3 rounds: more evidence before committing to a correction." }
+  ];
+  var MAX_KEEPER_LEVEL = KEEPER_LEVELS.length - 1;
+  // Training to `level`: experience needed (rounds decoded), days of study, fee.
+  var TRAINING = {
+    2: { xp: 150, days: 1, fee: 1000 },
+    3: { xp: 500, days: 2, fee: 2500 },
+    4: { xp: 1200, days: 3, fee: 5000 }
   };
+  // Decoding speed in work units per hour: base + xp × perXp, capped.
+  var KEEPER_SPEED = { base: 4, perXp: 1 / 300, max: 12 };
+  var KEEPER_NAMES = ["Alex", "Sam", "Robin", "Jordan", "Kai", "Noor", "Priya", "Tomás", "Mei", "Yusuf",
+    "Inès", "Lars", "Zara", "Felix", "Amara", "Hiro", "Leila", "Owen", "Sana", "Teo", "Wren", "Ola", "Dev", "Rosa"];
+
+  // ---------- The lab (physical error rates) ----------
+  // Each dial has a value per research level (index 0 = starting
+  // hardware). Per syndrome round, data qubit j gets
+  //   coherence / cycle  +  (checks wired to j) × gates
+  // of the enclosure's channel, and check i is misread with probability
+  //   readout + (weight of i) × gates.
+  // This is the phenomenological model with a rough charge for the CNOTs
+  // in each round; circuit-level noise (CNOT order, hook errors) is a
+  // later milestone.
+  var LAB = {
+    coherence: { name: "Coherence", values: [0.008, 0.0055, 0.0035, 0.002], unit: "idle error per qubit per hour",
+      blurb: "Longer-lived qubits: less error on every data qubit while it waits." },
+    gates: { name: "Two-qubit gates", values: [0.0008, 0.0006, 0.0004, 0.0002], unit: "error per CNOT",
+      blurb: "Cleaner CNOTs between ancillas and data. Every round, each data qubit pays once per check it is wired to." },
+    readout: { name: "Readout", values: [0.01, 0.007, 0.0045, 0.0025], unit: "chance a check is misread",
+      blurb: "Fewer misreported check outcomes." },
+    cycle: { name: "Syndrome cycle", values: [1, 2, 3], unit: "rounds per hour",
+      blurb: "Measure more often: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode." }
+  };
+  // Cost of each research step, by the level being reached.
+  var RESEARCH = [null, { fee: 5000, days: 2 }, { fee: 12000, days: 4 }, { fee: 25000, days: 6 }];
 
   // ---------- Economy constants ----------
   var ECONOMY = {
     startingCash: 50000, startingReputation: 50,
     ticksPerDay: 24, parkSize: [12, 8],
-    vetBill: 2000, bankruptDays: 7,
+    vetBill: 2500, bankruptDays: 7,
     ticketPrice: 12,          // $ per visitor
     visitorsPerAppeal: 0.8,   // visitors/day per point of appeal, at full health and reputation 50
     sickReputationHit: 1.5,    // reputation lost per logical error
@@ -294,7 +336,9 @@
   }
 
   var ZooData = {
-    SPECIES: SPECIES, BIOMES: BIOMES, KEEPERS: KEEPERS, ECONOMY: ECONOMY,
+    SPECIES: SPECIES, BIOMES: BIOMES, ECONOMY: ECONOMY,
+    KEEPER_LEVELS: KEEPER_LEVELS, MAX_KEEPER_LEVEL: MAX_KEEPER_LEVEL, TRAINING: TRAINING,
+    KEEPER_SPEED: KEEPER_SPEED, KEEPER_NAMES: KEEPER_NAMES, LAB: LAB, RESEARCH: RESEARCH,
     checkPlacement: checkPlacement
   };
   if (typeof module !== "undefined" && module.exports) module.exports = ZooData;
