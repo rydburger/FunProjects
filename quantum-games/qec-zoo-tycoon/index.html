@@ -244,6 +244,63 @@
   .guide .mono { font-size: 12px; color: var(--ink-dim); }
   .guide li.unknown { opacity: 0.9; border-style: dashed; }
   .guide .placard { margin-top: 8px; }
+
+  /* ---- investors ---- */
+  .inv-round { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .inv-round b { font-family: var(--font-display); font-size: 19px; font-weight: 500; }
+  .inv-round .mono, .inv-note { font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); }
+  .roadmap { list-style: none; margin: 8px 0; padding: 0; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+  .roadmap li { display: flex; gap: 8px; align-items: baseline; }
+  .roadmap .ck { width: 14px; flex: none; color: var(--ink-dim); }
+  .roadmap li.met .ck { color: var(--accent); }
+  .roadmap li.met .lb { color: var(--ink-dim); text-decoration: line-through; text-decoration-color: var(--line); }
+  .roadmap .v { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); white-space: nowrap; }
+  .inv-break { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 12px; margin: 6px 0 0; }
+  .inv-break dt { color: var(--ink-dim); }
+  .inv-break dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+  .rounds { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12.5px; }
+  .rounds li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+  .rounds li:last-child { border-bottom: none; }
+  .rounds .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .offer { border: 1px solid var(--lit); background: var(--lit-soft); border-radius: 10px; padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+  details.inv-more summary { cursor: pointer; font-size: 12.5px; color: var(--ink-dim); margin-top: 6px; }
+  .quotes { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+  .quotes .quote { margin: 0; }
+
+  /* ---- investor tour ---- */
+  .tour { margin-bottom: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent-soft); font-size: 13.5px; }
+  .tour .who { font-weight: 600; }
+  .tour .perks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tour .perks .btn { font-size: 12px; padding: 4px 9px; white-space: normal; text-align: left; }
+  .enc.stop { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+  /* ---- construction ---- */
+  .enc.building { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bc) 0 8px, transparent 8px 16px); }
+  .enc .hb i.build { background: var(--lit); }
+
+  /* ---- staff ---- */
+  .staff-list li { flex-wrap: wrap; }
+  .staff-list li.away { border-style: dashed; }
+  .staff-list .who-k { flex: 1 1 140px; min-width: 0; }
+  .staff-list .acts { display: flex; gap: 4px; flex-wrap: wrap; }
+  .staff-list .acts .btn { font-size: 11.5px; padding: 3px 7px; }
+  .minibars { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; align-items: center; font-size: 10.5px; color: var(--ink-dim); margin-top: 4px; }
+  .minibars .meter { margin: 0; height: 5px; }
+  .meter i.warn { background: var(--lit); }
+  .meter i.bad { background: var(--sick); }
+  .keeper-card + .keeper-card { margin-top: 8px; }
+  .keeper-card .who .x-btn { font-size: 16px; padding: 0 4px; }
+  .add-keeper { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .add-keeper select { font: inherit; font-size: 13px; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-panel-2); color: var(--ink); min-width: 0; flex: 1 1 160px; }
+  .duty { font-size: 13px; margin: 0 0 8px; }
+
+  /* ---- blueprints ---- */
+  .tool-row { display: flex; gap: 4px; align-items: stretch; }
+  .tool-row .tool { flex: 1 1 auto; min-width: 0; }
+  .tool-del { border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--ink-dim); cursor: pointer; padding: 0 9px; font: inherit; }
+  .tool-del.armed { background: var(--sick); color: var(--bg-panel); border-color: var(--sick); font-size: 12px; }
+  @media (max-width: 760px) { .tools .tool-row { flex: 1 1 150px; } }
+  button:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -266,16 +323,18 @@
       <div class="kpi"><span class="l">Date</span><span class="n" id="kDay"></span><span class="sub" id="kHour"></span></div>
       <div class="kpi"><span class="l">Reputation</span><span class="n" id="kRep"></span><span class="sub" id="kRepSub"></span></div>
       <div class="kpi"><span class="l">Visitors / day</span><span class="n" id="kVis"></span><span class="sub" id="kVisSub"></span></div>
-      <div class="kpi goal"><span class="l" id="kGoalLabel">Series A goal</span>
-        <div class="gbar"><span class="b"><i id="gCash"></i></span><span class="t" id="gCashT"></span></div>
-        <div class="gbar"><span class="b"><i id="gRep"></i></span><span class="t" id="gRepT"></span></div>
+      <div class="kpi"><span class="l">Valuation</span><span class="n" id="kVal"></span><span class="sub" id="kValSub"></span></div>
+      <div class="kpi goal"><span class="l" id="kGoalLabel">Next round</span>
+        <div class="gbar"><span class="b"><i id="gVal"></i></span><span class="t" id="gValT"></span></div>
+        <div class="gbar"><span class="b"><i id="gConf"></i></span><span class="t" id="gConfT"></span></div>
         <span class="sub" id="kGoal"></span></div>
     </div>
     <div class="seg speed" id="speedSeg" aria-label="Game speed">
       <button type="button" data-speed="0" title="Pause (space)">⏸</button>
-      <button type="button" data-speed="1" title="Normal speed (1)">▶</button>
-      <button type="button" data-speed="3" title="Fast (2)">▶▶</button>
-      <button type="button" data-speed="10" title="Very fast (3)">▶▶▶</button>
+      <button type="button" data-speed="1" title="Normal speed: a day in 12 seconds (1)">▶</button>
+      <button type="button" data-speed="5" title="Fast (2)">▶▶</button>
+      <button type="button" data-speed="20" title="Very fast (3)">▶▶▶</button>
+      <button type="button" data-speed="60" title="A year in about a minute (4)">⏩</button>
     </div>
   </div>
 
@@ -290,6 +349,10 @@
         </div>
         <div class="tools" id="tools"></div>
         <div class="hint" id="toolHint">Pick a habitat, then click the park to place it. <span class="kbd">Esc</span> cancels.</div>
+      </div>
+      <div class="panel">
+        <h2>Investors</h2>
+        <div id="investors"></div>
       </div>
       <div class="panel">
         <h2>Staff</h2>
@@ -310,6 +373,7 @@
 
     <!-- park -->
     <div class="park-wrap">
+      <div class="tour" id="tour" hidden></div>
       <div class="park" id="park" aria-label="Park map"></div>
       <div class="ticker" id="ticker"></div>
     </div>
@@ -330,11 +394,14 @@
 <script src="placard.js"></script>
 <script src="exhibit-sim.js"></script>
 <script src="exhibit-view.js"></script>
+<script src="staff.js"></script>
+<script src="investors.js"></script>
 <script src="park.js"></script>
 <script src="workshop.js"></script>
 <script>
 (function () {
   var S = window.Stabilizer, Z = window.ZooData, V = window.ExhibitView, Park = window.Park, X = window.ExhibitSim;
+  var Staff = window.Staff, Inv = window.Investors;
   var SPECIES = Z.SPECIES, BIOMES = Z.BIOMES, LEVELS = Z.KEEPER_LEVELS, LAB = Z.LAB, ECO = Z.ECONOMY;
 
   function $(id) { return document.getElementById(id); }
@@ -344,7 +411,15 @@
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
-  function money(v) { return (v < 0 ? "−$" : "$") + Math.round(Math.abs(v)).toLocaleString(); }
+  function money(v) { return (v < 0 ? "−$" : "$") + Math.round(Math.abs(v)).toLocaleString("en-US"); }
+  // $12.3k, $4.5M, $1.2B: for the big numbers investors throw around.
+  function big(v) {
+    var a = Math.abs(v), sign = v < 0 ? "−$" : "$";
+    var u = a >= 1e9 ? [1e9, "B"] : a >= 1e6 ? [1e6, "M"] : a >= 1e4 ? [1e3, "k"] : [1, ""];
+    var x = a / u[0];
+    return sign + (u[1] ? (x >= 100 ? Math.round(x) : x.toFixed(1).replace(/\.0$/, "")) : Math.round(x)) + u[1];
+  }
+  function pctInt(v) { return Math.round(v * 100) + "%"; }
   function pad2(n) { return (n < 10 ? "0" : "") + n; }
   function clock(tick) { return "Day " + (Math.floor(tick / ECO.ticksPerDay) + 1) + " " + pad2(tick % ECO.ticksPerDay) + ":00"; }
   function healthClass(v) { return v < 40 ? "low" : v < 75 ? "mid" : ""; }
@@ -377,13 +452,17 @@
     speedBeforeModal: 1
   };
   var TICKS_PER_SECOND_AT_1X = 2;
+  var FOCUS = Z.FOCUS;
 
   // ---------- news ----------
   var news = [];
+  function newsItem(n) { return h("li", n.kind, '<span class="t">' + clock(n.t) + "</span>" + n.text); }
   function post(text, kind) {
-    news.unshift({ t: park.tick, text: text, kind: kind || "" });
-    if (news.length > 80) news.pop();
-    renderNews();
+    var n = { t: park.tick, text: text, kind: kind || "" };
+    news.unshift(n);
+    var ul = $("log");
+    ul.insertBefore(newsItem(n), ul.firstChild);
+    if (news.length > 80) { news.pop(); if (ul.lastChild) ul.removeChild(ul.lastChild); }
     var tk = $("ticker");
     tk.className = "ticker " + (kind || "");
     tk.innerHTML = '<span class="t">' + clock(park.tick) + "</span>" + text;
@@ -391,16 +470,16 @@
   function renderNews() {
     var ul = $("log");
     ul.innerHTML = "";
-    news.forEach(function (n) {
-      var li = h("li", n.kind, '<span class="t">' + clock(n.t) + "</span>" + n.text);
-      ul.appendChild(li);
-    });
+    var frag = document.createDocumentFragment();
+    news.forEach(function (n) { frag.appendChild(newsItem(n)); });
+    ul.appendChild(frag);
   }
 
   // ---------- palette ----------
   function toolInfo(t) {
-    if (t.kind === "biome") { var b = BIOMES[t.id]; return { fp: b.footprint, cost: b.cost, name: b.name }; }
-    return { fp: Habitat.footprint(t.design.qubits.length + t.design.checks.length), cost: Habitat.price(t.design).cost, name: t.name };
+    if (t.kind === "biome") { var b = BIOMES[t.id]; return { fp: b.footprint, cost: b.cost, days: b.buildDays, name: b.name }; }
+    var pr = Habitat.price(t.design);
+    return { fp: Habitat.footprint(t.design.qubits.length + t.design.checks.length), cost: pr.cost, days: pr.days, name: t.name };
   }
   function sameTool(a, b) {
     return !!a && !!b && a.kind === b.kind && (a.kind === "biome" ? a.id === b.id : a.entryId === b.entryId && a.entryId !== undefined);
@@ -416,9 +495,8 @@
       btn.type = "button";
       btn.dataset.cost = b.cost;
       btn.dataset.known = known ? "1" : "";
-      btn.innerHTML = '<span class="sw"></span><span class="nm">' + (known ? "" : "🔒 ") + b.name + "</span>" +
-        '<span class="meta">' + (known ? money(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + sp.glyph
-          : "") + "</span>";
+      btn.innerHTML = '<span class="sw"></span><span class="nm">' + b.name + "</span>" +
+        '<span class="meta">' + big(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + b.buildDays + "d · " + sp.glyph + "</span>";
       btn.disabled = !known || park.cash < b.cost;
       btn.title = known ? b.blurb : "Build a working habitat for the " + sp.name + " in the workshop to discover it. The field guide has a hint.";
       btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
@@ -430,18 +508,36 @@
         ". See the field guide."));
     }
     park.book.designs.forEach(function (e) {
+      if (e.retired) return;
       var sp = spOf(e.speciesId), t = { kind: "design", design: e.layout, name: e.name, entryId: e.id };
       var info = toolInfo(t);
+      var row = h("div", "tool-row");
       var btn = h("button", "tool b-design" + (sameTool(ui.tool, t) ? " on" : ""));
       btn.type = "button";
       btn.dataset.cost = info.cost;
       btn.dataset.known = "1";
       btn.innerHTML = '<span class="sw"></span><span class="nm">' + esc(e.name) + "</span>" +
-        '<span class="meta">' + money(info.cost) + " · " + info.fp[0] + "×" + info.fp[1] + " · " + sp.glyph + "</span>";
+        '<span class="meta">' + big(info.cost) + " · " + info.fp[0] + "×" + info.fp[1] + " · " + info.days + "d · " + sp.glyph + "</span>";
       btn.disabled = park.cash < info.cost;
       btn.title = "Your design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks.";
       btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
-      box.appendChild(btn);
+      row.appendChild(btn);
+      var armed = ui.armedDelete === e.id;
+      var del = h("button", "tool-del" + (armed ? " armed" : ""), armed ? "Delete?" : "×");
+      del.type = "button";
+      del.title = "Delete this blueprint";
+      del.setAttribute("aria-label", "Delete the blueprint " + e.name);
+      del.addEventListener("click", function () {
+        if (!armed) { ui.armedDelete = e.id; renderTools(); return; }
+        ui.armedDelete = null;
+        if (sameTool(ui.tool, t)) setTool(null);
+        var r = Park.deleteDesign(park, e.id);
+        post(r.retired ? "Retired the blueprint <b>" + esc(e.name) + "</b>. Enclosures built from it stay; it leaves the book when they're gone."
+          : "Deleted the blueprint <b>" + esc(e.name) + "</b>.");
+        refreshAll();
+      });
+      row.appendChild(del);
+      box.appendChild(row);
     });
   }
   function updateToolAffordability() {
@@ -456,7 +552,7 @@
     renderPark();
     var info = t && toolInfo(t);
     $("toolHint").innerHTML = t
-      ? "Placing <b>" + esc(info.name) + "</b> (" + info.fp.join("×") + "). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
+      ? "Placing <b>" + esc(info.name) + "</b> (" + info.fp.join("×") + ", " + info.days + " days to build). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
       : "Pick a habitat, then click the park to place it. <span class=\"kbd\">Esc</span> cancels.";
   }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -475,8 +571,12 @@
     elm.style.gridColumn = (x + 1) + " / span " + w;
     elm.style.gridRow = (y + 1) + " / span " + hh;
   }
+  // id -> { e, g, nm, kp, hb, bar, last }: the tile and its parts, so the
+  // per-frame update touches the DOM only where something changed.
   var encEls = {};
   function renderPark() {
+    parkEl.style.setProperty("--cols", park.width);
+    parkEl.style.setProperty("--rows", park.height);
     parkEl.innerHTML = "";
     encEls = {};
     park.order.forEach(function (id) {
@@ -487,7 +587,8 @@
       e.innerHTML = '<span class="g"></span><span class="nm"></span><span class="kp"></span><span class="hb"><i></i></span>';
       e.title = label(rec);
       parkEl.appendChild(e);
-      encEls[id] = e;
+      encEls[id] = { e: e, g: e.querySelector(".g"), nm: e.querySelector(".nm"), kp: e.querySelector(".kp"),
+        hb: e.querySelector(".hb"), bar: e.querySelector(".hb i"), last: {} };
     });
     if (ui.tool && ui.hover) {
       var a = anchorFor(ui.tool, ui.hover), fp = toolInfo(ui.tool).fp;
@@ -500,29 +601,41 @@
     }
     updatePark();
   }
+  function setIf(o, key, v, apply) { if (o.last[key] !== v) { o.last[key] = v; apply(v); } }
   function updatePark() {
-    var now = performance.now();
+    var now = performance.now(), stops = park.tour ? park.tour.route : [];
     park.order.forEach(function (id) {
-      var rec = park.exhibits[id], e = encEls[id];
-      if (!e) return;
-      var g = e.querySelector(".g"), nm = e.querySelector(".nm"), kp = e.querySelector(".kp"), hb = e.querySelector(".hb i");
-      if (rec.animal) {
+      var rec = park.exhibits[id], o = encEls[id];
+      if (!o) return;
+      var g, nm, gc = "g", bw = null, bc = "";
+      if (rec.building) {
+        g = "🏗"; gc = "g empty"; nm = Park.daysLeft(park, rec) + " days";
+        bw = Math.round(100 * (park.tick - rec.buildStart) / (rec.buildUntil - rec.buildStart)); bc = "build";
+      } else if (rec.animal) {
         var sp = spOf(rec.animal.speciesId);
-        g.textContent = glyphs(sp, rec.animal.k); g.className = "g";
-        nm.textContent = shortName(sp);
-        hb.parentNode.style.display = "";
-        hb.style.width = Math.round(rec.animal.health) + "%";
-        hb.className = healthClass(rec.animal.health);
+        g = glyphs(sp, rec.animal.k); nm = shortName(sp);
+        bw = Math.round(rec.animal.health); bc = healthClass(rec.animal.health);
       } else {
-        g.textContent = "empty"; g.className = "g empty";
-        nm.textContent = habOf(rec).name;
-        hb.parentNode.style.display = "none";
+        g = "empty"; gc = "g empty"; nm = habOf(rec).name;
       }
-      var kk = rec.keeperId ? park.keepers[rec.keeperId] : null;
-      kp.textContent = kk ? (kk.training ? "📚" : "🧑‍🌾") + kk.level : (rec.animal ? "⚠️" : "");
-      kp.title = kk ? kk.name + ", " + keeperTitle(kk) + (kk.training ? " (studying)" : "") : "No keeper";
-      e.classList.toggle("sel", ui.selected === id);
-      e.classList.toggle("sick", (ui.sickFlash[id] || 0) > now);
+      setIf(o, "g", g, function (v) { o.g.textContent = v; });
+      setIf(o, "gc", gc, function (v) { o.g.className = v; });
+      setIf(o, "nm", nm, function (v) { o.nm.textContent = v; });
+      setIf(o, "bw", bw, function (v) { o.hb.style.display = v === null ? "none" : ""; if (v !== null) o.bar.style.width = v + "%"; });
+      setIf(o, "bc", bc, function (v) { o.bar.className = v; });
+      var here = rec.keeperIds.map(function (kid) { return park.keepers[kid]; });
+      var present = here.filter(Park.keeperPresent);
+      var kp = present.length ? (present.some(function (k) { return k.training; }) ? "📚" : "🧑‍🌾") +
+          Math.max.apply(null, present.map(function (k) { return k.level; })) + (present.length > 1 ? "×" + present.length : "")
+        : here.length ? "🏖" : (rec.animal ? "⚠️" : "");
+      setIf(o, "kp", kp, function (v) {
+        o.kp.textContent = v;
+        o.kp.title = here.length ? here.map(function (k) { return k.name + " (" + Staff.statusText(k) + ")"; }).join(", ") : "No keeper";
+      });
+      setIf(o, "building", !!rec.building, function (v) { o.e.classList.toggle("building", v); });
+      setIf(o, "sel", ui.selected === id, function (v) { o.e.classList.toggle("sel", v); });
+      setIf(o, "sick", (ui.sickFlash[id] || 0) > now, function (v) { o.e.classList.toggle("sick", v); });
+      setIf(o, "stop", stops.indexOf(id) >= 0, function (v) { o.e.classList.toggle("stop", v); });
     });
   }
   function cellFromEvent(ev) {
@@ -548,12 +661,9 @@
       var r = ui.tool.kind === "biome" ? Park.build(park, ui.tool.id, a.x, a.y)
         : Park.buildDesign(park, ui.tool.design, a.x, a.y, { name: ui.tool.speciesName });
       if (!r.ok) { post("Can't build there: " + r.reason, "sick"); return; }
-      post("Built the <b>" + label(r.exhibit) + "</b> for " + money(cost) + ".");
-      if (r.discovered) {
-        var dsp = spOf(r.speciesId);
-        post("✨ New species discovered: the <b>" + esc(dsp.name) + "</b> " + dsp.glyph + "!");
-        setTimeout(function () { showDiscovery(r); }, 0);
-      }
+      post("🏗 Construction started on the <b>" + label(r.exhibit) + "</b> (" + big(cost) + "). It opens on day " +
+        (Math.floor(r.exhibit.buildUntil / ECO.ticksPerDay) + 1) + "." +
+        (r.discovers ? " If it works, you'll have discovered the <b>" + esc(spOf(r.speciesId).name) + "</b>." : ""));
       ui.selected = r.exhibit.id;
       ui.armedDemolish = false;
       setTool(null);
@@ -581,7 +691,7 @@
     var head = h("div", "insp-head");
     var title = h("div", "");
     var sp = rec.animal ? spOf(rec.animal.speciesId) : null;
-    title.appendChild(h("h3", "", (sp ? glyphs(sp, rec.animal.k) + " " + esc(sp.name) : "Empty enclosure")));
+    title.appendChild(h("h3", "", (sp ? glyphs(sp, rec.animal.k) + " " + esc(sp.name) : rec.building ? "🏗 Under construction" : "Empty enclosure")));
     title.appendChild(h("div", "sub", label(rec) + (sp ? " · " + sp.params : "")));
     head.appendChild(title);
     var close = h("button", "x-btn", "×");
@@ -589,6 +699,19 @@
     close.addEventListener("click", function () { select(null); });
     head.appendChild(close);
     insp.appendChild(head);
+
+    if (rec.building) {
+      var future = rec.biomeId ? spOf(BIOMES[rec.biomeId].native) : spOf(habOf(rec).entry.speciesId);
+      var bs = h("div", "section");
+      bs.appendChild(h("span", "label", "Construction"));
+      bs.appendChild(h("div", "health", '<div class="row"><span>Opens on day ' + (Math.floor(rec.buildUntil / ECO.ticksPerDay) + 1) +
+        '</span><span class="mono" id="iBuild"></span></div><div class="bar"><div class="fill mid" id="iBuildFill"></div></div>'));
+      bs.appendChild(h("div", "hint", "Paid " + big(biome.cost) + " up front; no upkeep until it opens. " +
+        (rec.discovers ? "When it works you'll have discovered the <b>" + esc(future.name) + "</b> " + future.glyph + "."
+          : "It's for the " + esc(future.name) + " " + future.glyph + ".") +
+        " Keepers can be assigned now; they start once an animal moves in."));
+      insp.appendChild(bs);
+    }
 
     if (rec.animal) {
       var hb = h("div", "health",
@@ -604,7 +727,7 @@
       views.innerHTML =
         '<div class="view"><div class="cap"><span>Really there</span></div><svg id="iGod" role="img" aria-label="Errors in the last incident"></svg></div>' +
         '<div class="view"><div class="cap"><span>Keeper sees</span><span class="mono" id="iFired"></span></div><svg id="iKeeper" role="img" aria-label="Checks fired in the last incident"></svg>' +
-        '<div class="overlay" id="iNoKeeper"' + (rec.keeperId ? " hidden" : "") + "><span>No keeper: nobody is measuring.</span></div></div>";
+        '<div class="overlay" id="iNoKeeper"' + (rec.animal.level ? " hidden" : "") + "><span>No keeper on duty: nobody is measuring.</span></div></div>";
       sec.appendChild(views);
       insp.appendChild(sec);
 
@@ -620,7 +743,7 @@
     insp.appendChild(renderKeeperSection(rec));
 
     // Animal purchase
-    if (!rec.animal) {
+    if (!rec.animal && !rec.building) {
       var ps = h("div", "section");
       ps.appendChild(h("span", "label", "Buy an animal"));
       var ul = h("ul", "species-list");
@@ -666,7 +789,7 @@
       noiseText = "<br>Per round: data error " + range(pd) + " per qubit, misread " + range(qs) + " per check" +
         " (lab hardware; more wires mean more gate errors).";
     }
-    hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.channel) + ". Upkeep $" + biome.upkeep + "/day." + noiseText));
+    hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.channel) + ". Upkeep " + money(biome.upkeep) + "/day." + noiseText));
     insp.appendChild(hs);
     if (sp) {
       var d = h("details", "placard-d section");
@@ -688,14 +811,15 @@
     }
     var refund = Math.round(biome.cost * ECO.demolishRefund);
     var dem = h("button", "btn danger" + (ui.armedDemolish ? " armed" : ""),
-      ui.armedDemolish ? "Confirm: demolish (+" + money(refund) + ")" : "Demolish");
+      ui.armedDemolish ? "Confirm: demolish (+" + big(refund) + ")" : rec.building ? "Cancel construction" : "Demolish");
     dem.type = "button";
     dem.addEventListener("click", function () {
       if (!ui.armedDemolish) { ui.armedDemolish = true; renderInspector(); return; }
-      var label = label(rec);
+      var name = label(rec);
       var lost = rec.animal ? " The " + esc(spOf(rec.animal.speciesId).name) + (rec.animal.k > 1 ? " were" : " was") + " rehomed." : "";
-      Park.demolish(park, rec.id);
-      post("Demolished the " + label + " (refund " + money(refund) + ")." + lost);
+      var r = Park.demolish(park, rec.id);
+      if (!r.ok) { post(r.reason, "sick"); return; }
+      post("Demolished the " + name + " (refund " + money(r.refund) + ")." + lost);
       ui.selected = null; ui.armedDemolish = false;
       refreshAll();
     });
@@ -705,124 +829,200 @@
     updateInspector();
   }
 
+  function statusLine(k) {
+    var st = Staff.statusText(k);
+    if (k.absence) st += " until day " + (k.absence.untilDay + 1);
+    else if (k.plannedVacation) st += " from day " + (k.plannedVacation.fromDay + 1);
+    return st;
+  }
   function renderKeeperSection(rec) {
     var ks = h("div", "section");
-    ks.appendChild(h("span", "label", "Zookeeper"));
-    var k = rec.keeperId ? park.keepers[rec.keeperId] : null;
-    if (!k) {
-      ks.appendChild(h("div", "hint", rec.animal ? "⚠️ Nobody is measuring the checks: errors will pile up." : "You can hire a keeper before the animal arrives."));
+    ks.appendChild(h("span", "label", "Zookeepers"));
+    ks.appendChild(h("div", "duty", "", ""));
+    ks.lastChild.id = "kDuty";
+    var here = rec.keeperIds.map(function (kid) { return park.keepers[kid]; });
+    if (!here.length) {
+      ks.appendChild(h("div", "hint", rec.animal ? "⚠️ Nobody is measuring the checks: errors will pile up."
+        : "You can assign keepers before the animal arrives."));
+    }
+    here.forEach(function (k) {
+      var card = h("div", "keeper-card");
+      card.dataset.k = k.id;
+      card.innerHTML = '<div class="who"><span><b>' + k.name + "</b> · " + keeperTitle(k) + '</span><span class="meta">' + money(Park.keeperSalary(k)) + "/day</span></div>" +
+        '<div class="meta" data-f="status"></div>' +
+        '<div class="meta">Speed <span data-f="speed"></span> work/hour · <span data-f="share"></span></div><div class="meter"><i data-f="speedBar"></i></div>' +
+        '<div class="meta" data-f="xpText"></div><div class="meter"><i data-f="xpBar"></i></div>';
       var row = h("div", "btn-row");
-      var hire = h("button", "btn", "Hire a trainee (" + money(LEVELS[1].salary) + "/day)");
-      hire.type = "button";
-      hire.addEventListener("click", function () {
-        var r = Park.hireKeeper(park, rec.id);
-        post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper, for the " + label(rec) + ".");
+      var train = h("button", "btn", "Train");
+      train.type = "button"; train.dataset.f = "train";
+      train.addEventListener("click", function () {
+        var r = Park.trainKeeper(park, k.id);
+        if (!r.ok) { post(r.reason, "sick"); return; }
+        post("<b>" + k.name + "</b> enrolled in " + LEVELS[k.level + 1].title.toLowerCase() + " training, done " + whenText(r.until) + ".");
         refreshAll();
       });
-      row.appendChild(hire);
-      ks.appendChild(row);
-      var free = park.keeperOrder.map(function (id) { return park.keepers[id]; }).filter(function (x) { return !x.exhibitId; });
-      if (free.length) {
-        var ul = h("ul", "staff-list");
-        ul.style.marginTop = "8px";
-        free.forEach(function (fk) {
-          var li = h("li", "", "<span><b>" + fk.name + "</b> <span class=\"s\">" + keeperTitle(fk) + " · in the staff room</span></span>");
-          var b = h("button", "btn quiet", "Assign");
-          b.type = "button";
-          b.addEventListener("click", function () {
-            Park.assignKeeper(park, fk.id, rec.id);
-            post("<b>" + fk.name + "</b> now looks after the " + label(rec) + ".");
-            refreshAll();
-          });
-          li.appendChild(b);
-          ul.appendChild(li);
-        });
-        ks.appendChild(ul);
-      }
-      return ks;
+      row.appendChild(train);
+      var off = h("button", "btn quiet", k.exhibitIds.length > 1 ? "Off this exhibit" : "To staff room");
+      off.type = "button";
+      off.addEventListener("click", function () {
+        Park.unassignKeeper(park, k.id, rec.id);
+        post("<b>" + k.name + "</b> no longer looks after the " + label(rec) + ".");
+        refreshAll();
+      });
+      row.appendChild(off);
+      card.appendChild(row);
+      ks.appendChild(card);
+    });
+    // Add someone: a new trainee, or anyone already on staff.
+    var add = h("div", "add-keeper");
+    var hire = h("button", "btn" + (here.length ? " quiet" : ""), "Hire a trainee (" + money(LEVELS[1].salary) + "/day)");
+    hire.type = "button";
+    hire.addEventListener("click", function () {
+      var r = Park.hireKeeper(park, rec.id);
+      post("Hired <b>" + r.keeper.name + "</b>, a trainee keeper, for the " + label(rec) + ".");
+      refreshAll();
+    });
+    add.appendChild(hire);
+    var others = park.keeperOrder.map(function (id) { return park.keepers[id]; }).filter(function (k) { return rec.keeperIds.indexOf(k.id) < 0; });
+    if (others.length) {
+      var sel = h("select", "");
+      sel.id = "addKeeper";
+      sel.setAttribute("aria-label", "Add a keeper to this exhibit");
+      var loads = Park.staffing(park, true).loads;
+      sel.appendChild(new Option("Add someone already on staff…", ""));
+      others.forEach(function (k) {
+        sel.appendChild(new Option(k.name + " · " + keeperTitle(k) + " · " + (k.exhibitIds.length ? k.exhibitIds.length + " exhibit" + (k.exhibitIds.length === 1 ? "" : "s") +
+          ", load " + (loads[k.id] || 0).toFixed(2) : "in the staff room") + (k.absence ? " · " + Staff.statusText(k) : ""), String(k.id)));
+      });
+      sel.addEventListener("change", function () {
+        var k = park.keepers[Number(sel.value)];
+        if (!k) return;
+        Park.assignKeeper(park, k.id, rec.id);
+        post("<b>" + k.name + "</b> now also looks after the " + label(rec) + (k.exhibitIds.length > 1 ? ", splitting their time " + k.exhibitIds.length + " ways." : "."));
+        refreshAll();
+      });
+      add.appendChild(sel);
     }
-    var card = h("div", "keeper-card");
-    card.innerHTML = '<div class="who"><span><b>' + k.name + "</b> · " + keeperTitle(k) + '</span><span class="meta">' + money(Park.keeperSalary(k)) + "/day</span></div>" +
-      '<div class="algo" id="kAlgo"></div><div class="warn" id="kWarn" hidden></div>' +
-      '<div class="meta">Speed <span id="kSpeed"></span> work/hour</div><div class="meter"><i id="kSpeedBar"></i></div>' +
-      '<div class="meta" id="kXpText"></div><div class="meter"><i id="kXpBar"></i></div>';
-    var row2 = h("div", "btn-row");
-    var train = h("button", "btn", "Train");
-    train.type = "button"; train.id = "kTrain";
-    train.addEventListener("click", function () {
-      var r = Park.trainKeeper(park, k.id);
-      if (!r.ok) { post(r.reason, "sick"); return; }
-      post("<b>" + k.name + "</b> enrolled in " + LEVELS[k.level + 1].title.toLowerCase() + " training, done " + whenText(r.until) + ".");
-      refreshAll();
-    });
-    row2.appendChild(train);
-    var away = h("button", "btn quiet", "To staff room");
-    away.type = "button";
-    away.addEventListener("click", function () {
-      Park.assignKeeper(park, k.id, null);
-      post("<b>" + k.name + "</b> left the " + label(rec) + " for the staff room.");
-      refreshAll();
-    });
-    row2.appendChild(away);
-    card.appendChild(row2);
-    ks.appendChild(card);
+    ks.appendChild(add);
+    ks.appendChild(h("div", "hint", "A keeper's time is split between their exhibits (bigger codes take more). Spread them thin and decoding " +
+      "slows down; tired keepers also burn out. Two keepers on one exhibit pool their time and cover each other's holidays."));
     return ks;
   }
   function updateKeeperSection(rec) {
-    var k = rec.keeperId ? park.keepers[rec.keeperId] : null, algo = $("kAlgo");
-    if (!k || !algo) return;
-    var eff = rec.animal ? rec.animal.level : k.level;
-    algo.innerHTML = LEVELS[eff].blurb;
-    var warn = $("kWarn");
-    if (rec.animal && eff < k.level) {
-      var need = X.workPerRound(rec.animal, k.level) * X.roundsPerTick(rec.animal);
-      warn.hidden = false;
-      warn.textContent = "⚠️ Knows " + LEVELS[k.level].title.toLowerCase() + " decoding, but can't keep up with it here (needs " +
-        need.toFixed(1) + " work/hour at " + X.roundsPerTick(rec.animal) + " round(s)/hour), so uses " + LEVELS[eff].title.toLowerCase() + " decoding. Speed grows with experience.";
-    } else warn.hidden = true;
-    var sp = Park.keeperSpeed(k), SPD = Z.KEEPER_SPEED;
-    $("kSpeed").textContent = sp.toFixed(1) + " / " + SPD.max;
-    $("kSpeedBar").style.width = (100 * sp / SPD.max) + "%";
-    var tb = $("kTrain");
-    if (k.training) {
-      $("kXpText").textContent = "Studying for " + LEVELS[k.training.toLevel].title.toLowerCase() + ": done " + whenText(k.training.untilTick);
-      var t0 = k.training.untilTick - Z.TRAINING[k.training.toLevel].days * ECO.ticksPerDay;
-      $("kXpBar").style.width = Math.min(100, 100 * (park.tick - t0) / (k.training.untilTick - t0)) + "%";
-      tb.disabled = true; tb.textContent = "Studying…"; tb.title = "";
-    } else if (k.level >= Z.MAX_KEEPER_LEVEL) {
-      $("kXpText").textContent = "Experience " + Math.floor(k.xp) + " rounds · fully trained";
-      $("kXpBar").style.width = "100%";
-      tb.disabled = true; tb.textContent = "Fully trained"; tb.title = "";
-    } else {
-      var c = Park.canTrain(park, k.id), next = Z.TRAINING[k.level + 1];
-      $("kXpText").textContent = "Experience " + Math.floor(k.xp) + " / " + next.xp + " rounds for the next course";
-      $("kXpBar").style.width = Math.min(100, 100 * k.xp / next.xp) + "%";
-      tb.disabled = !c.ok;
-      tb.textContent = "Train → " + LEVELS[k.level + 1].title + " (" + money(next.fee) + ", " + next.days + " day" + (next.days === 1 ? "" : "s") + ")";
-      tb.title = c.ok ? LEVELS[k.level + 1].blurb : c.reason;
-    }
+    var duty = $("kDuty");
+    if (!duty) return;
+    var an = rec.animal, SPD = Z.KEEPER_SPEED;
+    if (an) {
+      var lvl = an.level, want = an.keeper ? an.keeper.level : 0;
+      var txt = !an.keeper ? (rec.keeperIds.length ? "🏖 Everyone assigned here is away: nobody is measuring." : "")
+        : "Decoding: " + LEVELS[lvl].blurb;
+      if (an.keeper && lvl < want) {
+        txt += ' <span class="neg-t">Their pooled speed here (' + an.keeper.speed.toFixed(1) + " work/hour) can't run " + LEVELS[want].title.toLowerCase() +
+          " decoding (needs " + (X.workPerRound(an, want) * X.roundsPerTick(an)).toFixed(1) + ").</span>";
+      }
+      if (an.keeper && an.attendance < 1) {
+        txt += ' <span class="neg-t">Spread too thin: they only get to ' + pctInt(an.attendance) + " of the rounds.</span>";
+      }
+      duty.innerHTML = txt;
+    } else duty.textContent = "";
+    var shares = Park.staffing(park, false).exhibits[rec.id];
+    Array.prototype.forEach.call(insp.querySelectorAll(".keeper-card[data-k]"), function (card) {
+      var k = park.keepers[card.dataset.k];
+      if (!k) return;
+      function f(n) { return card.querySelector('[data-f="' + n + '"]'); }
+      var sp = Park.keeperSpeed(k);
+      f("status").textContent = statusLine(k) + " · fatigue " + Math.round(k.fatigue) + " · morale " + Math.round(k.morale) +
+        " · " + k.exhibitIds.length + " exhibit" + (k.exhibitIds.length === 1 ? "" : "s");
+      f("speed").textContent = sp.toFixed(1) + " / " + SPD.max;
+      f("share").textContent = shares && shares.shares[k.id] !== undefined ? pctInt(shares.shares[k.id] / sp) + " of their time here" : "not decoding here now";
+      f("speedBar").style.width = (100 * sp / SPD.max) + "%";
+      var tb = f("train");
+      if (k.training) {
+        f("xpText").textContent = "Studying for " + LEVELS[k.training.toLevel].title.toLowerCase() + ": done " + whenText(k.training.untilTick);
+        var t0 = k.training.untilTick - Z.TRAINING[k.training.toLevel].days * ECO.ticksPerDay;
+        f("xpBar").style.width = Math.min(100, 100 * (park.tick - t0) / (k.training.untilTick - t0)) + "%";
+        tb.disabled = true; tb.textContent = "Studying…"; tb.title = "";
+      } else if (k.level >= Z.MAX_KEEPER_LEVEL) {
+        f("xpText").textContent = "Experience " + Math.floor(k.xp) + " rounds · fully trained";
+        f("xpBar").style.width = "100%";
+        tb.disabled = true; tb.textContent = "Fully trained"; tb.title = "";
+      } else {
+        var c = Park.canTrain(park, k.id), next = Z.TRAINING[k.level + 1];
+        f("xpText").textContent = "Experience " + Math.floor(k.xp) + " / " + next.xp + " rounds for the next course";
+        f("xpBar").style.width = Math.min(100, 100 * k.xp / next.xp) + "%";
+        tb.disabled = !c.ok;
+        tb.textContent = "Train → " + LEVELS[k.level + 1].title + " (" + big(next.fee) + ", " + next.days + " days)";
+        tb.title = c.ok ? LEVELS[k.level + 1].blurb : c.reason;
+      }
+    });
   }
 
   // ---------- staff & lab panels ----------
+  function meterClass(v, warn, bad) { return v >= bad ? "bad" : v >= warn ? "warn" : ""; }
   function renderStaff() {
     var ul = $("staff");
     ul.innerHTML = "";
     if (!park.keeperOrder.length) ul.appendChild(h("li", "", '<span class="s">No keepers yet.</span>'));
+    var W = Z.STAFF.keeper;
     park.keeperOrder.forEach(function (id) {
-      var k = park.keepers[id], rec = k.exhibitId ? park.exhibits[k.exhibitId] : null;
-      var li = h("li", "", "<span><b>" + k.name + "</b> " + (k.training ? "📚" : "") + '<br><span class="s">' + keeperTitle(k) + " · " +
-        (rec ? label(rec) : "staff room") + "</span></span>");
-      if (rec) { li.style.cursor = "pointer"; li.addEventListener("click", function () { select(rec.id); }); }
-      else {
-        var f = h("button", "btn quiet", "Let go");
-        f.type = "button";
-        f.addEventListener("click", function () { Park.fireKeeper(park, k.id); post("Let <b>" + k.name + "</b> go."); refreshAll(); });
-        li.appendChild(f);
-      }
+      var k = park.keepers[id];
+      var where = k.exhibitIds.length === 1 ? label(park.exhibits[k.exhibitIds[0]]) : k.exhibitIds.length ? k.exhibitIds.length + " exhibits" : "staff room";
+      var li = h("li", k.absence ? "away" : "");
+      li.dataset.k = id;
+      var who = h("span", "who-k", "<b>" + k.name + "</b> " + (k.training ? "📚" : "") + '<br><span class="s">' + keeperTitle(k) + " · " + where +
+        '</span><br><span class="s" data-f="status"></span>' +
+        '<span class="minibars"><span>fatigue</span><span class="meter"><i data-f="fat"></i></span><span>morale</span><span class="meter"><i data-f="mor"></i></span></span>');
+      if (k.exhibitIds.length) { who.style.cursor = "pointer"; who.addEventListener("click", function () { select(k.exhibitIds[0]); }); }
+      li.appendChild(who);
+      var acts = h("span", "acts");
+      var vac = h("button", "btn quiet", "Holiday");
+      vac.type = "button"; vac.dataset.f = "vac";
+      vac.title = "Send them on holiday now (up to " + W.vacation.chunk + " days)";
+      vac.addEventListener("click", function () {
+        var r = Park.sendOnVacation(park, k.id);
+        if (!r.ok) { post(r.reason, "sick"); return; }
+        post("🏖 <b>" + k.name + "</b> is off on holiday for " + r.days + " day" + (r.days === 1 ? "" : "s") + ".");
+        refreshAll();
+      });
+      acts.appendChild(vac);
+      var bon = h("button", "btn quiet", "Bonus " + big(Park.bonusCost(k)));
+      bon.type = "button"; bon.dataset.f = "bonus";
+      bon.addEventListener("click", function () {
+        var r = Park.giveBonus(park, k.id);
+        if (!r.ok) { post(r.reason, "sick"); return; }
+        post("💸 <b>" + k.name + "</b> got a " + big(r.cost) + " bonus. Morale up.");
+        refreshAll();
+      });
+      acts.appendChild(bon);
+      var armed = ui.armedFire === id;
+      var f = h("button", "btn danger" + (armed ? " armed" : ""), armed ? "Confirm" : "Let go");
+      f.type = "button";
+      f.addEventListener("click", function () {
+        if (!armed) { ui.armedFire = id; renderStaff(); return; }
+        ui.armedFire = null;
+        Park.fireKeeper(park, k.id); post("Let <b>" + k.name + "</b> go."); refreshAll();
+      });
+      acts.appendChild(f);
+      li.appendChild(acts);
       ul.appendChild(li);
     });
     var payroll = park.keeperOrder.reduce(function (a, id) { return a + Park.keeperSalary(park.keepers[id]); }, 0);
-    $("staffHint").textContent = park.keeperOrder.length ? "Payroll " + money(payroll) + "/day (keepers in the staff room are paid too)." : "";
+    $("staffHint").textContent = park.keeperOrder.length ? "Payroll " + money(payroll) + "/day (keepers in the staff room are paid too). " +
+      W.vacation.allowance + " days of holiday a year each; tired keepers book theirs " + W.vacation.notice + " days ahead." : "";
+    updateStaff();
+  }
+  function updateStaff() {
+    Array.prototype.forEach.call(document.querySelectorAll("#staff li[data-k]"), function (li) {
+      var k = park.keepers[li.dataset.k];
+      if (!k) return;
+      function f(n) { return li.querySelector('[data-f="' + n + '"]'); }
+      f("status").textContent = statusLine(k) + " · " + k.vacationLeft + " holiday days left";
+      var fat = f("fat"), mor = f("mor");
+      fat.style.width = Math.round(k.fatigue) + "%"; fat.className = meterClass(k.fatigue, 45, 70);
+      mor.style.width = Math.round(k.morale) + "%"; mor.className = meterClass(100 - k.morale, 50, 70);
+      f("vac").disabled = !Staff.canVacation(k).ok;
+      f("bonus").disabled = !Park.canBonus(park, k.id).ok;
+    });
   }
   function renderLab() {
     var ul = $("lab");
@@ -838,7 +1038,7 @@
         li.appendChild(h("div", "busy", "Researching → " + labValueText(dial, d.values[lvl + 1]) + ", done " + whenText(proj.untilTick)));
       } else if (lvl + 1 < d.values.length) {
         var step = Z.RESEARCH[lvl + 1];
-        var b = h("button", "btn quiet", "Research → " + labValueText(dial, d.values[lvl + 1]) + " · " + money(step.fee) + " · " + step.days + "d");
+        var b = h("button", "btn quiet", "Research → " + labValueText(dial, d.values[lvl + 1]) + " · " + big(step.fee) + " · " + step.days + " days");
         b.type = "button";
         b.dataset.dial = dial;
         b.disabled = !Park.canResearch(park, dial).ok;
@@ -868,13 +1068,16 @@
     insp.appendChild(h("h2", "", "Your zoo"));
     if (!park.order.length) {
       insp.appendChild(h("div", "placard",
-        "<p><b>Welcome, founder.</b> You have " + money(park.cash) + " in pre-seed funding and an empty lot.</p>" +
-        "<p>1. Build a Parity Riverbank and buy its Repetition Tortoise, the one species everybody knows how to keep. " +
+        "<p><b>Welcome, founder.</b> You've closed a " + big(Z.ROUNDS[0].raised) + " seed round at a " + big(Z.ROUNDS[0].valuation) +
+        " valuation. The plan: take this zoo public at " + big(Z.ROUNDS[Z.ROUNDS.length - 1].target) + ".</p>" +
+        "<p>1. Build a Parity Riverbank and buy its Repetition Tortoise, the one species everybody knows how to keep. Experiments take time: " +
+        "the riverbank opens after " + BIOMES.riverbank.buildDays + " days, a surface code after a year. " +
         "Each animal is a logical qubit protected by a quantum error-correcting code, and it lives only in a habitat that measures exactly its stabilizers.<br>" +
         "2. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
         "3. Discover more species in the <b>habitat workshop</b>: place qubits and checks, wire them up, and build a habitat whose checks make a working code. " +
         "The field guide has hints.<br>" +
-        "4. Fund the lab to lower the hardware's error rates.</p>" +
+        "4. Fund the lab to lower the hardware's error rates.<br>" +
+        "5. Keep investors impressed. They tour the zoo; when the valuation beats the next round's target, start raising.</p>" +
         "<p class=\"hint\">Healthy, rare animals draw visitors. Sick ones cost vet bills and reputation. " +
         "The <a href=\"sandbox.html\">exhibit sandbox</a> shows one enclosure round by round.</p>"));
       return;
@@ -884,7 +1087,7 @@
       var rec = park.exhibits[id];
       var sp = rec.animal ? spOf(rec.animal.speciesId) : null;
       var li = h("li", "",
-        '<span class="g">' + (sp ? sp.glyph : "·") + '</span><span class="nm">' + (sp ? esc(sp.name) : "Empty") +
+        '<span class="g">' + (sp ? sp.glyph : rec.building ? "🏗" : "·") + '</span><span class="nm">' + (sp ? esc(sp.name) : rec.building ? "Under construction" : "Empty") +
         '<br><span class="h">' + label(rec) + '</span></span><span class="h" data-ov="' + id + '"></span>');
       li.addEventListener("click", function () { select(id); });
       ul.appendChild(li);
@@ -899,13 +1102,18 @@
     if (!rec) {
       Array.prototype.forEach.call(insp.querySelectorAll("[data-ov]"), function (e) {
         var r = park.exhibits[e.dataset.ov];
-        e.textContent = !r ? "" : r.animal ? Math.round(r.animal.health) + "%" + (r.keeperId ? "" : " ⚠️") : "—";
+        e.textContent = !r ? "" : r.building ? "🏗 " + Park.daysLeft(park, r) + "d" : r.animal ? Math.round(r.animal.health) + "%" + (r.animal.level ? "" : " ⚠️") : "—";
       });
       return;
     }
     Array.prototype.forEach.call(insp.querySelectorAll(".species-list .btn"), function (b) {
       b.disabled = !b.dataset.ok || park.cash < Number(b.dataset.cost);
     });
+    if (rec.building && $("iBuild")) {
+      var frac = (park.tick - rec.buildStart) / (rec.buildUntil - rec.buildStart);
+      $("iBuild").textContent = Park.daysLeft(park, rec) + " days to go";
+      $("iBuildFill").style.width = Math.round(100 * frac) + "%";
+    }
     if (!rec.animal) { updateKeeperSection(rec); return; }
     var an = rec.animal, hv = Math.round(an.health);
     $("iHealth").textContent = hv + "%";
@@ -915,6 +1123,7 @@
     if ($("iHealths")) $("iHealths").textContent = an.healths.map(function (v, i) { return "#" + (i + 1) + " " + Math.round(v) + "%"; }).join(" · ");
     updateKeeperSection(rec);
     var inc = an.incident, hasKeeper = an.level > 0;
+    if ($("iNoKeeper")) $("iNoKeeper").hidden = hasKeeper;
     var view = inc ? { errors: inc.before, pulse: null, syndrome: inc.syndrome, correction: inc.correction, keeper: hasKeeper }
       : { errors: X.residual(an), pulse: null, syndrome: null, correction: null, keeper: hasKeeper };
     var key = inc ? inc.tick + ":" + an.rounds : "none";
@@ -935,46 +1144,170 @@
 
   // ---------- top bar ----------
   function renderTopbar() {
-    var r = Park.rates(park);
+    var r = Park.rates(park), f = park.funding;
     var cash = $("kCash");
-    cash.textContent = money(park.cash);
+    cash.textContent = big(park.cash);
+    cash.title = money(park.cash);
     cash.className = "n" + (park.cash < 0 ? " neg" : "");
     var net = $("kNet");
-    net.textContent = (r.net >= 0 ? "+" : "") + money(r.net) + " / day";
+    net.textContent = (r.net >= 0 ? "+" : "") + big(r.net) + " / day";
     net.className = "sub " + (r.net > 0 ? "pos" : r.net < 0 ? "neg" : "");
     $("kDay").textContent = "Day " + Park.day(park);
-    $("kHour").textContent = pad2(Park.hour(park)) + ":00";
+    $("kHour").textContent = "Year " + (Math.floor(Park.dayIndex(park) / 365) + 1) + " · " + pad2(Park.hour(park)) + ":00";
     $("kRep").textContent = Math.round(park.reputation);
     $("kRepSub").textContent = "of 100";
-    $("kVis").textContent = Math.round(r.visitors).toLocaleString();
+    $("kVis").textContent = Math.round(r.visitors).toLocaleString("en-US");
     $("kVisSub").textContent = "@ $" + ECO.ticketPrice + " a ticket";
-    var goal = ECO.goal;
-    $("gCash").style.width = Math.max(0, Math.min(100, 100 * park.cash / goal.cash)) + "%";
-    $("gCashT").textContent = "$" + Math.round(Math.max(0, park.cash) / 1000) + "k / $" + goal.cash / 1000 + "k";
-    $("gRep").style.width = Math.min(100, 100 * park.reputation / goal.reputation) + "%";
-    $("gRepT").textContent = "rep " + Math.round(park.reputation) + " / " + goal.reputation;
+    var round = Park.currentRound(park), v = valuationNow();
+    $("kVal").textContent = big(v.value);
+    $("kValSub").textContent = "last round " + big(f.valuation) + " · you own " + pctInt(f.stake);
+    var done = park.status === "won";
+    $("kGoalLabel").textContent = done ? "Listed" : "Next: " + round.name + " at " + big(round.target);
+    $("gVal").style.width = Math.max(0, Math.min(100, 100 * v.value / round.target)) + "%";
+    $("gValT").textContent = pctInt(v.value / round.target) + " of target";
+    $("gConf").style.width = Math.round(park.confidence) + "%";
+    $("gConfT").textContent = "confidence " + Math.round(park.confidence);
     var gs = $("kGoal");
-    if (park.status === "won") { gs.textContent = "🎉 Closed on day " + park.endDay; gs.className = "sub pos"; }
+    if (done) { gs.textContent = "🔔 Listed on day " + park.endDay; gs.className = "sub pos"; }
     else if (park.status === "lost") { gs.textContent = "Ran out of runway on day " + park.endDay; gs.className = "sub warn"; }
     else if (park.daysInDebt > 0) {
       var left = ECO.bankruptDays - park.daysInDebt;
-      gs.textContent = "⚠️ In debt — " + left + " day" + (left === 1 ? "" : "s") + " of runway left";
+      gs.textContent = "⚠️ In debt: " + left + " day" + (left === 1 ? "" : "s") + " of runway left";
       gs.className = "sub warn";
-    } else if (park.cash < 0) { gs.textContent = "⚠️ In the red — get back above $0 by midnight"; gs.className = "sub warn"; }
+    } else if (park.cash < 0) { gs.textContent = "⚠️ In the red: get back above $0 by midnight"; gs.className = "sub warn"; }
+    else if (f.raise) { gs.textContent = "📣 Roadshow under way, verdict " + whenText(f.raise.untilTick); gs.className = "sub pos"; }
+    else if (f.offer) { gs.textContent = "📨 A bridge offer is waiting"; gs.className = "sub warn"; }
+    else if (v.value >= round.target && Park.canRaise(park).ok) { gs.textContent = "✅ Investors would bite: start raising"; gs.className = "sub pos"; }
     else { gs.textContent = ""; gs.className = "sub"; }
     Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
       b.classList.toggle("on", Number(b.dataset.speed) === ui.speed);
     });
   }
+  // The valuation, recomputed at most a few times a second.
+  var valCache = { tick: -1, at: 0, v: null };
+  function valuationNow() {
+    var now = performance.now();
+    if (!valCache.v || (valCache.tick !== park.tick && now - valCache.at > 250)) valCache = { tick: park.tick, at: now, v: Park.valuation(park) };
+    return valCache.v;
+  }
+
+  // ---------- investors ----------
+  function metricText(it) {
+    var v = it.value;
+    if (it.metric === "revenue") return big(v) + "/day";
+    if (it.metric === "errorRate") return v.toFixed(3);
+    if (it.metric === "morale") return Math.round(v);
+    return String(v);
+  }
+  function renderInvestors() {
+    var box = $("investors"), f = park.funding;
+    box.innerHTML = "";
+    var round = Park.currentRound(park), v = valuationNow();
+    if (park.status === "won") {
+      box.appendChild(h("div", "inv-round", "<b>🔔 Listed</b><span class=\"mono\">day " + park.endDay + "</span>"));
+    } else {
+      box.appendChild(h("div", "inv-round", "<b>" + round.name + "</b><span class=\"mono\">target " + big(round.target) + "</span>"));
+      box.appendChild(h("div", "inv-note", "Worth " + big(v.value) + " to investors now (" + pctInt(v.value / round.target) + ")"));
+      var ul = h("ul", "roadmap");
+      v.roadmap.items.forEach(function (it) {
+        ul.appendChild(h("li", it.met ? "met" : "", '<span class="ck">' + (it.met ? "✓" : "○") + '</span><span class="lb">' + it.label +
+          '</span><span class="v">' + metricText(it) + "</span>"));
+      });
+      box.appendChild(ul);
+      var why = h("details", "inv-more");
+      why.innerHTML = "<summary>How they value the zoo</summary><dl class=\"inv-break\">" +
+        "<dt>Ticket sales × " + v.multiple.toFixed(0) + " (growth)</dt><dd>" + big(v.revenuePart) + "</dd>" +
+        "<dt>Animals × d², species, lab</dt><dd>" + big(v.tech) + "</dd>" +
+        "<dt>Hype (confidence " + Math.round(park.confidence) + ")</dt><dd>×" + v.hype.toFixed(2) + "</dd>" +
+        "<dt>" + round.name + " premium</dt><dd>×" + v.premium + "</dd>" +
+        "<dt>Roadmap (" + v.roadmap.met + "/" + v.roadmap.items.length + ")</dt><dd>×" + v.roadmapFactor.toFixed(2) + "</dd></dl>";
+      box.appendChild(why);
+      var row = h("div", "btn-row");
+      if (f.raise) {
+        row.appendChild(h("div", "hint", "📣 Roadshow under way: investors tour every " + Z.FUNDING.roadshowTourEvery +
+          " days. Verdict " + whenText(f.raise.untilTick) + ". Keep the animals healthy."));
+      } else if (f.offer) {
+        var o = f.offer;
+        var off = h("div", "offer", "📨 Bridge offer: " + big(o.cash) + " for " + pctInt(o.share) + " of the company (at " + big(o.valuation) + "). No new letter.");
+        var acc = h("button", "btn", "Take the bridge");
+        acc.type = "button";
+        acc.addEventListener("click", function () {
+          var r = Park.acceptOffer(park);
+          if (r.ok) post("🌉 Took the bridge: " + big(r.raised) + " in the bank.");
+          refreshAll();
+        });
+        var dec = h("button", "btn quiet", "Decline");
+        dec.type = "button";
+        dec.addEventListener("click", function () { Park.declineOffer(park); post("Declined the bridge offer."); refreshAll(); });
+        var br = h("div", "btn-row"); br.appendChild(acc); br.appendChild(dec); off.appendChild(br);
+        box.appendChild(off);
+      } else {
+        var c = Park.canRaise(park);
+        var go = h("button", "btn", round.ipo ? "Start the IPO roadshow" : "Start raising " + round.name);
+        go.type = "button"; go.id = "raiseBtn";
+        go.disabled = !c.ok;
+        go.title = c.ok ? "A " + Z.FUNDING.roadshowDays + "-day roadshow; investors tour every " + Z.FUNDING.roadshowTourEvery + " days." : c.reason;
+        go.addEventListener("click", function () {
+          var r = Park.startRaise(park);
+          if (!r.ok) { post(r.reason, "sick"); return; }
+          post("📣 The " + round.name + " roadshow has begun. Verdict " + whenText(r.until) + ".");
+          refreshAll();
+        });
+        row.appendChild(go);
+        if (!c.ok) row.appendChild(h("div", "hint", c.reason));
+        else if (v.value < Z.FUNDING.bridgeAt * round.target) row.appendChild(h("div", "hint", "Far below target today: investors would pass."));
+        else if (v.value < round.target) row.appendChild(h("div", "hint", "Below target today: expect a bridge at best."));
+      }
+      box.appendChild(row);
+    }
+    var hist = h("ul", "rounds");
+    f.history.slice().reverse().forEach(function (e) {
+      hist.appendChild(h("li", "", "<span>" + e.name + " · day " + e.day + '</span><span class="mono">' + big(e.raised) + " at " + big(e.valuation) + "</span>"));
+    });
+    box.appendChild(hist);
+  }
+  function updateInvestors() {
+    var b = $("raiseBtn");
+    if (b) b.disabled = !Park.canRaise(park).ok;
+  }
+  function renderTour() {
+    var el = $("tour"), t = park.tour;
+    el.hidden = !t;
+    if (!t) return;
+    var stops = t.route.filter(function (id) { return park.exhibits[id]; }).map(function (id) { return label(park.exhibits[id]); });
+    el.innerHTML = '<div><span class="who">🧐 ' + t.investor.name + " of " + t.investor.fund + "</span> is " + (t.roadshow ? "on a roadshow visit" : "touring the zoo") +
+      " until " + pad2(Z.TOURS.end) + ":00. They care most about <b>" + FOCUS[t.focus] + "</b>.</div>" +
+      '<div class="hint">Route: ' + (stops.join(" → ") || "nowhere in particular") + (t.incidents ? ' · <span class="neg-t">' + t.incidents + " logical error" +
+        (t.incidents === 1 ? "" : "s") + " on the route!</span>" : "") + "</div>";
+    var perks = h("div", "perks");
+    if (t.perk) perks.appendChild(h("span", "hint", "🍽 Treated to: " + Inv.perkInfo(t.perk).name.toLowerCase() + "."));
+    else Z.PERKS.forEach(function (p) {
+      var b = h("button", "btn quiet", p.name + " · " + big(p.cost));
+      b.type = "button";
+      b.title = p.blurb;
+      b.disabled = !Park.canPerk(park, p.id).ok;
+      b.addEventListener("click", function () {
+        var r = Park.buyPerk(park, p.id);
+        if (!r.ok) { post(r.reason, "sick"); return; }
+        post("🍽 " + p.name + " with " + t.investor.name + ": " + p.blurb);
+        renderTour(); renderTopbar();
+      });
+      perks.appendChild(b);
+    });
+    el.appendChild(perks);
+  }
 
   function refreshAll() {
+    valCache.v = null;
     renderTopbar();
     renderTools();
+    renderInvestors();
+    renderTour();
     renderStaff();
     renderLab();
     renderPark();
     renderInspector();
-    saveGame();
+    saveSoon();
   }
 
   // ---------- dialogs ----------
@@ -1014,55 +1347,73 @@
   function row(label, value, cls) {
     return "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + label + "</td><td>" + value + "</td></tr>";
   }
-  function investorQuote(e) {
-    if (e.net > 0 && e.sick <= 2) return "Textbook fault tolerance. We're very excited about this team.";
-    if (e.net > 0) return "Revenue looks great — but walk us through those logical errors.";
-    if (e.runwayDays !== null && e.runwayDays < 30) return "We need to talk about your burn rate.";
-    if (e.vet > e.revenue / 4) return "Those vet bills are eating your margins. Who's minding the animals?";
-    if (e.revenue < 1) return "Pre-revenue is fine at this stage. Keep building.";
-    return "Growth is expensive. Show us the path to profitability.";
+  function quotesHtml(list, who) {
+    return '<div class="quotes">' + list.map(function (q) { return '<div class="quote">“' + q + "”</div>"; }).join("") + "</div>" +
+      (who ? '<p class="hint">— ' + who + "</p>" : "");
   }
-  function showInvestorUpdate(e) {
-    var sick = e.sickest && park.exhibits[e.sickest.exhibitId];
-    var html = '<span class="eyebrow">Investor update · Month ' + e.month + '</span>' +
-      '<h2 class="title" id="modalTitle">' + (e.net >= 0 ? "In the black" : "Burning cash") + "</h2>" +
-      '<div class="quote">“' + investorQuote(e) + "”</div>" +
+  var TIER_TITLE = {
+    legendary: "Oversubscribed. Wildly.", great: "Term sheets everywhere", good: "Round closed",
+    bridge: "Close, but no letter", pass: "Investors passed"
+  };
+  function showRound(e) {
+    var b = e.breakdown, lead = Inv.randomInvestor(Math.random);
+    var html = '<span class="eyebrow">' + e.name + " · day " + (Park.day(park) - 1) + "</span>" +
+      '<h2 class="title" id="modalTitle">' + (e.ipo && e.outcome === "closed" ? "🔔 You rang the bell!" : TIER_TITLE[e.tier]) + "</h2>" +
+      quotesHtml(e.quotes, lead.name + ", " + lead.fund) +
       "<table>" +
-      row("Ticket revenue (" + Math.round(e.visitors).toLocaleString() + " visitors)", money(e.revenue)) +
-      row("Salaries & upkeep", "−" + money(e.expenses)) +
-      row("Vet bills (" + e.sick + " logical error" + (e.sick === 1 ? "" : "s") + ")", "−" + money(e.vet)) +
-      row("Net for the month", '<span class="' + (e.net >= 0 ? "pos-t" : "neg-t") + '">' + money(e.net) + "</span>", "total") +
+      row("Investors' valuation", big(e.valuation)) +
+      row(e.name + " target", big(e.target)) +
+      (e.outcome === "closed" ? row("Raised", '<span class="pos-t">' + big(e.raised) + "</span>", "total") +
+        row("Founders now own", pctInt(e.stake)) : "") +
       "</table>" +
-      "<p>" + (e.runwayDays === null ? "Runway: <b>profitable</b> — you're not burning cash."
-        : "Runway: <b>" + Math.floor(e.runwayDays) + " days</b> at this month's burn.") + "</p>" +
-      (sick ? "<p>Sickest exhibit: <b>" + (sick.animal ? spOf(sick.animal.speciesId).name : "The animal") + "</b> in the " +
-        label(sick) + " (" + e.sickest.count + " logical error" + (e.sickest.count === 1 ? "" : "s") + ")." +
-        (sick.keeperId ? "" : " It has no keeper!") + "</p>" : "") +
-      '<p class="hint">Series A needs ' + money(ECO.goal.cash) + " in the bank and reputation " + ECO.goal.reputation +
-      ". You're at " + money(park.cash) + " and " + Math.round(park.reputation) + ".</p>";
-    openModal(html, [{ label: "Back to the zoo", onClick: function () { closeModal(true); } }]);
+      '<dl class="inv-break"><dt>Ticket sales × ' + b.multiple.toFixed(0) + "</dt><dd>" + big(b.revenuePart) + "</dd>" +
+      "<dt>Animals × d², species, lab</dt><dd>" + big(b.tech) + "</dd><dt>Hype</dt><dd>×" + b.hype.toFixed(2) + "</dd>" +
+      "<dt>Stage premium</dt><dd>×" + b.premium + "</dd><dt>Roadmap</dt><dd>×" + b.roadmapFactor.toFixed(2) + "</dd>" +
+      (e.tours.length ? "<dt>Roadshow tours</dt><dd>" + e.tours.map(function (x) { return Math.round(x); }).join(" · ") + "</dd>" : "") + "</dl>";
+    var buttons;
+    if (e.outcome === "closed" && e.ipo) {
+      html += "<p>The zoo is a public company. Your founders' stake of " + pctInt(e.stake) + " is worth <b>" + big(e.stake * e.valuation) +
+        "</b>, on paper, which is the best kind of paper.</p>" + zooSummary();
+      buttons = [{ label: "New game", cls: "quiet", onClick: function () { closeModal(false); newGame(); } },
+        { label: "Keep running the zoo", onClick: function () { Park.continueAfterWin(park); closeModal(true); refreshAll(); } }];
+    } else if (e.outcome === "closed") {
+      html += "<p>The lot has grown to " + park.width + "×" + park.height + ". Next up: <b>" + Park.currentRound(park).name + "</b> at " +
+        big(Park.currentRound(park).target) + ", once investors have seen the money at work (" + Z.FUNDING.afterCloseDays + " days).</p>";
+      buttons = [{ label: "Back to the zoo", onClick: function () { closeModal(true); refreshAll(); } }];
+    } else if (e.outcome === "bridge") {
+      html += "<p>They'll put in " + big(e.offer.cash) + " for " + pctInt(e.offer.share) + " of the company. It keeps the lights on; it doesn't count as the " + e.name + ".</p>";
+      buttons = [{ label: "Decline", cls: "quiet", onClick: function () { Park.declineOffer(park); post("Declined the bridge offer."); closeModal(true); refreshAll(); } },
+        { label: "Take the bridge", onClick: function () { var r = Park.acceptOffer(park); post("🌉 Took the bridge: " + big(r.raised) + " in the bank."); closeModal(true); refreshAll(); } }];
+    } else {
+      html += "<p>Try again in " + Z.FUNDING.cooldownDays + " days. Investors were weakest on <b>" + roadmapGap(b) + "</b>.</p>";
+      buttons = [{ label: "Back to the zoo", onClick: function () { closeModal(true); refreshAll(); } }];
+    }
+    openModal(html, buttons);
+  }
+  function roadmapGap(b) {
+    var miss = b.roadmap.items.filter(function (it) { return !it.met; }).map(function (it) { return it.label.toLowerCase(); });
+    return miss.length ? miss.join(", ") : "the hype (confidence " + Math.round(park.confidence) + ")";
   }
   function zooSummary() {
     var counts = {};
-    park.order.forEach(function (id) { var a = park.exhibits[id].animal; if (a) counts[a.speciesId] = (counts[a.speciesId] || 0) + 1; });
+    park.order.forEach(function (id) { var a = park.exhibits[id].animal; if (a) counts[a.speciesId] = (counts[a.speciesId] || 0) + a.k; });
     var animals = Object.keys(counts).map(function (k) { return spOf(k).glyph + "×" + counts[k]; }).join("  ") || "none";
-    return "<table>" + row("Days in business", park.endDay) + row("Funding", money(park.cash)) +
+    return "<table>" + row("Days in business", park.endDay) + row("Funding", big(park.cash)) +
       row("Reputation", Math.round(park.reputation)) + row("Animals", animals) +
+      row("Rounds", park.funding.history.map(function (e) { return e.name; }).join(" → ")) +
       row("Logical errors, all time", park.totalSick) + "</table>";
   }
   function showEnd() {
     if (park.status === "won") {
-      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Series A closed! 🎉</h2>' +
-        "<p>Your zoo hit " + money(ECO.goal.cash) + " in the bank with a reputation of " + Math.round(park.reputation) +
-        ". The investors are in — every animal on show is a logical qubit that stayed alive.</p>" + zooSummary(),
+      openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">🔔 Listed!</h2>' +
+        "<p>Your error-correction zoo is a public company, valued at " + big(park.funding.valuation) + ". Founders own " + pctInt(park.funding.stake) + ".</p>" + zooSummary(),
         [{ label: "New game", cls: "quiet", onClick: function () { closeModal(false); newGame(); } },
-         { label: "Keep playing", onClick: function () { Park.continueAfterWin(park); closeModal(true); saveGame(); } }]);
+         { label: "Keep running the zoo", onClick: function () { Park.continueAfterWin(park); closeModal(true); saveGame(); } }]);
     } else {
       openModal('<span class="eyebrow">Day ' + park.endDay + '</span><h2 class="title" id="modalTitle">Ran out of runway</h2>' +
         "<p>After " + ECO.bankruptDays + " days in the red, the board pulled the plug.</p>" + zooSummary() +
-        '<p class="hint">Tips: every animal needs a keeper — unkept codes are worse than a bare qubit. ' +
-        "Train keepers whose animals keep getting sick: space-time decoders see through misread checks. " +
-        "The lab lowers error rates for every enclosure at once. Don't build enclosures you can't stock yet.</p>",
+        '<p class="hint">Tips: every animal needs a keeper, and unkept codes are worse than a bare qubit. Experiments take months to build, so keep ' +
+        "runway for the wait. Distance-2 codes can only detect errors, so their animals keep getting sick. When you're short of cash, a bridge beats bankruptcy.</p>",
         [{ label: "Look around", cls: "quiet", onClick: function () { closeModal(false); } },
          { label: "New game", onClick: function () { closeModal(false); newGame(); } }]);
     }
@@ -1099,16 +1450,28 @@
       }
     });
     Object.keys(park.book.custom).forEach(function (id) {
+      if (!Park.isKnown(park, id)) return; // still under construction
       var sp = spOf(id);
       html += '<li><details><summary><span class="g">' + sp.glyph + "</span> <b>" + esc(sp.name) + '</b> <span class="mono">' + sp.params +
         "</span></summary><p class=\"hint\">Discovered in your zoo on day " + (Math.floor(sp.discoveredTick / ECO.ticksPerDay) + 1) +
         '. Not in any catalogue: everything below is computed from its checks.</p><div class="placard">' + Placard.html(sp) + "</div>" +
-        '<label class="ws-name">Rename <input type="text" maxlength="40" data-rename="' + id + '" value="' + esc(sp.name) + '"></label></details></li>';
+        '<label class="ws-name">Rename <input type="text" maxlength="40" data-rename="' + id + '" value="' + esc(sp.name) + '"></label>' +
+        (Park.canForgetSpecies(park, id).ok ? '<div class="btn-row"><button type="button" class="btn danger" data-forget="' + id + '">Drop from the field guide</button></div>'
+          : '<p class="hint">' + Park.canForgetSpecies(park, id).reason.replace("Demolish its habitats first.", "To drop it from the guide, demolish its habitats first.") + "</p>") +
+        "</details></li>";
     });
     html += "</ul>";
     openModal(html, [{ label: "Close", onClick: function () { closeModal(true); refreshAll(); } }], "wide");
     Array.prototype.forEach.call(document.querySelectorAll("[data-rename]"), function (inp) {
       inp.addEventListener("change", function () { Park.renameSpecies(park, inp.dataset.rename, inp.value); saveGame(); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-forget]"), function (b) {
+      b.addEventListener("click", function () {
+        if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Confirm: drop it and its blueprints"; return; }
+        var name = spOf(b.dataset.forget).name;
+        if (Park.forgetSpecies(park, b.dataset.forget).ok) post("Dropped the <b>" + esc(name) + "</b> from the field guide.");
+        openFieldGuide();
+      });
     });
   }
   function showDiscovery(r) {
@@ -1126,10 +1489,14 @@
 
   // ---------- save / load ----------
   var SAVE_KEY = "qecZooSave";
+  var saveTimer = null;
   function saveGame() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     try { localStorage.setItem(SAVE_KEY, JSON.stringify({ park: Park.save(park), news: news.slice(0, 40), draft: ui.draft })); }
     catch (e) { /* storage unavailable: the game still works, it just won't persist */ }
   }
+  // Saving serialises the whole zoo: at high speed, do it at most every few seconds.
+  function saveSoon() { if (!saveTimer) saveTimer = setTimeout(saveGame, 3000); }
   function loadGame() {
     try {
       var raw = localStorage.getItem(SAVE_KEY);
@@ -1139,22 +1506,24 @@
       news = Array.isArray(data.news) ? data.news : [];
       ui.draft = data.draft && !Habitat.malformed(data.draft) ? data.draft : null;
       return true;
-    } catch (e) { return false; }
+    } catch (e) { loadError = e && /funding update/.test(e.message) ? e.message : null; return false; }
   }
+  var loadError = null;
   function newGame() {
     park = Park.createPark();
     news = [];
     ui.selected = null; ui.tool = null; ui.draft = null; ui.armedDemolish = false; ui.sickFlash = {};
     try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    renderNews();
     setTool(null);
     refreshAll();
-    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+    welcome();
     setSpeed(1);
   }
   $("newGameBtn").addEventListener("click", function () {
     if (!park.order.length && park.tick === 0) return;
     openModal('<h2 class="title" id="modalTitle">Start over?</h2><p>Your current zoo (day ' + Park.day(park) + ", " +
-      money(park.cash) + ") will be lost.</p>",
+      big(park.cash) + ") will be lost.</p>",
       [{ label: "Cancel", cls: "quiet", onClick: function () { closeModal(true); } },
        { label: "New game", cls: "danger armed", onClick: function () { closeModal(false); newGame(); } }]);
   });
@@ -1162,7 +1531,20 @@
   window.addEventListener("pagehide", saveGame);
 
   // ---------- time ----------
+  function welcome() {
+    post("Welcome, founder! You've raised a " + big(Z.ROUNDS[0].raised) + " seed round. Build an enclosure to get started; next stop, the " +
+      Z.ROUNDS[1].name + " at " + big(Z.ROUNDS[1].target) + ".");
+  }
+  var STAFF_NEWS = {
+    planned: function (e) { return "🗓 <b>" + e.name + "</b> booked " + e.days + " days off from day " + (e.fromDay + 1) + ". Arrange cover for their exhibits."; },
+    vacation: function (e) { return "🏖 <b>" + e.name + "</b> is on holiday for " + e.days + " days."; },
+    back: function (e) { return "👋 <b>" + e.name + "</b> is back at work."; },
+    sick: function (e) { return "🤒 <b>" + e.name + "</b> is off sick for " + e.days + " days. Overwork does that."; },
+    burnout: function (e) { return "🔥 <b>" + e.name + "</b> burned out and is off for " + e.days + " days. Spread the load."; },
+    quit: function (e) { return "🚪 <b>" + e.name + "</b> resigned. The other keepers noticed, and so did investors."; }
+  };
   function handleEvents(events) {
+    var redraw = false;
     events.forEach(function (e) {
       if (e.type === "sick") {
         var rec = park.exhibits[e.exhibitId];
@@ -1172,31 +1554,63 @@
           : rec && rec.animal && rec.animal.level ? "too many errors at once to tell apart" : "nobody was measuring the checks";
         var esp = spOf(e.speciesId), many = rec && rec.animal && rec.animal.k > 1;
         post((many ? "Animal #" + (e.animal + 1) + " of the " : "The ") + esc(esp.name) + " in the " + label(rec) + " caught a logical " + e.kind +
-          " — " + why + ". Vet bill −" + money(e.bill).slice(1) + ".", "sick");
-      } else if (e.type === "day") {
+          ": " + why + ". Vet bill " + money(e.bill) + "." + (e.onTour ? " An investor saw it happen." : ""), "sick");
+        if (e.onTour) redraw = true;
+      } else if (e.type === "built") {
+        var b = park.exhibits[e.exhibitId];
+        if (b) post("🏗 The <b>" + label(b) + "</b> is open. Stock it with animals.");
+        redraw = true;
+      } else if (e.type === "discovered") {
+        var dsp = spOf(e.speciesId);
+        post("✨ It works! New species discovered: the <b>" + esc(dsp.name) + "</b> " + dsp.glyph + ".");
+        setTimeout(function () { showDiscovery(e); }, 0);
+        redraw = true;
+      } else if (e.type === "month") {
         if (park.order.length) {
-          post("Day " + e.day + " closed: " + Math.round(e.visitors).toLocaleString() + " visitors, tickets " + money(e.revenue) +
-            ", running costs " + money(e.expenses) + (e.vet ? ", vet bills " + money(e.vet) : "") + ".");
+          post("📊 Month " + e.month + ": tickets " + big(e.revenue) + ", costs " + big(e.expenses) + (e.vet ? ", vet bills " + big(e.vet) : "") +
+            ", net " + big(e.net) + (e.runwayDays !== null ? " (runway " + Math.floor(e.runwayDays) + " days)" : "") + '. The board: “' + e.quote + "”");
         }
-        saveGame();
+        saveSoon();
+      } else if (e.type === "day") {
+        saveSoon();
       } else if (e.type === "trained") {
         post("🎓 <b>" + e.name + "</b> finished training and is now a " + LEVELS[e.level].title.toLowerCase() + ".");
-        refreshAll();
+        redraw = true;
       } else if (e.type === "research") {
         post("🔬 Lab breakthrough: <b>" + LAB[e.dial].name.toLowerCase() + "</b> is now " + labValueText(e.dial, e.value) +
           ". Every enclosure has the new hardware.");
-        refreshAll();
+        redraw = true;
+      } else if (e.type === "staff") {
+        post(STAFF_NEWS[e.kind](e), e.kind === "sick" || e.kind === "burnout" || e.kind === "quit" ? "sick" : "");
+        redraw = true;
+      } else if (e.type === "tour-start") {
+        post("🧐 <b>" + e.tour.investor.name + "</b> of " + e.tour.investor.fund + " is touring the zoo today. They care most about " + FOCUS[e.tour.focus] + ".");
+        renderTour();
+      } else if (e.type === "tour") {
+        post("🧐 " + e.investor.name + " (" + e.investor.fund + ") left " + (e.delta >= 0 ? "impressed" : "unimpressed") + ': “' + e.quote + "” Confidence " +
+          (e.delta >= 0 ? "+" : "") + e.delta.toFixed(1) + ".", e.delta < -2 ? "sick" : "");
+        renderTour();
+        renderInvestors();
+      } else if (e.type === "milestone") {
+        post("🎯 Roadmap milestone for the " + Z.ROUNDS[e.round].name + ": <b>" + e.label + "</b>. Investors like that.");
+        renderInvestors();
+      } else if (e.type === "round") {
+        post(e.outcome === "closed" ? (e.ipo ? "🔔 <b>IPO!</b> Listed at " : "💰 <b>" + e.name + " closed</b> at ") + big(e.valuation) + ", raising " + big(e.raised) + "."
+          : e.outcome === "bridge" ? "📨 The " + e.name + " fell short (" + big(e.valuation) + "). Investors offer a bridge."
+          : "🙅 Investors passed on the " + e.name + " (" + big(e.valuation) + " against " + big(e.target) + ").", e.outcome === "pass" ? "sick" : "");
+        redraw = true;
+        saveGame();
+        showRound(e); // opens the dialog now, which also stops this frame's ticks
       } else if (e.type === "debt") {
         post("⚠️ The zoo ended the day in debt. " + e.daysLeft + " more day" + (e.daysLeft === 1 ? "" : "s") +
           " in the red and the board pulls the plug.", "sick");
-      } else if (e.type === "investor") {
-        if (park.order.length) showInvestorUpdate(e);
-      } else if (e.type === "won" || e.type === "lost") {
-        post(e.type === "won" ? "🎉 <b>Series A closed</b> on day " + e.day + "!" : "<b>Ran out of runway</b> on day " + e.day + ".", e.type === "lost" ? "sick" : "");
+      } else if (e.type === "lost") {
+        post("<b>Ran out of runway</b> on day " + e.day + ".", "sick");
         saveGame();
         showEnd();
       }
     });
+    return redraw;
   }
   var lastFrame = 0, acc = 0;
   function frame(t) {
@@ -1206,13 +1620,19 @@
     if (ui.speed > 0) {
       acc += dt;
       var msPerTick = 1000 / (TICKS_PER_SECOND_AT_1X * ui.speed);
-      var n = 0;
+      var n = 0, redraw = false, wasTour = !!park.tour;
       while (acc >= msPerTick && n < 20 && !ui.modalOpen) {
         acc -= msPerTick; n++;
-        handleEvents(Park.tick(park));
+        if (handleEvents(Park.tick(park))) redraw = true;
         if (ui.selected !== null && !park.exhibits[ui.selected]) ui.selected = null;
       }
-      if (n) { renderTopbar(); updateToolAffordability(); updateLabButtons(); updateInspector(); }
+      if (acc > 4 * msPerTick) acc = 4 * msPerTick; // don't bank time the browser couldn't keep up with
+      if (redraw) refreshAll();
+      else if (n) {
+        renderTopbar(); updateToolAffordability(); updateLabButtons(); updateInspector(); updateStaff(); updateInvestors();
+        if (park.tour && !wasTour) renderTour();
+        if (Math.floor(park.tick / ECO.ticksPerDay) !== ui.lastDayDrawn) { ui.lastDayDrawn = Math.floor(park.tick / ECO.ticksPerDay); renderInvestors(); }
+      }
     }
     updatePark(); // sick flashes fade with wall-clock time
     requestAnimationFrame(frame);
@@ -1231,8 +1651,9 @@
       if (ui.speed) { lastSpeed = ui.speed; setSpeed(0); } else setSpeed(lastSpeed);
     }
     else if (e.key === "1") setSpeed(1);
-    else if (e.key === "2") setSpeed(3);
-    else if (e.key === "3") setSpeed(10);
+    else if (e.key === "2") setSpeed(5);
+    else if (e.key === "3") setSpeed(20);
+    else if (e.key === "4") setSpeed(60);
   });
 
   // Theme toggle: auto -> light -> dark. Remembered per viewer if storage works.
@@ -1254,11 +1675,12 @@
   if (loadGame()) {
     refreshAll();
     renderNews();
-    post("Welcome back! Your zoo is where you left it: day " + Park.day(park) + ", " + money(park.cash) + ".");
+    post("Welcome back! Your zoo is where you left it: day " + Park.day(park) + ", " + big(park.cash) + ".");
     if (park.status === "lost" || (park.status === "won" && !park.freePlay)) showEnd();
   } else {
     refreshAll();
-    post("Welcome, founder! You have " + money(park.cash) + " in pre-seed funding. Build an enclosure to get started.");
+    if (loadError) post("Your previous zoo was saved before the funding update and can't be loaded, so this is a fresh start.", "sick");
+    welcome();
   }
   requestAnimationFrame(frame);
 })();

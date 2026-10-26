@@ -354,9 +354,13 @@ From the original brief:
 
 - **Park design & management** — paths, guest flow, placement adjacency bonuses.
 - **Tour guides** — boost appeal by "explaining" placards; tie to the Zoo's code relations.
+  (Since the funding update they should also steer investor tours: `chooseRoute` and
+  `tour.guide` in `park.js`, `STAFF.guide` in `zoo-data.js`.)
 - **Gift shops / food stands** — secondary revenue, guest satisfaction.
 - **Guests with needs** — funding agencies (want prestige/novelty: high d, exotic codes),
   investors (want revenue growth, low burn), academics (want rare species), press.
+  **Investors are in** (funding update, 2026-10-26): routine tours with a focus each, perks,
+  funding rounds to an IPO. See STATUS.md.
 
 Physics-driven extensions that fit the metaphor:
 

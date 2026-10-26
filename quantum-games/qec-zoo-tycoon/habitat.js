@@ -93,9 +93,15 @@
     var w = Math.ceil(Math.sqrt(tiles));
     return [w, Math.ceil(tiles / w)];
   }
+  // Construction time in days for a habitat of this many qubits (data + ancilla).
+  function buildDays(totalQubits) {
+    var t = B.days;
+    var d = t.refDays * Math.pow(Math.max(1, totalQubits) / t.refQubits, t.exponent);
+    return Math.max(t.min, Math.min(t.max, Math.round(d)));
+  }
   function price(design) {
     var q = design.qubits.length + design.checks.length, w = wireCount(design);
-    return { cost: q * B.perQubit + w * B.perWire, upkeep: q * B.upkeepPerQubit + w * B.upkeepPerWire };
+    return { cost: q * B.perQubit + w * B.perWire, upkeep: q * B.upkeepPerQubit + w * B.upkeepPerWire, days: buildDays(q) };
   }
 
   // ---------- analysis ----------
@@ -103,7 +109,7 @@
   // Returns { n, m, wires, ops, problems: [string] (each blocks building),
   //   notes: [string], clash: { a, b, qubits } | null, rank, redundant, k,
   //   d, dAtLeast, css, code: (code with computed logicals) | null,
-  //   idle: [qubits in no check], valid, footprint, cost, upkeep }.
+  //   idle: [qubits in no check], valid, footprint, cost, upkeep, days (to build) }.
   function analyze(design, opts) {
     opts = opts || {};
     var n = design.qubits.length, m = design.checks.length, ops = checkOps(design);
@@ -111,7 +117,7 @@
     var out = {
       n: n, m: m, wires: wireCount(design), ops: ops, problems: [], notes: [], clash: null,
       rank: 0, redundant: 0, k: 0, d: null, dAtLeast: null, css: false, code: null, idle: [],
-      valid: false, footprint: footprint(n + m), cost: pr.cost, upkeep: pr.upkeep
+      valid: false, footprint: footprint(n + m), cost: pr.cost, upkeep: pr.upkeep, days: pr.days
     };
     if (!n) out.problems.push("Place some data qubits.");
     if (!m) out.problems.push("Add at least one check.");
@@ -321,12 +327,12 @@
     if (!d || d < 1) return t[1];
     return d < t.length ? t[d] : t[t.length - 1] + 40 * (d - t.length + 1);
   }
-  function customCost(d) { return Math.round(customAppeal(d) * Z.CUSTOM.costPerAppeal / 500) * 500; }
+  function customCost(d) { return Math.round(customAppeal(d) * Z.CUSTOM.costPerAppeal / 5000) * 5000; }
 
   var Habitat = {
     checkLabel: checkLabel, emptyDesign: emptyDesign, clone: clone, checkOp: checkOp, checkOps: checkOps,
     wireCount: wireCount, fromCode: fromCode, designFor: designFor, malformed: malformed,
-    footprint: footprint, price: price, analyze: analyze,
+    footprint: footprint, price: price, buildDays: buildDays, analyze: analyze,
     equivalence: equivalence, mapPauli: mapPauli, identify: identify, textbook: textbook,
     customAppeal: customAppeal, customCost: customCost
   };
