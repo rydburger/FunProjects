@@ -44,8 +44,14 @@
   var Z = isNode ? require("./zoo-data.js") : root.ZooData;
 
   var VET_WEIGHT = 2;
-  var SICK_HEALTH_HIT = 30;
-  var RECOVERY_PER_TICK = 0.5;
+  // Health: a logical error costs SICK_HEALTH_HIT; every tick an animal
+  // gets back RECOVERY_RATE of what it's missing plus RECOVERY_PER_TICK.
+  // So health settles where recovery balances the error rate: ~97 at 0.2
+  // logical errors a day, ~80 at 0.6, ~55 at 1.2.
+  var SICK_HEALTH_HIT = 20;
+  var RECOVERY_RATE = 0.02;
+  var RECOVERY_PER_TICK = 0.1;
+  function recover(h) { return Math.min(100, h + (100 - h) * RECOVERY_RATE + RECOVERY_PER_TICK); }
 
   var vetCache = new WeakMap();
   function vetFor(code) {
@@ -267,7 +273,7 @@
     if (ex.roundInTick >= roundsPerTick(ex)) {
       ex.roundInTick = 0;
       ex.ticks++;
-      for (var a = 0; a < ex.k; a++) ex.healths[a] = Math.min(100, ex.healths[a] + RECOVERY_PER_TICK);
+      for (var a = 0; a < ex.k; a++) ex.healths[a] = recover(ex.healths[a]);
       ex.health = meanHealth(ex);
       ev.tickDone = true;
     }
@@ -313,7 +319,7 @@
   }
 
   var ExhibitSim = {
-    VET_WEIGHT: VET_WEIGHT, SICK_HEALTH_HIT: SICK_HEALTH_HIT, RECOVERY_PER_TICK: RECOVERY_PER_TICK,
+    VET_WEIGHT: VET_WEIGHT, SICK_HEALTH_HIT: SICK_HEALTH_HIT, RECOVERY_PER_TICK: RECOVERY_PER_TICK, RECOVERY_RATE: RECOVERY_RATE, recover: recover,
     labValues: labValues, noiseModel: noiseModel, workPerRound: workPerRound, roundsPerTick: roundsPerTick,
     effectiveLevel: effectiveLevel, canRun: canRun, createExhibit: createExhibit, setKeeper: setKeeper, setLab: setLab,
     residual: residual, advancePhase: advancePhase, runTick: runTick, snapshot: snapshot, restore: restore

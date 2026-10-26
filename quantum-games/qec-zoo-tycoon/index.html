@@ -72,15 +72,33 @@
     border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
   }
   .park.building { cursor: crosshair; }
+  /* A plot spans its bounding box; only its own tiles are drawn (and
+     clickable), so shapes interlock. Edges facing outside get a border. */
   .enc {
-    margin: 3px; border-radius: 10px; border: 2px solid var(--bb); background: var(--bc);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    position: relative; cursor: pointer; min-width: 0; overflow: hidden; padding: 4px;
-    transition: box-shadow 0.2s;
+    display: grid; grid-template-columns: repeat(var(--w), 1fr); grid-template-rows: repeat(var(--h), 1fr);
+    position: relative; min-width: 0; min-height: 0; pointer-events: none; --bw: 2px;
   }
-  .enc.sel { box-shadow: 0 0 0 3px var(--accent); }
-  .enc.sick { animation: sickflash 1.2s ease; }
-  @keyframes sickflash { 0%, 60% { box-shadow: 0 0 0 4px var(--sick); background: var(--sick-soft); } }
+  .enc .cell { background: var(--bc); border: 0 solid var(--bb); pointer-events: auto; cursor: pointer; min-width: 0; min-height: 0; }
+  .enc .cell.t { border-top-width: var(--bw); margin-top: 3px; }
+  .enc .cell.b { border-bottom-width: var(--bw); margin-bottom: 3px; }
+  .enc .cell.l { border-left-width: var(--bw); margin-left: 3px; }
+  .enc .cell.r { border-right-width: var(--bw); margin-right: 3px; }
+  .enc .cell.t.l { border-top-left-radius: 9px; }
+  .enc .cell.t.r { border-top-right-radius: 9px; }
+  .enc .cell.b.l { border-bottom-left-radius: 9px; }
+  .enc .cell.b.r { border-bottom-right-radius: 9px; }
+  .enc .info {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1;
+    position: relative; min-width: 0; min-height: 0; overflow: hidden; padding: 4px; pointer-events: none;
+  }
+  .enc .info.narrow { padding: 2px 1px; }
+  .enc .info.narrow .nm { display: none; }
+  .enc .info.narrow .g { font-size: clamp(14px, 2.2vw, 26px); white-space: normal; text-align: center; }
+  .enc .info.narrow .g.empty { font-size: 10px; }
+  .enc .info.narrow .kp { position: static; }
+  .enc.sel { --bb: var(--accent); --bw: 3px; }
+  .enc.sick .cell { animation: sickflash 1.2s ease; }
+  @keyframes sickflash { 0%, 60% { background: var(--sick-soft); border-color: var(--sick); } }
   .enc .g { font-size: clamp(18px, 3.2vw, 36px); line-height: 1.1; white-space: nowrap; }
   .enc .g.empty { opacity: 0.45; font-size: clamp(14px, 2vw, 22px); }
   .enc .nm { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -91,8 +109,10 @@
   .enc .hb i.low { background: var(--sick); }
   .enc .kp { position: absolute; top: 3px; right: 5px; font-size: clamp(11px, 1.4vw, 16px); }
   .enc .kp.none { filter: grayscale(1); opacity: 0.8; }
-  .preview { margin: 3px; border-radius: 10px; border: 2px dashed var(--accent); background: var(--accent-soft); pointer-events: none; }
+  .preview { margin: 2px; border-radius: 5px; border: 2px dashed var(--accent); background: var(--accent-soft); pointer-events: none; }
   .preview.bad { border-color: var(--sick); background: var(--sick-soft); }
+  svg.shape { vertical-align: middle; fill: var(--bb, var(--accent)); opacity: 0.9; }
+  .tool svg.shape { margin-left: 2px; }
   .ticker {
     margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: var(--bg-panel);
     border: 1px solid var(--line); font-size: 13.5px; min-height: 40px;
@@ -272,10 +292,10 @@
   .tour .who { font-weight: 600; }
   .tour .perks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .tour .perks .btn { font-size: 12px; padding: 4px 9px; white-space: normal; text-align: left; }
-  .enc.stop { outline: 2px dashed var(--accent); outline-offset: -6px; }
+  .enc.stop .info { outline: 2px dashed var(--accent); outline-offset: -3px; border-radius: 8px; }
 
   /* ---- construction ---- */
-  .enc.building { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bc) 0 8px, transparent 8px 16px); }
+  .enc.building .cell { border-style: dashed; background: repeating-linear-gradient(135deg, var(--bc) 0 8px, transparent 8px 16px); }
   .enc .hb i.build { background: var(--lit); }
 
   /* ---- staff ---- */
@@ -363,7 +383,9 @@
       <div class="panel">
         <h2>Lab</h2>
         <ul class="lab-list" id="lab"></ul>
-        <div class="hint">One project at a time. New hardware reaches every enclosure when it's done.</div>
+        <div class="hint">One project at a time. New hardware reaches every enclosure when it's done.
+          The starting hardware is NISQ-grade, right at threshold: a bigger code is no better than a smaller one.
+          Research pushes it below threshold, where every step in distance cuts logical errors.</div>
       </div>
       <div class="panel">
         <h2>Zoo news</h2>
@@ -443,6 +465,7 @@
   var ui = {
     speed: 1,          // 0 = paused; otherwise multiplier
     tool: null,        // what's being placed: null | { kind: "biome", id } | { kind: "design", design, name, speciesName }
+    rot: 0,            // quarter turns of the plot being placed
     draft: null,       // the design open in the workshop
     hover: null,       // { x, y } cell under the pointer
     selected: null,    // exhibit id
@@ -476,11 +499,24 @@
   }
 
   // ---------- palette ----------
-  function toolInfo(t) {
-    if (t.kind === "biome") { var b = BIOMES[t.id]; return { fp: b.footprint, cost: b.cost, days: b.buildDays, name: b.name }; }
-    var pr = Habitat.price(t.design);
-    return { fp: Habitat.footprint(t.design.qubits.length + t.design.checks.length), cost: pr.cost, days: pr.days, name: t.name };
+  // What a tool builds: { cells (turned `rot` quarter turns), fp (their
+  // bounding box), cost, days, name }.
+  function toolInfo(t, rot) {
+    var cells, info;
+    if (t.kind === "biome") {
+      var b = BIOMES[t.id];
+      cells = Park.biomeCells(t.id, rot);
+      info = { cost: b.cost, days: b.buildDays, name: b.name };
+    } else {
+      var pr = Habitat.price(t.design);
+      cells = Park.designCells(park, t.design, rot);
+      info = { cost: pr.cost, days: pr.days, name: t.name };
+    }
+    info.cells = cells;
+    info.fp = Habitat.bounds(cells);
+    return info;
   }
+  function tilesText(n) { return n + " tile" + (n === 1 ? "" : "s"); }
   function sameTool(a, b) {
     return !!a && !!b && a.kind === b.kind && (a.kind === "biome" ? a.id === b.id : a.entryId === b.entryId && a.entryId !== undefined);
   }
@@ -496,7 +532,7 @@
       btn.dataset.cost = b.cost;
       btn.dataset.known = known ? "1" : "";
       btn.innerHTML = '<span class="sw"></span><span class="nm">' + b.name + "</span>" +
-        '<span class="meta">' + big(b.cost) + " · " + b.footprint[0] + "×" + b.footprint[1] + " · " + b.buildDays + "d · " + sp.glyph + "</span>";
+        '<span class="meta">' + big(b.cost) + " · " + b.buildDays + "d · " + sp.glyph + " " + Habitat.shapeSvg(b.cells, 5) + "</span>";
       btn.disabled = !known || park.cash < b.cost;
       btn.title = known ? b.blurb : "Build a working habitat for the " + sp.name + " in the workshop to discover it. The field guide has a hint.";
       btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
@@ -517,7 +553,7 @@
       btn.dataset.cost = info.cost;
       btn.dataset.known = "1";
       btn.innerHTML = '<span class="sw"></span><span class="nm">' + esc(e.name) + "</span>" +
-        '<span class="meta">' + big(info.cost) + " · " + info.fp[0] + "×" + info.fp[1] + " · " + info.days + "d · " + sp.glyph + "</span>";
+        '<span class="meta">' + big(info.cost) + " · " + info.days + "d · " + sp.glyph + " " + Habitat.shapeSvg(info.cells, 5) + "</span>";
       btn.disabled = park.cash < info.cost;
       btn.title = "Your design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks.";
       btn.addEventListener("click", function () { setTool(sameTool(ui.tool, t) ? null : t); });
@@ -546,14 +582,28 @@
     });
   }
   function setTool(t) {
+    if (!sameTool(t, ui.tool)) ui.rot = 0;
     ui.tool = t;
     $("park").classList.toggle("building", !!t);
     renderTools();
     renderPark();
-    var info = t && toolInfo(t);
-    $("toolHint").innerHTML = t
-      ? "Placing <b>" + esc(info.name) + "</b> (" + info.fp.join("×") + ", " + info.days + " days to build). Click the park to build. <span class=\"kbd\">Esc</span> cancels."
+    renderToolHint();
+  }
+  function renderToolHint() {
+    var t = ui.tool, info = t && toolInfo(t, ui.rot), hint = $("toolHint");
+    hint.innerHTML = t
+      ? "Placing <b>" + esc(info.name) + "</b> (" + tilesText(info.cells.length) + ", " + info.days + " days to build). Click the park to build. " +
+        '<button class="btn" type="button" id="rotBtn">⟳ Rotate</button> <span class="kbd">R</span> turns it, <span class="kbd">Esc</span> cancels. ' +
+        "Plots interlock: fit them together to save space."
       : "Pick a habitat, then click the park to place it. <span class=\"kbd\">Esc</span> cancels.";
+    var rb = $("rotBtn");
+    if (rb) rb.addEventListener("click", rotateTool);
+  }
+  function rotateTool() {
+    if (!ui.tool) return;
+    ui.rot = (ui.rot + 1) % 4;
+    renderPark();
+    renderToolHint();
   }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
@@ -563,8 +613,8 @@
   parkEl.style.setProperty("--rows", park.height);
 
   function anchorFor(t, cell) {
-    // Centre the footprint on the pointer.
-    var fp = toolInfo(t).fp;
+    // Centre the plot's bounding box on the pointer.
+    var fp = toolInfo(t, ui.rot).fp;
     return { x: cell.x - Math.floor((fp[0] - 1) / 2), y: cell.y - Math.floor((fp[1] - 1) / 2) };
   }
   function place(elm, x, y, w, hh) {
@@ -583,22 +633,45 @@
       var rec = park.exhibits[id];
       var e = h("div", "enc b-" + (rec.biomeId || "design"));
       place(e, rec.x, rec.y, rec.w, rec.h);
+      e.style.setProperty("--w", rec.w);
+      e.style.setProperty("--h", rec.h);
       e.dataset.id = id;
-      e.innerHTML = '<span class="g"></span><span class="nm"></span><span class="kp"></span><span class="hb"><i></i></span>';
-      e.title = label(rec);
+      var has = {};
+      rec.cells.forEach(function (c) { has[c[0] + "," + c[1]] = true; });
+      rec.cells.forEach(function (c) {
+        var x = c[0], y = c[1];
+        var cls = "cell" + (has[x + "," + (y - 1)] ? "" : " t") + (has[x + "," + (y + 1)] ? "" : " b") +
+          (has[(x - 1) + "," + y] ? "" : " l") + (has[(x + 1) + "," + y] ? "" : " r");
+        var cell = h("div", cls);
+        cell.style.gridColumn = String(x + 1);
+        cell.style.gridRow = String(y + 1);
+        cell.title = label(rec);
+        e.appendChild(cell);
+      });
+      var info = h("div", "info", '<span class="g"></span><span class="nm"></span><span class="kp"></span><span class="hb"><i></i></span>');
+      var ir = Habitat.innerRect(rec.cells);
+      if (Math.min(ir.w, ir.h) === 1) info.classList.add("narrow");
+      info.style.gridColumn = (ir.x + 1) + " / span " + ir.w;
+      info.style.gridRow = (ir.y + 1) + " / span " + ir.h;
+      e.appendChild(info);
       parkEl.appendChild(e);
-      encEls[id] = { e: e, g: e.querySelector(".g"), nm: e.querySelector(".nm"), kp: e.querySelector(".kp"),
-        hb: e.querySelector(".hb"), bar: e.querySelector(".hb i"), last: {} };
+      encEls[id] = { e: e, g: info.querySelector(".g"), nm: info.querySelector(".nm"), kp: info.querySelector(".kp"),
+        hb: info.querySelector(".hb"), bar: info.querySelector(".hb i"), last: {} };
     });
     if (ui.tool && ui.hover) {
-      var a = anchorFor(ui.tool, ui.hover), fp = toolInfo(ui.tool).fp;
-      var ok = (ui.tool.kind === "biome" ? Park.canBuild(park, ui.tool.id, a.x, a.y) : Park.canBuildDesign(park, ui.tool.design, a.x, a.y)).ok;
+      var tinfo = toolInfo(ui.tool, ui.rot), a = anchorFor(ui.tool, ui.hover), fp = tinfo.fp;
       // Clamp the preview into the grid so it stays visible at the edges.
       var px = Math.max(0, Math.min(park.width - fp[0], a.x)), py = Math.max(0, Math.min(park.height - fp[1], a.y));
-      var pv = h("div", "preview" + (ok ? "" : " bad"));
-      place(pv, px, py, fp[0], fp[1]);
-      parkEl.appendChild(pv);
-    }
+      var ok = (ui.tool.kind === "biome" ? Park.canBuild(park, ui.tool.id, px, py, ui.rot) : Park.canBuildDesign(park, ui.tool.design, px, py, ui.rot)).ok;
+      ui.anchor = { x: px, y: py };
+      tinfo.cells.forEach(function (c) {
+        var cx = px + c[0], cy = py + c[1];
+        if (cx >= park.width || cy >= park.height) return;
+        var pv = h("div", "preview" + (ok && park.grid[cy * park.width + cx] === null ? "" : " bad"));
+        place(pv, cx, cy, 1, 1);
+        parkEl.appendChild(pv);
+      });
+    } else ui.anchor = null;
     updatePark();
   }
   function setIf(o, key, v, apply) { if (o.last[key] !== v) { o.last[key] = v; apply(v); } }
@@ -657,9 +730,10 @@
     var c = cellFromEvent(ev);
     if (!c) return;
     if (ui.tool) {
-      var a = anchorFor(ui.tool, c), cost = toolInfo(ui.tool).cost;
-      var r = ui.tool.kind === "biome" ? Park.build(park, ui.tool.id, a.x, a.y)
-        : Park.buildDesign(park, ui.tool.design, a.x, a.y, { name: ui.tool.speciesName });
+      // Build where the preview shows (it's clamped into the lot).
+      var a = ui.anchor && ui.hover && ui.hover.x === c.x && ui.hover.y === c.y ? ui.anchor : anchorFor(ui.tool, c), cost = toolInfo(ui.tool, ui.rot).cost;
+      var r = ui.tool.kind === "biome" ? Park.build(park, ui.tool.id, a.x, a.y, ui.rot)
+        : Park.buildDesign(park, ui.tool.design, a.x, a.y, { name: ui.tool.speciesName, rot: ui.rot });
       if (!r.ok) { post("Can't build there: " + r.reason, "sick"); return; }
       post("🏗 Construction started on the <b>" + label(r.exhibit) + "</b> (" + big(cost) + "). It opens on day " +
         (Math.floor(r.exhibit.buildUntil / ECO.ticksPerDay) + 1) + "." +
@@ -1071,7 +1145,7 @@
         "<p><b>Welcome, founder.</b> You've closed a " + big(Z.ROUNDS[0].raised) + " seed round at a " + big(Z.ROUNDS[0].valuation) +
         " valuation. The plan: take this zoo public at " + big(Z.ROUNDS[Z.ROUNDS.length - 1].target) + ".</p>" +
         "<p>1. Build a Parity Riverbank and buy its Repetition Tortoise, the one species everybody knows how to keep. Experiments take time: " +
-        "the riverbank opens after " + BIOMES.riverbank.buildDays + " days, a surface code after a year. " +
+        "the riverbank opens after " + BIOMES.riverbank.buildDays + " days, a new surface code after about a month. " +
         "Each animal is a logical qubit protected by a quantum error-correcting code, and it lives only in a habitat that measures exactly its stabilizers.<br>" +
         "2. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
         "3. Discover more species in the <b>habitat workshop</b>: place qubits and checks, wire them up, and build a habitat whose checks make a working code. " +
@@ -1646,6 +1720,7 @@
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
     if (ui.modalOpen) return;
     if (e.key === "Escape") { if (ui.tool) setTool(null); else select(null); }
+    else if ((e.key === "r" || e.key === "R") && ui.tool) rotateTool();
     else if (e.key === " ") {
       e.preventDefault();
       if (ui.speed) { lastSpeed = ui.speed; setSpeed(0); } else setSpeed(lastSpeed);

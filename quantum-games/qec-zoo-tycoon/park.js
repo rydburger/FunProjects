@@ -136,7 +136,13 @@
     park.order.forEach(function (id) { stamp(park, park.exhibits[id], id); });
   }
   function stamp(park, rec, value) {
-    for (var dy = 0; dy < rec.h; dy++) for (var dx = 0; dx < rec.w; dx++) park.grid[(rec.y + dy) * park.width + (rec.x + dx)] = value;
+    rec.cells.forEach(function (c) { park.grid[(rec.y + c[1]) * park.width + (rec.x + c[0])] = value; });
+  }
+  // A rectangle's cells (saves from before shaped plots).
+  function rectCells(w, h) {
+    var cells = [];
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) cells.push([x, y]);
+    return cells;
   }
 
   // ---------- species and habitats ----------
@@ -187,11 +193,11 @@
   function habitatOf(park, rec) {
     if (rec.biomeId) {
       var b = Z.BIOMES[rec.biomeId];
-      return { name: b.name, cost: b.cost, upkeep: b.upkeep, footprint: b.footprint, channel: b.climate.channel, blurb: b.blurb,
+      return { name: b.name, cost: b.cost, upkeep: b.upkeep, footprint: [rec.w, rec.h], tiles: rec.cells.length, channel: b.climate.channel, blurb: b.blurb,
         designed: false, checks: b.checks.length, days: b.buildDays };
     }
     var e = designEntry(park, rec.designId);
-    return { name: e.name, cost: rec.cost, upkeep: rec.upkeep, footprint: [rec.w, rec.h], channel: "depolarizing", designed: true, entry: e,
+    return { name: e.name, cost: rec.cost, upkeep: rec.upkeep, footprint: [rec.w, rec.h], tiles: rec.cells.length, channel: "depolarizing", designed: true, entry: e,
       checks: e.layout.checks.length, days: rec.days,
       blurb: "Your own design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks, " +
         Hab.wireCount(e.layout) + " wires." };
@@ -206,27 +212,36 @@
   function daysLeft(park, rec) { return rec.building ? Math.max(0, Math.ceil((rec.buildUntil - park.tick) / TPD)) : 0; }
 
   // ---------- building ----------
-  function fits(park, x, y, fp) {
-    if (x < 0 || y < 0 || x + fp[0] > park.width || y + fp[1] > park.height) return { ok: false, reason: "Doesn't fit inside the lot." };
-    for (var dy = 0; dy < fp[1]; dy++) for (var dx = 0; dx < fp[0]; dx++) {
-      if (park.grid[(y + dy) * park.width + (x + dx)] !== null) return { ok: false, reason: "Overlaps another enclosure." };
+  // Every plot has a shape (cells, see Habitat.normalize) that can be
+  // turned a quarter turn at a time (`rot`) before it's placed with its
+  // bounding box's corner at (x, y). Shapes interlock: only the tiles
+  // themselves have to be free.
+  function biomeCells(biomeId, rot) { return Hab.rotate(Z.BIOMES[biomeId].cells, rot); }
+  function designCells(park, design, rot) { return Hab.rotate(studyDesign(park, design).analysis.cells, rot); }
+  function fits(park, x, y, cells) {
+    for (var i = 0; i < cells.length; i++) {
+      var cx = x + cells[i][0], cy = y + cells[i][1];
+      if (cx < 0 || cy < 0 || cx >= park.width || cy >= park.height) return { ok: false, reason: "Doesn't fit inside the lot." };
+      if (park.grid[cy * park.width + cx] !== null) return { ok: false, reason: "Overlaps another enclosure." };
     }
     return { ok: true, reason: null };
   }
-  function canBuild(park, biomeId, x, y) {
+  function canBuild(park, biomeId, x, y, rot) {
     var biome = Z.BIOMES[biomeId];
     if (!biome) return { ok: false, reason: "No such habitat." };
     if (!isKnown(park, biome.native)) {
       return { ok: false, reason: "Nobody here knows how to keep the " + Z.SPECIES[biome.native].name +
         " yet. Discover it by building a working habitat for it in the workshop." };
     }
-    var f = fits(park, x, y, biome.footprint);
+    var f = fits(park, x, y, biomeCells(biomeId, rot));
     if (!f.ok) return f;
     if (park.cash < biome.cost) return { ok: false, reason: "Not enough funding (" + dollars(biome.cost) + " needed)." };
     return { ok: true, reason: null };
   }
   function dollars(v) { return "$" + Math.round(v).toLocaleString("en-US"); }
   function occupy(park, rec, cost, days) {
+    var fp = Hab.bounds(rec.cells);
+    rec.w = fp[0]; rec.h = fp[1];
     rec.building = true;
     rec.buildStart = park.tick;
     rec.buildUntil = park.tick + days * TPD;
@@ -237,12 +252,12 @@
     park.order.push(rec.id);
     park.cash -= cost;
   }
-  function build(park, biomeId, x, y) {
-    var check = canBuild(park, biomeId, x, y);
+  function build(park, biomeId, x, y, rot) {
+    var check = canBuild(park, biomeId, x, y, rot);
     if (!check.ok) return check;
     var b = Z.BIOMES[biomeId], id = park.nextId++;
     var rec = {
-      id: id, biomeId: biomeId, x: x, y: y, w: b.footprint[0], h: b.footprint[1],
+      id: id, biomeId: biomeId, x: x, y: y, cells: biomeCells(biomeId, rot),
       number: park.order.filter(function (o) { return park.exhibits[o].biomeId === biomeId; }).length + 1,
       builtTick: park.tick
     };
@@ -276,23 +291,24 @@
     if (!entry.key) hidden(entry, "key", JSON.stringify(entry.layout));
     return entry.key;
   }
-  function canBuildDesign(park, design, x, y) {
+  function canBuildDesign(park, design, x, y, rot) {
     var bad = Hab.malformed(design);
     if (bad) return { ok: false, reason: bad };
     var st = studyDesign(park, design), a = st.analysis;
     if (!a.valid) return { ok: false, reason: a.problems[0], study: st };
-    var f = fits(park, x, y, a.footprint);
+    var f = fits(park, x, y, Hab.rotate(a.cells, rot));
     if (!f.ok) return { ok: false, reason: f.reason, study: st };
     if (park.cash < a.cost) return { ok: false, reason: "Not enough funding (" + dollars(a.cost) + " needed).", study: st };
     return { ok: true, reason: null, study: st };
   }
   // Build a design at (x, y). opts: { name } for a species nobody has
-  // catalogued. Its species is discovered when the habitat opens.
+  // catalogued, { rot } quarter turns. Its species is discovered when the
+  // habitat opens.
   // Returns { ok, exhibit, speciesId, discovers (it will discover a
   // species when it opens), newSpecies (uncatalogued), entry (its book entry) }.
   function buildDesign(park, design, x, y, opts) {
     opts = opts || {};
-    var c = canBuildDesign(park, design, x, y);
+    var c = canBuildDesign(park, design, x, y, opts.rot);
     if (!c.ok) return c;
     var st = c.study, a = st.analysis, speciesId = st.speciesId, newSpecies = false;
     if (!speciesId) {
@@ -320,7 +336,7 @@
     entry.retired = false;
     var id = park.nextId++;
     var rec = {
-      id: id, biomeId: null, designId: entry.id, x: x, y: y, w: a.footprint[0], h: a.footprint[1],
+      id: id, biomeId: null, designId: entry.id, x: x, y: y, cells: Hab.rotate(a.cells, opts.rot),
       number: park.order.filter(function (o) { return park.exhibits[o].designId === entry.id; }).length + 1,
       cost: a.cost, upkeep: a.upkeep, days: a.days, builtTick: park.tick,
       discovers: isKnown(park, speciesId) ? null : speciesId
@@ -652,7 +668,9 @@
     var h = park.history, last7 = h.slice(-7), last30 = h.slice(-30), prev30 = h.slice(-60, -30);
     var revenue = last7.length ? avgOf(last7, function (d) { return d.revenue; }) : rates(park).revenue;
     var r30 = avgOf(last30, function (d) { return d.revenue; }), p30 = avgOf(prev30, function (d) { return d.revenue; });
-    var growth = p30 < 500 ? (r30 >= 500 ? 1 : 0) : Math.max(-1, Math.min(1, r30 / p30 - 1));
+    // Growth on a small base doesn't impress: below growthFloor a day the
+    // floor stands in for last month's revenue.
+    var growth = Math.max(-1, Math.min(1, (r30 - p30) / Math.max(p30, Z.VALUATION.growthFloor)));
     var animals = 0, healthSum = 0, techUnits = 0, best = 0;
     park.order.forEach(function (id) {
       var an = park.exhibits[id].animal;
@@ -1045,7 +1063,9 @@
       var rec = park.exhibits[id];
       if (rec.designId ? !designEntry(park, rec.designId) : !Z.BIOMES[rec.biomeId]) throw new Error("Unknown habitat in save: " + (rec.biomeId || rec.designId));
       if (!Array.isArray(rec.keeperIds) || rec.keeperIds.some(function (kid) { return !park.keepers[kid]; })) throw new Error("Unknown keeper in save at " + id);
+      if (!Array.isArray(rec.cells)) rec.cells = rectCells(rec.w, rec.h); // saved before shaped plots
     });
+    setLot(park, park.lotLevel);
     Object.keys(park.exhibits).forEach(function (id) {
       var rec = park.exhibits[id];
       if (rec.animal) {
@@ -1068,7 +1088,7 @@
     createPark: createPark, day: day, hour: hour, dayIndex: dayIndex,
     isKnown: isKnown, speciesInfo: speciesInfo, speciesDistance: speciesDistance, habitatOf: habitatOf, nativeBiome: nativeBiome,
     knownCandidates: knownCandidates, isOpen: isOpen, daysLeft: daysLeft,
-    canBuild: canBuild, build: build, exhibitAt: exhibitAt, demolish: demolish,
+    canBuild: canBuild, build: build, exhibitAt: exhibitAt, demolish: demolish, biomeCells: biomeCells, designCells: designCells, fits: fits,
     studyDesign: studyDesign, canBuildDesign: canBuildDesign, buildDesign: buildDesign, renameSpecies: renameSpecies,
     designEntry: designEntry, designInUse: designInUse, deleteDesign: deleteDesign, canForgetSpecies: canForgetSpecies, forgetSpecies: forgetSpecies,
     animalCount: animalCount, stockCost: stockCost, speciesOptions: speciesOptions, buyAnimal: buyAnimal,

@@ -1,6 +1,6 @@
 # Zoo Tycoon — status & handoff
 
-Last updated: 2026-10-26 (funding update, after M7). Written so a new session can resume without the original chat.
+Last updated: 2026-10-26 (second playtest update: shaped plots, NISQ lab, real funding ladder). Written so a new session can resume without the original chat.
 Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan**) and
 [`README.md`](README.md) (player-facing rules and how it works).
 
@@ -18,13 +18,50 @@ The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
   - [#5](https://github.com/rydburger/FunProjects/pull/5) merged M4 + M5.
   - [#6](https://github.com/rydburger/FunProjects/pull/6) merged M6.
   - [#7](https://github.com/rydburger/FunProjects/pull/7) merged M7.
-  - The funding update is on branch `claude/gifted-darwin-pd1muz`.
-- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 88 in
-  `tests/zoo-tycoon.test.js`, all passing (the zoo suite takes ~10 s: its bots play up to ten
-  game years).
+  - [#8](https://github.com/rydburger/FunProjects/pull/8) merged the funding update.
+  - The second playtest update (below) is on branch `claude/gifted-darwin-pd1muz`.
+- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 91 in
+  `tests/zoo-tycoon.test.js`, all passing (the zoo suite takes a few minutes: its bots play up
+  to ten game years at NISQ-grade error rates).
 - **Browser checks:** park (construction, staffing, tours and perks, a raise and its verdict,
   demolish, blueprint delete, a two-year bot save at 60× speed: steady 60 fps) and sandbox (0.1×)
   verified in headless Chromium in light and dark themes and at 390px width, with no console errors.
+
+### Second playtest update (2026-10-26)
+
+The owner asked for: different exhibit shapes per habitat (random for player designs, sized by
+the code) so placement becomes a tiling puzzle; construction in about a month rather than a year;
+research that matters (start with NISQ-grade error rates, research pushes below threshold,
+without vet bills killing new players); a funding ladder that matches real ~$20B companies; and
+training courses that last weeks. Done:
+- **Shaped plots.** `BIOMES[].shape` (row strings → `cells`): riverbank a 4×1 strip, forest a
+  diagonal band, glade a triangle, dunes a ridge, wetlands 3×3, floe 2×2, marsh a rounded 5×5.
+  Workshop designs get `Habitat.shapeFor(design)`: a random connected polyomino of
+  ⌈qubits/2⌉ tiles in a box ~√tiles + 1 on a side, seeded by a hash of the design JSON (so a
+  blueprint always builds the same shape). Area follows the qubit count, which grows with
+  distance; a pure distance rule would give a long repetition code a huge plot. `rec.cells` (after
+  rotation) is what's stamped; `rec.w`/`rec.h` are the bounding box. `build(…, rot)`,
+  `buildDesign(…, { rot })`, `Park.fits/biomeCells/designCells`. Saves without `cells` load as
+  rectangles (save version unchanged). UI: per-tile outlines, the label on the largest inner
+  rectangle (`Habitat.innerRect`), a per-tile preview, R / ⟳ to rotate, shape icons
+  (`Habitat.shapeSvg`) in the build menu and workshop.
+- **Construction:** workshop days = 30 × qubits/17 (7–90); catalogue 7 (riverbank) to 75 days
+  (marsh). **Training:** 7 / 14 / 21 days.
+- **Lab:** level 0 is NISQ-grade (coherence 2%/h, gates 0.28%/CNOT, readout 2.8%: ~3% data and
+  ~4% outcome error per round on a surface code). With a head keeper the d = 5 Giant Axolotl is no
+  better than the d = 3 Axolotl there; fully researched it's several times better (tests pin
+  both). Health now relaxes toward 100 (2% of the gap + 0.1 per tick; −20 per logical error), so
+  it settles at a level that tracks the error rate instead of pinning at 0, and the vet bill is
+  $1.5k.
+- **Bug fixed:** the Grand Marsh measured a product of two plaquettes that let one error light
+  three detectors, so no keeper could run matching there and the d = 5 code never beat d = 3.
+  It now measures a bent plaquette (plaquette × the boundary pair beside it) that keeps
+  matching valid; a test checks every catalogue habitat supports space-time decoding.
+- **Funding ladder** (PsiQuantum, Snowflake, Quantinuum; see README): A $100M (sells 20%), B
+  $400M (15%), C $1.5B (12%), D $4B (10%), E $10B (8%), IPO $20B (10%). Valuation coefficients
+  were cut to match (revenue multiple 12 + 18 × growth, $2M per k·d², $10M per species, $8M per
+  lab level; stage premiums 1 → 6), growth is measured against at least $20k/day of revenue (no
+  more "100% growth" from a standing start), and the post-close wait is 150 days.
 
 ### The funding update (2026-10-26)
 
@@ -166,37 +203,42 @@ The game files build on it:
 - **Start:** a $10M seed round at $40M (founders keep 75%), reputation 50, investor confidence 50,
   a 12×8 lot. **Goal:** the IPO ($20B). **Lose:** 7 consecutive days in debt. **Time:** 24 ticks
   per day; 1× speed = 2 ticks per second; speeds 1/5/20/60×.
-- **Rounds:** A $300M (sells 15%), B $2B (12%), C $5B (10%), D $10B (8%), IPO $20B (10%), stage
-  premiums ×1, 1.25, 1.6, 2, 3. Roadshow 21 days (tours every 3); after a close, 300 days before
-  the next raise; bridge at 60–100% of target (sells 6%); pass → 45-day cooldown. Lots 12×8 →
-  14×10 → 16×12 → 18×13 → 20×14 → 22×15.
-- **Valuation:** (revenue/yr × (20 + 40 × growth) + $6M × Σ k·d²·health + $30M × species + $20M
+- **Rounds:** A $100M (sells 20%), B $400M (15%), C $1.5B (12%), D $4B (10%), E $10B (8%), IPO
+  $20B (10%), stage premiums ×1, 1.2, 1.6, 2.2, 3.5, 6. Roadshow 21 days (tours every 3); after a
+  close, 150 days before the next raise; bridge at 60–100% of target (sells 6%); pass → 45-day
+  cooldown. Lots 12×8 → 14×10 → 16×12 → 18×13 → 20×14 → 22×15.
+- **Valuation:** (revenue/yr × (12 + 18 × growth) + $2M × Σ k·d²·health + $10M × species + $8M
   × lab levels) × 2^((confidence − 50)/30) × premium × (1 − 0.35 × share of milestones missed).
-  Growth is the 30-day revenue change (capped at 100%; from a standing start it counts as 100%).
+  Growth is the 30-day revenue change against max(last month, $20k/day), capped at ±100%.
 - **Confidence:** tours move it by 0.2 × (impression − 50); +2 per discovery, +3 per milestone,
   −3 per resignation, −2 per day in debt, ±4 a month with revenue growth, +5/−5 on a close/pass;
   1% a day back toward 50. Impression = weighted mean of health, error rate, morale, roadmap,
   growth and wow (the fund's focus ×3), −25 per logical error on the route, + perk (6/10/15 for
   $15k/$45k/$140k).
-- **Prices:** catalogue habitats $300k (riverbank, 45 days) to $3.2M (marsh, 400 days); animals
-  $100k (tortoise) to $1.5M (giant); workshop $60k/qubit + $5k/wire, 365 × (qubits/17)^1.2 days
-  (30–540). Upkeep ~$800–8,000/day. Vet bill $10k. Tickets $20, 2 visitors per appeal point.
+- **Prices:** catalogue habitats $300k (riverbank, 7 days, 4 tiles) to $3.2M (marsh, 75 days, 21
+  tiles); animals $100k (tortoise) to $1.5M (giant); workshop $60k/qubit + $5k/wire, 30 ×
+  qubits/17 days (7–90), ⌈qubits/2⌉ tiles. Upkeep ~$800–8,000/day. Vet bill $1.5k. Tickets $20,
+  2 visitors per appeal point.
+- **Health:** −20 per logical error; each tick +2% of the gap to 100, +0.1. Settles near 97 at
+  0.2 logical errors a day, 80 at 0.6, 55 at 1.2.
 - **Staff:** salaries $450/$550/$700/$850 a day; training needs 500/2000/5000 rounds and costs
-  $20k/3 days, $50k/5 days, $100k/7 days; speed 4 + xp/1000 (max 12). Load weight 0.5 +
+  $20k/7 days, $50k/14 days, $100k/21 days (they keep working); speed 4 + xp/1000 (max 12). Load weight 0.5 +
   checks/16. Fatigue 0.45 × load^1.5 a day (+1 per logical error on their watch), −2 a day
   resting, −10 a day on holiday. Holiday 21 days a year, booked a week at a time 3 days ahead
   once fatigue ≥ 40 (30 days apart). Sick past fatigue 60, burnout past 85 (14 days, −30 morale);
   morale drifts to 85 − 0.6 × fatigue; quits possible below 25. Bonus = 20 days' salary, +20
   morale, every 60 days at most.
-- **Lab:** research $1.5M/30 days, $4M/60 days, $10M/90 days per level.
-- **Balance result (2026-10-26):** the test bot (see the balance tests) raises the Series A in
-  7–13 months and lists in 5.5–7.5 years (3 of 5 seeds within ten years; the others hover around
-  $20B); no keepers → bankrupt in year 1; no training/research/care → never lists.
-- *Below: physics and older notes (the dollar figures in them are pre-update).*
-- **Lab** (per level 0 → 3): coherence 0.8% → 0.55% → 0.35% → 0.2% per qubit per hour; gates
-  0.08% → 0.06% → 0.04% → 0.02% per CNOT; readout 1% → 0.7% → 0.45% → 0.25%; cycle 1 → 2 → 3
-  rounds/hour. Research costs $5k/2 days, $12k/4 days, $25k/6 days for levels 1/2/3. Channels:
-  depolarizing, except bit flips only at the Riverbank.
+- **Lab:** research $1.5M/30 days, $4M/60 days, $10M/90 days per level. Per level 0 → 3:
+  coherence 2% → 1.2% → 0.6% → 0.25% per qubit per hour; gates 0.28% → 0.16% → 0.08% → 0.03% per
+  CNOT; readout 2.8% → 1.6% → 0.8% → 0.4%; cycle 1 → 2 → 3 rounds/hour. Logical errors per animal
+  per day with a trainee at level 0: tortoise ~0.2, d = 3 codes ~1.2; with a head keeper ~0.6 for
+  both the Axolotl and the Giant Axolotl (at threshold).
+- **Balance result (2026-10-26, second update):** the test bot raises the Series A around day 55,
+  then B–D every ~170 days (the post-close wait), and lists in 2.5–3.2 years in 4 of 6 seeds
+  (one more after ~9 years; one stalls short of $20B at Series E). No keepers → bankrupt in
+  ~4 months; no training/research/care → bankrupt in year 2.
+- *Below: physics and older notes (the dollar figures and error rates in them are pre-update).*
+- Channels: depolarizing, except bit flips only at the Riverbank.
 - **Keepers:** salaries $120 / $150 / $190 / $240 per day for levels 1–4. Training to level
   2/3/4 needs 150/500/1200 rounds of experience and costs $1k/1 day, $2.5k/2 days, $5k/3 days.
   Speed = 4 + xp/300 work per hour, capped at 12. Work per round: 1, 1.5, then 2 and 3 × max(1,
@@ -225,9 +267,12 @@ The game files build on it:
 
 - The game ends at midnight, so the top bar reads "Day N+1" while the dialog says it ended on
   day N.
-- **Early valuations are growth-driven:** from a standing start revenue growth counts as 100%, so
-  the first months' valuations jump when the first animals go on show. Satirically apt; revisit
-  if it feels arbitrary.
+- **Early rounds come on the clock.** A strong player's valuation clears Series A–D targets
+  before the 150-day post-close wait ends, so those rounds close as soon as investors allow; the
+  wait, not the valuation, paces the early game for good play. Weaker play is valuation-gated.
+- **The NISQ start is a trap for fast expansion:** before research, a d = 3 animal's vet bills
+  roughly cancel its tickets, so a zoo that builds wide before funding the lab can run out of
+  runway between Series A and B (the bots show it). Intended, but watch it in playtests.
 - **Late game cash piles up** (billions after Series C). Lot space, construction time, staff and
   error rates are the constraints then. More late sinks (guides, shops, bigger lab tiers) would help.
 - **d = 2 codes are money pits** (many animals, constantly sick). Honest; postselection would fix it.

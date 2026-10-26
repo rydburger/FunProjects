@@ -86,12 +86,109 @@
     return null;
   }
 
-  // ---------- size and price ----------
-  // Half a tile per qubit (data or ancilla), as square as possible.
-  function footprint(totalQubits) {
-    var tiles = Math.max(1, Math.ceil(totalQubits / B.qubitsPerTile));
-    var w = Math.ceil(Math.sqrt(tiles));
-    return [w, Math.ceil(tiles / w)];
+  // ---------- size, shape and price ----------
+  // Half a tile per qubit (data or ancilla).
+  function tiles(totalQubits) { return Math.max(1, Math.ceil(totalQubits / B.qubitsPerTile)); }
+
+  // A shape is a list of [x, y] tiles, shifted so the smallest x and y
+  // are 0 and sorted row by row. Catalogue habitats have fixed shapes
+  // (BIOMES[].cells); a workshop design gets a random one, seeded by the
+  // design itself so a blueprint always has the same shape.
+  function normalize(cells) {
+    var mx = Infinity, my = Infinity;
+    cells.forEach(function (c) { mx = Math.min(mx, c[0]); my = Math.min(my, c[1]); });
+    return cells.map(function (c) { return [c[0] - mx, c[1] - my]; })
+      .sort(function (a, b) { return a[1] - b[1] || a[0] - b[0]; });
+  }
+  // Bounding box [w, h].
+  function bounds(cells) {
+    var w = 0, hh = 0;
+    cells.forEach(function (c) { w = Math.max(w, c[0] + 1); hh = Math.max(hh, c[1] + 1); });
+    return [w, hh];
+  }
+  // Turn a shape `turns` quarter turns clockwise.
+  function rotate(cells, turns) {
+    var out = cells;
+    for (var t = 0; t < (((turns || 0) % 4) + 4) % 4; t++) {
+      var hh = bounds(out)[1];
+      out = out.map(function (c) { return [hh - 1 - c[1], c[0]]; });
+    }
+    return normalize(out);
+  }
+  function hashString(str) {
+    var hsh = 2166136261;
+    for (var i = 0; i < str.length; i++) { hsh ^= str.charCodeAt(i); hsh = Math.imul(hsh, 16777619) >>> 0; }
+    return hsh >>> 0;
+  }
+  function seededRng(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // A random connected shape of `n` tiles that fits in a box about
+  // √n + 1 on a side. Tiles touching more of the shape are likelier, so
+  // it comes out lumpy rather than stringy, like an inventory piece.
+  function randomShape(n, seed) {
+    var rnd = seededRng(seed), side = n <= 2 ? n : Math.ceil(Math.sqrt(n)) + 1;
+    var have = { "0,0": true }, cells = [[0, 0]];
+    function has(x, y) { return have[x + "," + y] === true; }
+    while (cells.length < n) {
+      var b0 = [Infinity, Infinity, -Infinity, -Infinity];
+      cells.forEach(function (c) { b0 = [Math.min(b0[0], c[0]), Math.min(b0[1], c[1]), Math.max(b0[2], c[0]), Math.max(b0[3], c[1])]; });
+      var cand = [], seen = {};
+      cells.forEach(function (c) {
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+          var x = c[0] + d[0], y = c[1] + d[1], key = x + "," + y;
+          if (has(x, y) || seen[key]) return;
+          seen[key] = true;
+          if (Math.max(b0[2], x) - Math.min(b0[0], x) >= side || Math.max(b0[3], y) - Math.min(b0[1], y) >= side) return;
+          var nb = (has(x + 1, y) ? 1 : 0) + (has(x - 1, y) ? 1 : 0) + (has(x, y + 1) ? 1 : 0) + (has(x, y - 1) ? 1 : 0);
+          cand.push({ x: x, y: y, w: Math.pow(nb, 1.5) });
+        });
+      });
+      cand.sort(function (p, q) { return p.y - q.y || p.x - q.x; });
+      var total = cand.reduce(function (acc, c) { return acc + c.w; }, 0), r = rnd() * total, pick = cand[cand.length - 1];
+      for (var i = 0; i < cand.length; i++) { r -= cand[i].w; if (r < 0) { pick = cand[i]; break; } }
+      have[pick.x + "," + pick.y] = true;
+      cells.push([pick.x, pick.y]);
+    }
+    return normalize(cells);
+  }
+  // The largest rectangle of tiles inside a shape, { x, y, w, h } (ties go
+  // to the wider one): where a plot's label fits.
+  function innerRect(cells) {
+    var fp = bounds(cells), has = {}, best = { x: cells[0][0], y: cells[0][1], w: 1, h: 1 };
+    cells.forEach(function (c) { has[c[0] + "," + c[1]] = true; });
+    for (var y0 = 0; y0 < fp[1]; y0++) for (var x0 = 0; x0 < fp[0]; x0++) {
+      if (!has[x0 + "," + y0]) continue;
+      for (var y1 = y0; y1 < fp[1] && has[x0 + "," + y1]; y1++) {
+        for (var x1 = x0; x1 < fp[0]; x1++) {
+          var ok = true;
+          for (var y = y0; y <= y1 && ok; y++) if (!has[x1 + "," + y]) ok = false;
+          if (!ok) break;
+          var w = x1 - x0 + 1, hh = y1 - y0 + 1;
+          if (w * hh > best.w * best.h || (w * hh === best.w * best.h && w > best.w)) best = { x: x0, y: y0, w: w, h: hh };
+        }
+      }
+    }
+    return best;
+  }
+  // A small SVG picture of a shape (a string, for build menus).
+  function shapeSvg(cells, px) {
+    px = px || 6;
+    var fp = bounds(cells);
+    return '<svg class="shape" width="' + fp[0] * px + '" height="' + fp[1] * px + '" viewBox="0 0 ' + fp[0] * px + " " + fp[1] * px +
+      '" aria-hidden="true">' + cells.map(function (c) {
+        return '<rect x="' + (c[0] * px + 0.5) + '" y="' + (c[1] * px + 0.5) + '" width="' + (px - 1) + '" height="' + (px - 1) + '" rx="1"/>';
+      }).join("") + "</svg>";
+  }
+  // The plot a workshop design takes.
+  function shapeFor(design) {
+    return randomShape(tiles(design.qubits.length + design.checks.length), hashString(JSON.stringify(design)));
   }
   // Construction time in days for a habitat of this many qubits (data + ancilla).
   function buildDays(totalQubits) {
@@ -109,7 +206,8 @@
   // Returns { n, m, wires, ops, problems: [string] (each blocks building),
   //   notes: [string], clash: { a, b, qubits } | null, rank, redundant, k,
   //   d, dAtLeast, css, code: (code with computed logicals) | null,
-  //   idle: [qubits in no check], valid, footprint, cost, upkeep, days (to build) }.
+  //   idle: [qubits in no check], valid, cells (its plot), tiles, footprint
+  //   (bounding box [w, h]), cost, upkeep, days (to build) }.
   function analyze(design, opts) {
     opts = opts || {};
     var n = design.qubits.length, m = design.checks.length, ops = checkOps(design);
@@ -117,8 +215,11 @@
     var out = {
       n: n, m: m, wires: wireCount(design), ops: ops, problems: [], notes: [], clash: null,
       rank: 0, redundant: 0, k: 0, d: null, dAtLeast: null, css: false, code: null, idle: [],
-      valid: false, footprint: footprint(n + m), cost: pr.cost, upkeep: pr.upkeep, days: pr.days
+      valid: false, cost: pr.cost, upkeep: pr.upkeep, days: pr.days
     };
+    out.cells = shapeFor(design);
+    out.tiles = out.cells.length;
+    out.footprint = bounds(out.cells);
     if (!n) out.problems.push("Place some data qubits.");
     if (!m) out.problems.push("Add at least one check.");
     if (n > B.maxData) out.problems.push("At most " + B.maxData + " data qubits (this design has " + n + ").");
@@ -332,7 +433,8 @@
   var Habitat = {
     checkLabel: checkLabel, emptyDesign: emptyDesign, clone: clone, checkOp: checkOp, checkOps: checkOps,
     wireCount: wireCount, fromCode: fromCode, designFor: designFor, malformed: malformed,
-    footprint: footprint, price: price, buildDays: buildDays, analyze: analyze,
+    tiles: tiles, normalize: normalize, bounds: bounds, rotate: rotate, randomShape: randomShape, shapeFor: shapeFor, innerRect: innerRect, shapeSvg: shapeSvg,
+    hashString: hashString, price: price, buildDays: buildDays, analyze: analyze,
     equivalence: equivalence, mapPauli: mapPauli, identify: identify, textbook: textbook,
     customAppeal: customAppeal, customCost: customCost
   };
