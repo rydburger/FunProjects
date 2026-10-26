@@ -1,42 +1,59 @@
 // =========================================================
 // Error Correction Zoo Tycoon — park model.
 //
-// The whole zoo: a grid of enclosures, the animals and keepers in
-// them, cash, reputation and the clock. Pure game logic with no DOM,
+// The whole zoo: a lot of enclosures, the animals and keepers in them,
+// cash, reputation, investors and the clock. Pure game logic with no DOM,
 // so it can be unit-tested in Node; index.html renders it.
 //
-// Money flows continuously: ticket revenue and running costs
-// (salaries + upkeep) accrue every tick as 1/24 of their daily rate;
-// vet bills are charged immediately. A "day" event summarises
-// yesterday's books at each rollover; every 30 days an "investor"
-// event summarises the month.
+// Money flows continuously: ticket revenue and running costs (salaries +
+// upkeep of open enclosures) accrue every tick as 1/24 of their daily
+// rate; building, animals, courses, research and vet bills are paid at
+// once. A "day" event summarises each day's books and a "month" event
+// every 30 days.
 //
-// Win: cash >= ECONOMY.goal.cash and reputation >= goal.reputation at
-// the end of a day ("Series A closed"). Lose: in debt at the end of
-// ECONOMY.bankruptDays consecutive days ("ran out of runway").
-// save()/load() round-trip the whole park through JSON.
+// Construction. An enclosure is paid for when it's ordered and opens
+// `days` later (BIOMES[].buildDays, or Habitat.buildDays for a workshop
+// design). Until then it has no upkeep and holds no animals.
 //
-// Staff. Keepers are hired as trainees, one per exhibit, and can be
-// reassigned. They gain experience (xp = rounds decoded), which makes
-// them faster, and once they have enough they can take a training
-// course (a fee, and some days of study on the job) to learn the next
-// decoder. Every keeper on the payroll is paid, assigned or not.
+// The company. It starts with a seed round (ROUNDS[0]) and raises round
+// after round until it lists (the IPO wins the game). The player starts
+// a raise; for FUNDING.roadshowDays investors tour the zoo, and at the
+// end they value it (Investors.valuation, which rises with revenue,
+// growth, animals × distance², species, lab upgrades, the round's
+// roadmap and investor confidence). At or above the round's target the
+// round closes: cash in, part of the company sold, a bigger lot. Short of
+// it there may be a bridge offer, or a pass and a cooldown. Investors also
+// drop by for routine tours. During a tour the player can wine and dine
+// them (PERKS). Lose: in debt at the end of ECONOMY.bankruptDays
+// consecutive days ("ran out of runway").
+//
+// Staff. Keepers and exhibits are many-to-many. A keeper splits their
+// time between the stocked exhibits they look after, in proportion to
+// each one's weight (bigger codes need more) shared among the keepers
+// present there. An exhibit runs the most senior present keeper's
+// algorithm at the pooled speed of everyone's share (ExhibitSim falls
+// back to cheaper decoders, then skips rounds, if that's too slow). The
+// same load wears keepers out (staff.js): they book holidays, fall sick,
+// burn out and, if morale sinks, resign. Away keepers don't decode.
+// They gain experience (xp = rounds decoded), which makes them faster,
+// and can take a course to learn the next decoder.
 //
 // The lab. One research project at a time raises one dial of LAB
-// (zoo-data.js) by a level: lower error rates, or a faster syndrome
-// cycle. Every exhibit picks up the new hardware when it completes.
+// (zoo-data.js) by a level. Every exhibit picks up the new hardware when
+// it completes.
 //
 // Discovery and the blueprint book. Only the species in START_KNOWN are
-// known at first. Building a working habitat in the workshop
-// (buildDesign; designs are described in habitat.js) discovers the
-// species it holds: a textbook one, recognised whatever the qubit
-// numbering, unlocks its catalogue habitat; a code nobody has
-// catalogued becomes a new species with a computed placard. Every design
-// built goes into the book (park.book.designs) and can be built again.
-// A habitat holds one animal per logical qubit (k of them).
+// known at first. A habitat built in the workshop (designs are described
+// in habitat.js) discovers its species when it opens: a textbook one,
+// recognised whatever the qubit numbering, unlocks its catalogue habitat;
+// a code nobody has catalogued becomes a new species with a computed
+// placard. Every design built goes into the book (park.book.designs) and
+// can be built again, or deleted. A habitat holds one animal per logical
+// qubit (k of them).
 //
-// Browser: load after ../stabilizer.js, ../detectors.js, zoo-data.js, habitat.js,
-// exhibit-sim.js; exposes `window.Park`. Node: require("./park.js").
+// Browser: load after ../stabilizer.js, ../detectors.js, zoo-data.js,
+// habitat.js, exhibit-sim.js, staff.js, investors.js; exposes
+// `window.Park`. Node: require("./park.js").
 // =========================================================
 (function (root) {
   var isNode = typeof module !== "undefined" && module.exports;
@@ -44,25 +61,30 @@
   var X = isNode ? require("./exhibit-sim.js") : root.ExhibitSim;
   var S = isNode ? require("../stabilizer.js") : root.Stabilizer;
   var Hab = isNode ? require("./habitat.js") : root.Habitat;
-  var ECO = Z.ECONOMY;
+  var Staff = isNode ? require("./staff.js") : root.Staff;
+  var Inv = isNode ? require("./investors.js") : root.Investors;
+  var ECO = Z.ECONOMY, TPD = ECO.ticksPerDay;
+  var DAYS_PER_MONTH = 30;
 
   function createPark(opts) {
     opts = opts || {};
-    var w = ECO.parkSize[0], h = ECO.parkSize[1];
-    return {
-      width: w, height: h,
-      grid: new Array(w * h).fill(null), // cell -> exhibit id
+    var rng = opts.rng || Math.random, seed = Z.ROUNDS[0];
+    var park = {
+      width: 0, height: 0, lotLevel: 0,
+      grid: [],                          // cell -> exhibit id
       exhibits: {},                      // id -> exhibit record
       order: [],                         // ids in build order
       nextId: 1,
       cash: ECO.startingCash,
       reputation: ECO.startingReputation,
+      confidence: Z.CONFIDENCE.start,    // investor confidence, 0–100
       tick: 0,                           // absolute hours since opening
-      today: { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0 },
+      today: freshDay(),
       yesterday: null,
       month: freshMonth(),
-      status: "playing",                 // "playing" | "won" | "lost"
-      freePlay: false,                   // keep running after a win
+      history: [],                       // daily books, newest last (ECO.historyDays)
+      status: "playing",                 // "playing" | "won" (listed) | "lost"
+      freePlay: false,                   // keep running after the IPO
       endDay: null,                      // day the game was won or lost
       daysInDebt: 0,
       totalSick: 0,
@@ -71,24 +93,51 @@
       nextKeeperId: 1,
       lab: { levels: { coherence: 0, gates: 0, readout: 0, cycle: 0 }, project: null },
       book: freshBook(opts.known || Z.START_KNOWN),
-      rng: opts.rng || Math.random
+      funding: {
+        round: 1,                        // index into ROUNDS of the next round
+        stake: 1 - seed.raised / seed.valuation, // founders' share
+        valuation: seed.valuation,       // post-money of the last round
+        history: [{ round: 0, name: seed.name, day: 0, valuation: seed.valuation, raised: seed.raised }],
+        raise: null,                     // { round, startTick, untilTick, tours: [score] }
+        offer: null,                     // a bridge on the table: { round, valuation, share, cash }
+        cooldownUntil: 0,
+        milestones: {}                   // round id -> { metric: true } already celebrated
+      },
+      tour: null,                        // the investor on site, if any
+      nextTourTick: 0,
+      rng: rng
     };
+    setLot(park, 0);
+    park.nextTourTick = tourTickAfter(park, randomDays(park, Z.TOURS.everyDays));
+    return park;
   }
   // known: species id -> tick discovered; designs: [{ id, name,
-  // speciesId, layout }]; custom: species id -> uncatalogued species.
+  // speciesId, layout, retired }]; custom: species id -> uncatalogued species.
   function freshBook(known) {
     var b = { known: {}, designs: [], custom: {}, nextDesign: 1, nextCustom: 1 };
     known.forEach(function (id) { b.known[id] = 0; });
     return b;
   }
-
+  function freshDay() { return { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0, sickBy: {} }; }
   function freshMonth() { return { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0, sickBy: {} }; }
-  var DAYS_PER_MONTH = 30;
 
-  function day(park) { return Math.floor(park.tick / ECO.ticksPerDay) + 1; }
-  function hour(park) { return park.tick % ECO.ticksPerDay; }
+  function day(park) { return Math.floor(park.tick / TPD) + 1; }
+  function hour(park) { return park.tick % TPD; }
+  function dayIndex(park) { return Math.floor(park.tick / TPD); } // 0-based, for staff
+  function randomDays(park, range) { return range[0] + Math.floor(park.rng() * (range[1] - range[0] + 1)); }
 
-  function footprint(biomeId) { return Z.BIOMES[biomeId].footprint; }
+  // ---------- the lot ----------
+  function setLot(park, level) {
+    var lots = ECO.lots, dims = lots[Math.min(level, lots.length - 1)];
+    park.lotLevel = level;
+    park.width = Math.max(park.width, dims[0]);
+    park.height = Math.max(park.height, dims[1]);
+    park.grid = new Array(park.width * park.height).fill(null);
+    park.order.forEach(function (id) { stamp(park, park.exhibits[id], id); });
+  }
+  function stamp(park, rec, value) {
+    for (var dy = 0; dy < rec.h; dy++) for (var dx = 0; dx < rec.w; dx++) park.grid[(rec.y + dy) * park.width + (rec.x + dx)] = value;
+  }
 
   // ---------- species and habitats ----------
   function isKnown(park, speciesId) { return Object.prototype.hasOwnProperty.call(park.book.known, speciesId); }
@@ -109,6 +158,17 @@
     }
     return sp;
   }
+  // Code distance of a species (a lower bound if the search gave up).
+  var distanceCache = new WeakMap();
+  function speciesDistance(park, id) {
+    var sp = speciesInfo(park, id);
+    if (sp.custom) return sp.d !== null ? sp.d : sp.dAtLeast;
+    if (!distanceCache.has(sp.code)) {
+      var r = S.codeDistance(sp.code);
+      distanceCache.set(sp.code, r.d !== null ? r.d : r.atLeast);
+    }
+    return distanceCache.get(sp.code);
+  }
   // A book design's analysis (cached on the entry).
   function designSim(entry) {
     if (!entry.sim) {
@@ -123,14 +183,16 @@
     return null;
   }
   // What every enclosure has, catalogue or designed: { name, cost,
-  // upkeep, footprint, channel, blurb, designed, entry }.
+  // upkeep, footprint, channel, blurb, designed, entry, checks }.
   function habitatOf(park, rec) {
     if (rec.biomeId) {
       var b = Z.BIOMES[rec.biomeId];
-      return { name: b.name, cost: b.cost, upkeep: b.upkeep, footprint: b.footprint, channel: b.climate.channel, blurb: b.blurb, designed: false };
+      return { name: b.name, cost: b.cost, upkeep: b.upkeep, footprint: b.footprint, channel: b.climate.channel, blurb: b.blurb,
+        designed: false, checks: b.checks.length, days: b.buildDays };
     }
     var e = designEntry(park, rec.designId);
     return { name: e.name, cost: rec.cost, upkeep: rec.upkeep, footprint: [rec.w, rec.h], channel: "depolarizing", designed: true, entry: e,
+      checks: e.layout.checks.length, days: rec.days,
       blurb: "Your own design: " + e.layout.qubits.length + " data qubits, " + e.layout.checks.length + " checks, " +
         Hab.wireCount(e.layout) + " wires." };
   }
@@ -140,10 +202,12 @@
     Object.keys(park.book.custom).forEach(function (id) { c.push({ id: id, code: speciesInfo(park, id).code }); });
     return c;
   }
+  function isOpen(rec) { return !rec.building; }
+  function daysLeft(park, rec) { return rec.building ? Math.max(0, Math.ceil((rec.buildUntil - park.tick) / TPD)) : 0; }
 
   // ---------- building ----------
   function fits(park, x, y, fp) {
-    if (x < 0 || y < 0 || x + fp[0] > park.width || y + fp[1] > park.height) return { ok: false, reason: "Doesn't fit inside the park." };
+    if (x < 0 || y < 0 || x + fp[0] > park.width || y + fp[1] > park.height) return { ok: false, reason: "Doesn't fit inside the lot." };
     for (var dy = 0; dy < fp[1]; dy++) for (var dx = 0; dx < fp[0]; dx++) {
       if (park.grid[(y + dy) * park.width + (x + dx)] !== null) return { ok: false, reason: "Overlaps another enclosure." };
     }
@@ -156,13 +220,19 @@
       return { ok: false, reason: "Nobody here knows how to keep the " + Z.SPECIES[biome.native].name +
         " yet. Discover it by building a working habitat for it in the workshop." };
     }
-    var f = fits(park, x, y, footprint(biomeId));
+    var f = fits(park, x, y, biome.footprint);
     if (!f.ok) return f;
-    if (park.cash < biome.cost) return { ok: false, reason: "Not enough funding ($" + biome.cost.toLocaleString() + " needed)." };
+    if (park.cash < biome.cost) return { ok: false, reason: "Not enough funding (" + dollars(biome.cost) + " needed)." };
     return { ok: true, reason: null };
   }
-  function occupy(park, rec, cost) {
-    for (var dy = 0; dy < rec.h; dy++) for (var dx = 0; dx < rec.w; dx++) park.grid[(rec.y + dy) * park.width + (rec.x + dx)] = rec.id;
+  function dollars(v) { return "$" + Math.round(v).toLocaleString("en-US"); }
+  function occupy(park, rec, cost, days) {
+    rec.building = true;
+    rec.buildStart = park.tick;
+    rec.buildUntil = park.tick + days * TPD;
+    rec.keeperIds = [];
+    rec.animal = null;
+    stamp(park, rec, rec.id);
     park.exhibits[rec.id] = rec;
     park.order.push(rec.id);
     park.cash -= cost;
@@ -170,25 +240,25 @@
   function build(park, biomeId, x, y) {
     var check = canBuild(park, biomeId, x, y);
     if (!check.ok) return check;
-    var fp = footprint(biomeId), id = park.nextId++;
+    var b = Z.BIOMES[biomeId], id = park.nextId++;
     var rec = {
-      id: id, biomeId: biomeId, x: x, y: y, w: fp[0], h: fp[1],
+      id: id, biomeId: biomeId, x: x, y: y, w: b.footprint[0], h: b.footprint[1],
       number: park.order.filter(function (o) { return park.exhibits[o].biomeId === biomeId; }).length + 1,
-      keeperId: null, animal: null, builtTick: park.tick
+      builtTick: park.tick
     };
-    occupy(park, rec, Z.BIOMES[biomeId].cost);
+    occupy(park, rec, b.cost, b.buildDays);
     return { ok: true, exhibit: rec };
   }
 
   // What a design would hold: { analysis, speciesId (null: a species
   // nobody has catalogued), known (already discovered here), entry (the
   // same design already in the book, or null) }.
-  var studyCache = {};
+  var studyCache = {}, studyCount = 0;
   function studyDesign(park, design) {
     var key = JSON.stringify(design);
     var hit = studyCache[key];
     if (!hit) {
-      if (Object.keys(studyCache).length > 200) studyCache = {};
+      if (++studyCount > 200) { studyCache = {}; studyCount = 1; }
       var a = Hab.analyze(design);
       hit = { analysis: a, textbook: a.valid ? Hab.identify(a.code, Hab.textbook()) : null };
       studyCache[key] = hit;
@@ -199,8 +269,12 @@
       match = Hab.identify(hit.analysis.code, custom);
     }
     var entry = null;
-    park.book.designs.forEach(function (e) { if (JSON.stringify(e.layout) === key) entry = e; });
+    park.book.designs.forEach(function (e) { if (!entry && layoutKey(e) === key) entry = e; });
     return { analysis: hit.analysis, speciesId: match ? match.id : null, known: !!match && isKnown(park, match.id), entry: entry };
+  }
+  function layoutKey(entry) {
+    if (!entry.key) hidden(entry, "key", JSON.stringify(entry.layout));
+    return entry.key;
   }
   function canBuildDesign(park, design, x, y) {
     var bad = Hab.malformed(design);
@@ -209,12 +283,13 @@
     if (!a.valid) return { ok: false, reason: a.problems[0], study: st };
     var f = fits(park, x, y, a.footprint);
     if (!f.ok) return { ok: false, reason: f.reason, study: st };
-    if (park.cash < a.cost) return { ok: false, reason: "Not enough funding ($" + a.cost.toLocaleString() + " needed).", study: st };
+    if (park.cash < a.cost) return { ok: false, reason: "Not enough funding (" + dollars(a.cost) + " needed).", study: st };
     return { ok: true, reason: null, study: st };
   }
   // Build a design at (x, y). opts: { name } for a species nobody has
-  // catalogued. Returns { ok, exhibit, speciesId, discovered (first time
-  // here), newSpecies (uncatalogued), entry (its book entry) }.
+  // catalogued. Its species is discovered when the habitat opens.
+  // Returns { ok, exhibit, speciesId, discovers (it will discover a
+  // species when it opens), newSpecies (uncatalogued), entry (its book entry) }.
   function buildDesign(park, design, x, y, opts) {
     opts = opts || {};
     var c = canBuildDesign(park, design, x, y);
@@ -231,27 +306,27 @@
         glyph: gl[(num - 1) % gl.length], appeal: Hab.customAppeal(d), cost: Hab.customCost(d),
         n: a.n, k: a.k, d: a.d, dAtLeast: a.dAtLeast,
         params: "[[" + a.n + "," + a.k + "," + (a.d !== null ? a.d : "≥" + a.dAtLeast) + "]]" + (a.k > 1 ? " (" + a.k + " animals)" : ""),
-        checks: a.code.stabilizers.map(S.toString), discoveredTick: park.tick
+        checks: a.code.stabilizers.map(S.toString), discoveredTick: null
       };
       park.book.custom[speciesId] = sp;
       hidden(sp, "code", a.code);
     }
-    var discovered = !isKnown(park, speciesId);
-    if (discovered) park.book.known[speciesId] = park.tick;
     var entry = st.entry;
     if (!entry) {
       var spName = speciesInfo(park, speciesId).name, same = park.book.designs.filter(function (e) { return e.speciesId === speciesId; }).length;
       entry = { id: park.book.nextDesign++, name: spName + " habitat" + (same ? " " + (same + 1) : ""), speciesId: speciesId, layout: Hab.clone(design) };
       park.book.designs.push(entry);
     }
+    entry.retired = false;
     var id = park.nextId++;
     var rec = {
       id: id, biomeId: null, designId: entry.id, x: x, y: y, w: a.footprint[0], h: a.footprint[1],
       number: park.order.filter(function (o) { return park.exhibits[o].designId === entry.id; }).length + 1,
-      cost: a.cost, upkeep: a.upkeep, keeperId: null, animal: null, builtTick: park.tick
+      cost: a.cost, upkeep: a.upkeep, days: a.days, builtTick: park.tick,
+      discovers: isKnown(park, speciesId) ? null : speciesId
     };
-    occupy(park, rec, a.cost);
-    return { ok: true, exhibit: rec, speciesId: speciesId, discovered: discovered, newSpecies: newSpecies, entry: entry };
+    occupy(park, rec, a.cost, a.days);
+    return { ok: true, exhibit: rec, speciesId: speciesId, discovers: !!rec.discovers, newSpecies: newSpecies, entry: entry };
   }
   // Rename a species discovered here (catalogued ones keep their names).
   function renameSpecies(park, id, name) {
@@ -262,26 +337,65 @@
     if (sp.code) sp.code.name = name;
     return { ok: true };
   }
+  // ---------- the blueprint book ----------
+  function designInUse(park, designId) {
+    return park.order.some(function (id) { return park.exhibits[id].designId === designId; });
+  }
+  // Delete a blueprint. One that enclosures still use leaves the build
+  // menu now and the book once the last of them is demolished.
+  function deleteDesign(park, designId) {
+    var e = designEntry(park, designId);
+    if (!e) return { ok: false, reason: "No such blueprint." };
+    if (designInUse(park, designId)) { e.retired = true; return { ok: true, retired: true }; }
+    park.book.designs = park.book.designs.filter(function (d) { return d.id !== designId; });
+    return { ok: true, retired: false };
+  }
+  function pruneDesign(park, designId) {
+    var e = designEntry(park, designId);
+    if (e && e.retired && !designInUse(park, designId)) deleteDesign(park, designId);
+  }
+  // Can an uncatalogued species be dropped from the field guide (and its
+  // blueprints from the book)? Only while nothing in the zoo holds it.
+  function canForgetSpecies(park, id) {
+    if (!park.book.custom[id]) return { ok: false, reason: "Only species discovered here can be dropped." };
+    var used = park.order.some(function (eid) {
+      var rec = park.exhibits[eid], e = rec.designId && designEntry(park, rec.designId);
+      return (rec.animal && rec.animal.speciesId === id) || (e && e.speciesId === id);
+    });
+    return used ? { ok: false, reason: "Demolish its habitats first." } : { ok: true, reason: null };
+  }
+  function forgetSpecies(park, id) {
+    var c = canForgetSpecies(park, id);
+    if (!c.ok) return c;
+    delete park.book.custom[id];
+    delete park.book.known[id];
+    park.book.designs = park.book.designs.filter(function (e) { return e.speciesId !== id; });
+    return { ok: true };
+  }
+
   function exhibitAt(park, x, y) {
     if (x < 0 || y < 0 || x >= park.width || y >= park.height) return null;
     var id = park.grid[y * park.width + x];
     return id === null ? null : park.exhibits[id];
   }
-  // Demolishing refunds part of the build cost; the animal is rehomed
-  // (lost, no refund) and the keeper let go.
+  // Demolishing refunds part of the build cost (also mid-construction);
+  // the animals are rehomed (lost, no refund) and the keepers stay on
+  // the payroll, minus this exhibit.
   function demolish(park, id) {
     var rec = park.exhibits[id];
     if (!rec) return { ok: false, reason: "No such enclosure." };
-    if (rec.keeperId) park.keepers[rec.keeperId].exhibitId = null; // back to the staff room
-    for (var i = 0; i < park.grid.length; i++) if (park.grid[i] === id) park.grid[i] = null;
+    rec.keeperIds.slice().forEach(function (kid) { unassignKeeper(park, kid, id); });
+    stamp(park, rec, null);
     delete park.exhibits[id];
     park.order = park.order.filter(function (o) { return o !== id; });
+    if (park.tour) park.tour.route = park.tour.route.filter(function (o) { return o !== id; });
     var refund = Math.round(habitatOf(park, rec).cost * ECO.demolishRefund);
     park.cash += refund;
+    if (rec.designId) pruneDesign(park, rec.designId);
     return { ok: true, refund: refund };
   }
 
-  // ---------- animals & keepers ----------
+  // ---------- animals ----------
   // Animals per enclosure: one per logical qubit.
   function animalCount(park, speciesId) { return speciesInfo(park, speciesId).code.logicalX.length; }
   // Price of stocking an enclosure with this species (every animal).
@@ -315,19 +429,21 @@
   function buyAnimal(park, id, speciesId) {
     var rec = park.exhibits[id];
     if (!rec) return { ok: false, reason: "No such enclosure." };
+    if (rec.building) return { ok: false, reason: "Still under construction (" + daysLeft(park, rec) + " days to go)." };
     if (rec.animal) return { ok: false, reason: "This enclosure already has a resident." };
     if (!speciesInfo(park, speciesId)) return { ok: false, reason: "No such species." };
     var pl = placement(park, rec, speciesId);
     if (!pl.ok) return pl;
     var cost = stockCost(park, speciesId);
-    if (park.cash < cost) return { ok: false, reason: "Not enough funding ($" + cost.toLocaleString() + " needed)." };
+    if (park.cash < cost) return { ok: false, reason: "Not enough funding (" + dollars(cost) + " needed)." };
     park.cash -= cost;
     rec.animalTick = park.tick;
     var sim = simFor(park, rec);
     rec.animal = X.createExhibit({
       speciesId: speciesId, code: sim.code, checks: sim.checks, channel: habitatOf(park, rec).channel,
-      lab: labValues(park), keeper: keeperOnDuty(park, rec), rng: park.rng
+      lab: labValues(park), keeper: null, rng: park.rng
     });
+    syncDuty(park);
     return { ok: true };
   }
 
@@ -337,52 +453,97 @@
     return Math.min(sp.max, sp.base + k.xp * sp.perXp);
   }
   function keeperSalary(k) { return Z.KEEPER_LEVELS[k.level].salary; }
-  // The keeper working an exhibit right now (null if none).
-  function keeperOnDuty(park, rec) {
-    var k = rec.keeperId ? park.keepers[rec.keeperId] : null;
-    return k ? { level: k.level, speed: keeperSpeed(k) } : null;
+  function keeperPresent(k) { return Staff.present(k); }
+  // How much looking after an exhibit takes (bigger codes need more).
+  function exhibitWeight(park, rec) {
+    var w = Z.STAFF.keeper.exhibitWeight;
+    return w.base + w.perCheck * (rec.animal ? rec.animal.mem.checks.length : habitatOf(park, rec).checks);
   }
-  function syncKeeper(park, rec) {
-    if (rec.animal) X.setKeeper(rec.animal, keeperOnDuty(park, rec));
+  // Who is decoding where right now. Returns
+  //   { loads: keeper id -> load, exhibits: exhibit id -> { level, speed,
+  //     shares: keeper id -> speed share } | null }.
+  // Only stocked, open exhibits need anyone. `assumeAllPresent` gives the
+  // planned split (for costs), ignoring who's away.
+  function staffing(park, assumeAllPresent) {
+    var here = {}, loads = {}, out = {};
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id];
+      if (!rec.animal) return;
+      here[id] = rec.keeperIds.filter(function (kid) { return assumeAllPresent || keeperPresent(park.keepers[kid]); });
+    });
+    park.keeperOrder.forEach(function (kid) {
+      var k = park.keepers[kid], L = 0;
+      if (!assumeAllPresent && !keeperPresent(k)) { loads[kid] = 0; return; }
+      k.exhibitIds.forEach(function (eid) { if (here[eid]) L += exhibitWeight(park, park.exhibits[eid]) / here[eid].length; });
+      loads[kid] = L;
+    });
+    Object.keys(here).forEach(function (id) {
+      var ids = here[id];
+      if (!ids.length) { out[id] = null; return; }
+      var rec = park.exhibits[id], w = exhibitWeight(park, rec) / ids.length, speed = 0, level = 0, shares = {};
+      ids.forEach(function (kid) {
+        var k = park.keepers[kid], s = keeperSpeed(k) * w / loads[kid];
+        shares[kid] = s; speed += s; level = Math.max(level, k.level);
+      });
+      out[id] = { level: level, speed: speed, shares: shares };
+    });
+    return { loads: loads, exhibits: out };
   }
+  // Push the current staffing into every animal's simulation.
+  function syncDuty(park) {
+    var st = staffing(park, false);
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id];
+      if (rec.animal) X.setKeeper(rec.animal, st.exhibits[id] || null);
+    });
+    return st;
+  }
+  // The decoding effort an exhibit gets right now (null if nobody's there).
+  function keeperOnDuty(park, rec) { return staffing(park, false).exhibits[rec.id] || null; }
   // Hire a trainee; with exhibitId, put them straight to work there.
   function hireKeeper(park, exhibitId) {
     var id = park.nextKeeperId++;
     var names = Z.KEEPER_NAMES;
-    var k = { id: id, name: names[(id - 1) % names.length] + (id > names.length ? " " + (Math.floor((id - 1) / names.length) + 1) : ""),
-      level: 1, xp: 0, exhibitId: null, training: null, hiredTick: park.tick };
+    var k = Staff.create("keeper", dayIndex(park));
+    k.id = id;
+    k.name = names[(id - 1) % names.length] + (id > names.length ? " " + (Math.floor((id - 1) / names.length) + 1) : "");
+    k.level = 1; k.xp = 0; k.exhibitIds = []; k.training = null; k.hiredTick = park.tick;
     park.keepers[id] = k;
     park.keeperOrder.push(id);
     if (exhibitId) assignKeeper(park, id, exhibitId);
     return { ok: true, keeper: k };
   }
-  // Move a keeper to an exhibit (or to the staff room with exhibitId null).
-  // Whoever worked there before goes to the staff room.
+  // Add an exhibit to a keeper's rounds (exhibitId null: back to the
+  // staff room, off every exhibit).
   function assignKeeper(park, keeperId, exhibitId) {
     var k = park.keepers[keeperId];
     if (!k) return { ok: false, reason: "No such keeper." };
-    var rec = exhibitId ? park.exhibits[exhibitId] : null;
-    if (exhibitId && !rec) return { ok: false, reason: "No such enclosure." };
-    if (k.exhibitId && park.exhibits[k.exhibitId]) {
-      var old = park.exhibits[k.exhibitId];
-      old.keeperId = null;
-      syncKeeper(park, old);
+    if (exhibitId === null || exhibitId === undefined) {
+      k.exhibitIds.slice().forEach(function (eid) { unassignKeeper(park, keeperId, eid); });
+      return { ok: true };
     }
-    k.exhibitId = null;
-    if (rec) {
-      if (rec.keeperId && rec.keeperId !== keeperId) park.keepers[rec.keeperId].exhibitId = null;
-      rec.keeperId = keeperId;
-      k.exhibitId = rec.id;
-      syncKeeper(park, rec);
-    }
+    var rec = park.exhibits[exhibitId];
+    if (!rec) return { ok: false, reason: "No such enclosure." };
+    if (k.exhibitIds.indexOf(rec.id) < 0) k.exhibitIds.push(rec.id);
+    if (rec.keeperIds.indexOf(keeperId) < 0) rec.keeperIds.push(keeperId);
+    syncDuty(park);
     return { ok: true };
   }
-  function fireKeeper(park, keeperId) {
-    var k = park.keepers[keeperId];
-    if (!k) return { ok: false, reason: "No such keeper." };
+  function unassignKeeper(park, keeperId, exhibitId) {
+    var k = park.keepers[keeperId], rec = park.exhibits[exhibitId];
+    if (k) k.exhibitIds = k.exhibitIds.filter(function (e) { return e !== exhibitId; });
+    if (rec) rec.keeperIds = rec.keeperIds.filter(function (i) { return i !== keeperId; });
+    syncDuty(park);
+    return { ok: true };
+  }
+  function removeKeeper(park, keeperId) {
     assignKeeper(park, keeperId, null);
     delete park.keepers[keeperId];
     park.keeperOrder = park.keeperOrder.filter(function (i) { return i !== keeperId; });
+  }
+  function fireKeeper(park, keeperId) {
+    if (!park.keepers[keeperId]) return { ok: false, reason: "No such keeper." };
+    removeKeeper(park, keeperId);
     return { ok: true };
   }
   function canTrain(park, keeperId) {
@@ -392,7 +553,7 @@
     if (k.level >= Z.MAX_KEEPER_LEVEL) return { ok: false, reason: k.name + " already knows every decoder we can teach." };
     var t = Z.TRAINING[k.level + 1];
     if (k.xp < t.xp) return { ok: false, reason: k.name + " needs " + Math.ceil(t.xp - k.xp) + " more rounds of experience.", course: t };
-    if (park.cash < t.fee) return { ok: false, reason: "Not enough funding ($" + t.fee.toLocaleString() + " needed).", course: t };
+    if (park.cash < t.fee) return { ok: false, reason: "Not enough funding (" + dollars(t.fee) + " needed).", course: t };
     return { ok: true, reason: null, course: t };
   }
   // Enrol a keeper on the course for the next level. They keep working
@@ -402,12 +563,38 @@
     if (!c.ok) return c;
     var k = park.keepers[keeperId];
     park.cash -= c.course.fee;
-    k.training = { toLevel: k.level + 1, untilTick: park.tick + c.course.days * ECO.ticksPerDay };
+    k.training = { toLevel: k.level + 1, untilTick: park.tick + c.course.days * TPD };
     return { ok: true, until: k.training.untilTick };
+  }
+  function sendOnVacation(park, keeperId, days) {
+    var k = park.keepers[keeperId];
+    if (!k) return { ok: false, reason: "No such keeper." };
+    var r = Staff.sendOnVacation(k, dayIndex(park), days);
+    if (r.ok) syncDuty(park);
+    return r;
+  }
+  function bonusCost(k) { return Z.STAFF.keeper.bonus.salaryDays * keeperSalary(k); }
+  function canBonus(park, keeperId) {
+    var k = park.keepers[keeperId], b = Z.STAFF.keeper.bonus;
+    if (!k) return { ok: false, reason: "No such keeper." };
+    var wait = k.lastBonusDay + b.cooldownDays - dayIndex(park);
+    if (wait > 0) return { ok: false, reason: "Another bonus so soon would look desperate (" + wait + " days)." };
+    if (park.cash < bonusCost(k)) return { ok: false, reason: "Not enough funding (" + dollars(bonusCost(k)) + " needed)." };
+    return { ok: true, reason: null, cost: bonusCost(k) };
+  }
+  function giveBonus(park, keeperId) {
+    var c = canBonus(park, keeperId);
+    if (!c.ok) return c;
+    var k = park.keepers[keeperId];
+    park.cash -= c.cost;
+    k.lastBonusDay = dayIndex(park);
+    Staff.addMorale(k, Z.STAFF.keeper.bonus.morale);
+    return { ok: true, cost: c.cost };
   }
 
   // ---------- the lab ----------
   function labValues(park) { return X.labValues(park.lab.levels); }
+  function labLevels(park) { var n = 0; for (var d in park.lab.levels) n += park.lab.levels[d]; return n; }
   function canResearch(park, dial) {
     var d = Z.LAB[dial];
     if (!d) return { ok: false, reason: "No such research." };
@@ -415,14 +602,14 @@
     if (park.lab.project) return { ok: false, reason: "The lab is busy with " + Z.LAB[park.lab.project.dial].name.toLowerCase() + "." };
     if (lvl + 1 >= d.values.length) return { ok: false, reason: d.name + " is fully upgraded." };
     var step = Z.RESEARCH[lvl + 1];
-    if (park.cash < step.fee) return { ok: false, reason: "Not enough funding ($" + step.fee.toLocaleString() + " needed).", step: step };
+    if (park.cash < step.fee) return { ok: false, reason: "Not enough funding (" + dollars(step.fee) + " needed).", step: step };
     return { ok: true, reason: null, step: step };
   }
   function startResearch(park, dial) {
     var c = canResearch(park, dial);
     if (!c.ok) return c;
     park.cash -= c.step.fee;
-    park.lab.project = { dial: dial, untilTick: park.tick + c.step.days * ECO.ticksPerDay, startTick: park.tick };
+    park.lab.project = { dial: dial, untilTick: park.tick + c.step.days * TPD, startTick: park.tick };
     return { ok: true, until: park.lab.project.untilTick };
   }
 
@@ -434,9 +621,16 @@
     return ECO.visitorsPerAppeal * speciesInfo(park, rec.animal.speciesId).appeal * rec.animal.k * (rec.animal.health / 100) *
       reputationFactor(park);
   }
-  // Upkeep plus the salary of the keeper assigned here.
+  // Upkeep plus this exhibit's share of its keepers' salaries.
   function exhibitCosts(park, rec) {
-    return habitatOf(park, rec).upkeep + (rec.keeperId ? keeperSalary(park.keepers[rec.keeperId]) : 0);
+    var cost = isOpen(rec) ? habitatOf(park, rec).upkeep : 0;
+    if (!rec.animal || !rec.keeperIds.length) return cost;
+    var st = staffing(park, true), w = exhibitWeight(park, rec) / rec.keeperIds.length;
+    rec.keeperIds.forEach(function (kid) {
+      var L = st.loads[kid];
+      if (L > 0) cost += keeperSalary(park.keepers[kid]) * w / L;
+    });
+    return cost;
   }
   // Current daily rates (what the top bar shows).
   function rates(park) {
@@ -444,68 +638,264 @@
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
       visitors += exhibitVisitors(park, rec);
-      costs += habitatOf(park, rec).upkeep;
+      if (isOpen(rec)) costs += habitatOf(park, rec).upkeep;
     });
     park.keeperOrder.forEach(function (id) { costs += keeperSalary(park.keepers[id]); });
     var revenue = visitors * ECO.ticketPrice;
     return { visitors: visitors, revenue: revenue, costs: costs, net: revenue - costs };
   }
 
+  // ---------- investors ----------
+  function avgOf(list, f) { return list.length ? list.reduce(function (a, x) { return a + f(x); }, 0) / list.length : 0; }
+  // Everything investors look at (see investors.js).
+  function metrics(park) {
+    var h = park.history, last7 = h.slice(-7), last30 = h.slice(-30), prev30 = h.slice(-60, -30);
+    var revenue = last7.length ? avgOf(last7, function (d) { return d.revenue; }) : rates(park).revenue;
+    var r30 = avgOf(last30, function (d) { return d.revenue; }), p30 = avgOf(prev30, function (d) { return d.revenue; });
+    var growth = p30 < 500 ? (r30 >= 500 ? 1 : 0) : Math.max(-1, Math.min(1, r30 / p30 - 1));
+    var animals = 0, healthSum = 0, techUnits = 0, best = 0;
+    park.order.forEach(function (id) {
+      var an = park.exhibits[id].animal;
+      if (!an) return;
+      var d = speciesDistance(park, an.speciesId);
+      animals += an.k; healthSum += an.health * an.k;
+      techUnits += an.k * d * d * an.health / 100;
+      best = Math.max(best, d);
+    });
+    var animalDays = 0, sick = 0;
+    last30.forEach(function (d) { animalDays += d.animals; sick += d.sick; });
+    var keepers = park.keeperOrder.map(function (id) { return park.keepers[id]; });
+    var m = {
+      revenue: revenue, growth: growth, logicalQubits: animals, health: animals ? healthSum / animals : 0,
+      techUnits: techUnits, bestDistance: best, species: Object.keys(park.book.known).length,
+      labLevels: labLevels(park), headKeepers: keepers.filter(function (k) { return k.level >= Z.MAX_KEEPER_LEVEL; }).length,
+      errorRate: animalDays ? sick / animalDays : 0,
+      morale: keepers.length ? avgOf(keepers, function (k) { return k.morale; }) : 50
+    };
+    m.roadmapShare = Inv.roadmap(Math.min(park.funding.round, Z.ROUNDS.length - 1), m).share;
+    return m;
+  }
+  function currentRound(park) { return Z.ROUNDS[Math.min(park.funding.round, Z.ROUNDS.length - 1)]; }
+  function valuation(park) { return Inv.valuation(Math.min(park.funding.round, Z.ROUNDS.length - 1), metrics(park), park.confidence); }
+  function nudgeConfidence(park, delta) { park.confidence = Math.max(0, Math.min(100, park.confidence + delta)); }
+
+  function canRaise(park) {
+    var f = park.funding;
+    if (park.status !== "playing") return { ok: false, reason: park.status === "won" ? "You're already listed." : "The game is over." };
+    if (f.round >= Z.ROUNDS.length) return { ok: false, reason: "No more rounds to raise." };
+    if (f.raise) return { ok: false, reason: "The roadshow is under way." };
+    if (f.offer) return { ok: false, reason: "Answer the bridge offer first." };
+    if (park.tick < f.cooldownUntil) return { ok: false, reason: "Investors want to see progress first (" + Math.ceil((f.cooldownUntil - park.tick) / TPD) + " days)." };
+    return { ok: true, reason: null };
+  }
+  // Start the roadshow for the next round. It ends after
+  // FUNDING.roadshowDays with a verdict ("round" event).
+  function startRaise(park) {
+    var c = canRaise(park);
+    if (!c.ok) return c;
+    park.funding.raise = { round: park.funding.round, startTick: park.tick, untilTick: park.tick + Z.FUNDING.roadshowDays * TPD, tours: [] };
+    if (!park.tour) park.nextTourTick = Math.min(park.nextTourTick, tourTickAfter(park, 0));
+    return { ok: true, until: park.funding.raise.untilTick };
+  }
+  function closeRound(park, roundIndex, value, share, bridge) {
+    var f = park.funding, r = Z.ROUNDS[roundIndex], cash = value * share;
+    park.cash += cash;
+    f.stake *= 1 - share;
+    f.valuation = value;
+    f.history.push({ round: roundIndex, name: r.name + (bridge ? " bridge" : ""), day: day(park), valuation: value, raised: cash, bridge: !!bridge });
+    if (!bridge) {
+      f.round = roundIndex + 1;
+      setLot(park, park.lotLevel + 1);
+      f.cooldownUntil = park.tick + Z.FUNDING.afterCloseDays * TPD;
+      if (r.ipo) { park.status = "won"; park.endDay = day(park); }
+    }
+    return cash;
+  }
+  function finishRaise(park) {
+    var f = park.funding, raise = f.raise, ri = raise.round, r = Z.ROUNDS[ri];
+    f.raise = null;
+    var val = Inv.valuation(ri, metrics(park), park.confidence), ratio = val.value / r.target;
+    var tier = Inv.roundTier(ratio), ev = {
+      type: "round", round: ri, name: r.name, target: r.target, valuation: val.value, ratio: ratio, tier: tier,
+      breakdown: val, tours: raise.tours.slice(), quotes: Inv.roundQuotes(tier, !!r.ipo, park.rng), raised: 0, ipo: !!r.ipo
+    };
+    if (ratio >= 1) {
+      ev.outcome = "closed";
+      ev.raised = closeRound(park, ri, val.value, r.raise, false);
+      ev.stake = f.stake;
+      nudgeConfidence(park, 5);
+    } else if (tier === "bridge") {
+      ev.outcome = "bridge";
+      f.offer = { round: ri, valuation: val.value, share: Z.FUNDING.bridgeRaise, cash: val.value * Z.FUNDING.bridgeRaise };
+      ev.offer = f.offer;
+    } else {
+      ev.outcome = "pass";
+      f.cooldownUntil = park.tick + Z.FUNDING.cooldownDays * TPD;
+      nudgeConfidence(park, -5);
+    }
+    return ev;
+  }
+  function acceptOffer(park) {
+    var f = park.funding, o = f.offer;
+    if (!o) return { ok: false, reason: "No offer on the table." };
+    f.offer = null;
+    f.cooldownUntil = park.tick + Z.FUNDING.cooldownDays * TPD;
+    return { ok: true, raised: closeRound(park, o.round, o.valuation, o.share, true) };
+  }
+  function declineOffer(park) {
+    if (!park.funding.offer) return { ok: false, reason: "No offer on the table." };
+    park.funding.offer = null;
+    park.funding.cooldownUntil = park.tick + Z.FUNDING.cooldownDays * TPD;
+    return { ok: true };
+  }
+
+  // ---------- tours ----------
+  // The tick of the tour start hour, `days` days from now (today if it
+  // hasn't started yet and days is 0).
+  function tourTickAfter(park, days) {
+    var t = (Math.floor(park.tick / TPD) + days) * TPD + Z.TOURS.start;
+    return t > park.tick ? t : t + TPD;
+  }
+  // Up to TOURS.stops stocked exhibits, the investors drawn to the
+  // biggest draws. A tour guide (not hireable yet) would choose instead.
+  function chooseRoute(park, guide) {
+    var pool = park.order.filter(function (id) { return park.exhibits[id].animal; });
+    var route = [];
+    while (route.length < Z.TOURS.stops && pool.length) {
+      var weights = pool.map(function (id) { var an = park.exhibits[id].animal; return speciesInfo(park, an.speciesId).appeal * an.k; });
+      var total = weights.reduce(function (a, b) { return a + b; }, 0), r = park.rng() * total, i = 0;
+      while (i < pool.length - 1 && r >= weights[i]) { r -= weights[i]; i++; }
+      route.push(pool[i]);
+      pool.splice(i, 1);
+    }
+    return route;
+  }
+  function startTour(park) {
+    var route = chooseRoute(park, null);
+    if (!route.length) return null;
+    var inv = Inv.randomInvestor(park.rng);
+    park.tour = {
+      investor: inv, focus: inv.focus, route: route, incidents: 0, perk: null, guide: null,
+      startTick: park.tick, endTick: park.tick + (Z.TOURS.end - Z.TOURS.start), roadshow: !!park.funding.raise
+    };
+    return park.tour;
+  }
+  function canPerk(park, perkId) {
+    var p = Inv.perkInfo(perkId);
+    if (!p) return { ok: false, reason: "No such treat." };
+    if (!park.tour) return { ok: false, reason: "No investor is visiting." };
+    if (park.tour.perk) return { ok: false, reason: "They've already been wined and dined today." };
+    if (park.cash < p.cost) return { ok: false, reason: "Not enough funding (" + dollars(p.cost) + " needed)." };
+    return { ok: true, reason: null, perk: p };
+  }
+  function buyPerk(park, perkId) {
+    var c = canPerk(park, perkId);
+    if (!c.ok) return c;
+    park.cash -= c.perk.cost;
+    park.tour.perk = perkId;
+    return { ok: true, perk: c.perk };
+  }
+  function endTour(park) {
+    var t = park.tour;
+    park.tour = null;
+    var m = metrics(park), animals = 0, health = 0;
+    t.route.forEach(function (id) {
+      var an = park.exhibits[id] && park.exhibits[id].animal;
+      if (an) { animals += an.k; health += an.health * an.k; }
+    });
+    var imp = Inv.impression(t, m, { health: animals ? health / animals : null });
+    var before = park.confidence;
+    nudgeConfidence(park, Z.CONFIDENCE.tourWeight * (imp.score - 50));
+    var tier = Inv.tourTier(imp.score, t.incidents);
+    if (park.funding.raise) park.funding.raise.tours.push(imp.score);
+    park.nextTourTick = park.funding.raise ? tourTickAfter(park, Z.FUNDING.roadshowTourEvery)
+      : tourTickAfter(park, randomDays(park, Z.TOURS.everyDays));
+    return {
+      type: "tour", investor: t.investor, focus: t.focus, route: t.route, incidents: t.incidents, perk: t.perk,
+      score: imp.score, scores: imp.scores, weakest: imp.weakest, strongest: imp.strongest, tier: tier,
+      quote: Inv.pick(Z.QUOTES.tour[tier], park.rng), confidence: park.confidence, delta: park.confidence - before
+    };
+  }
+
   // ---------- time ----------
   // Advance the whole park by one tick (one hour). Returns events:
-  //   { type: "sick", exhibitId, speciesId, animal, kind, cause, bill }
+  //   { type: "sick", exhibitId, speciesId, animal, kind, cause, bill, onTour }
+  //   { type: "built", exhibitId } / { type: "discovered", exhibitId, speciesId, newSpecies }
   //   { type: "day", day, revenue, expenses, vet, visitors, sick, reputation }
   //   { type: "debt", daysInDebt, daysLeft }       (end of a day spent in debt)
-  //   { type: "investor", month, revenue, expenses, vet, visitors, sick,
-  //     net, dailyNet, runwayDays, sickest: { exhibitId, count } | null }
-  //   { type: "won", day } / { type: "lost", day }
+  //   { type: "month", month, revenue, expenses, vet, visitors, sick, net,
+  //     dailyNet, runwayDays, currentNet, growth, quote, sickest }
   //   { type: "trained", keeperId, name, level }
   //   { type: "research", dial, level, value }
+  //   { type: "staff", keeperId, name, kind, days, fromDay } (staff.js event kinds)
+  //   { type: "tour-start", tour } / { type: "tour", … } (see endTour)
+  //   { type: "milestone", round, label }
+  //   { type: "round", outcome: "closed" | "bridge" | "pass", … } (see finishRaise)
+  //   { type: "lost", day }
   // A lost game, or a won one the player hasn't chosen to continue,
   // no longer advances.
   function tick(park) {
     var events = [];
     if (park.status === "lost" || (park.status === "won" && !park.freePlay)) return events;
-    var perTick = 1 / ECO.ticksPerDay;
+    var perTick = 1 / TPD;
     var r = rates(park);
     park.cash += (r.revenue - r.costs) * perTick;
-    park.today.revenue += r.revenue * perTick;
-    park.today.expenses += r.costs * perTick;
-    park.today.visitors += r.visitors * perTick;
-    park.month.revenue += r.revenue * perTick;
-    park.month.expenses += r.costs * perTick;
-    park.month.visitors += r.visitors * perTick;
+    ["revenue", "expenses", "visitors"].forEach(function (key, i) {
+      var v = [r.revenue, r.costs, r.visitors][i] * perTick;
+      park.today[key] += v;
+      park.month[key] += v;
+    });
 
+    var st = syncDuty(park), tour = park.tour;
     park.order.forEach(function (id) {
       var rec = park.exhibits[id];
       if (!rec.animal) return;
-      syncKeeper(park, rec); // speed grows with experience
       var before = rec.animal.decoded;
       X.runTick(rec.animal).forEach(function (s) {
         park.cash -= ECO.vetBill;
-        park.today.vet += ECO.vetBill;
-        park.today.sick++;
-        park.month.vet += ECO.vetBill;
-        park.month.sick++;
-        park.totalSick++;
+        park.today.vet += ECO.vetBill; park.today.sick++;
+        park.today.sickBy[id] = (park.today.sickBy[id] || 0) + 1;
+        park.month.vet += ECO.vetBill; park.month.sick++;
         park.month.sickBy[id] = (park.month.sickBy[id] || 0) + 1;
+        park.totalSick++;
         park.reputation = Math.max(0, park.reputation - ECO.sickReputationHit);
-        events.push({ type: "sick", exhibitId: id, speciesId: rec.animal.speciesId, animal: s.animal, kind: s.kind, cause: s.cause, bill: ECO.vetBill });
+        var onTour = !!tour && tour.route.indexOf(id) >= 0;
+        if (onTour) tour.incidents++;
+        events.push({ type: "sick", exhibitId: id, speciesId: rec.animal.speciesId, animal: s.animal, kind: s.kind, cause: s.cause,
+          bill: ECO.vetBill, onTour: onTour });
       });
-      if (rec.keeperId) park.keepers[rec.keeperId].xp += rec.animal.decoded - before;
+      var done = rec.animal.decoded - before, duty = st.exhibits[id];
+      if (done && duty) Object.keys(duty.shares).forEach(function (kid) { park.keepers[kid].xp += done * duty.shares[kid] / duty.speed; });
     });
 
     park.tick++;
-    // Courses and research that finished this hour.
+    // Construction, courses and research that finished this hour.
+    park.order.forEach(function (id) {
+      var rec = park.exhibits[id];
+      if (!rec.building || park.tick < rec.buildUntil) return;
+      rec.building = false;
+      events.push({ type: "built", exhibitId: id });
+      if (rec.discovers && !isKnown(park, rec.discovers)) {
+        park.book.known[rec.discovers] = park.tick;
+        var csp = park.book.custom[rec.discovers];
+        if (csp) csp.discoveredTick = park.tick;
+        nudgeConfidence(park, Z.CONFIDENCE.discovery);
+        events.push({ type: "discovered", exhibitId: id, speciesId: rec.discovers, newSpecies: !!csp });
+      }
+      rec.discovers = null;
+    });
+    var retrained = false;
     park.keeperOrder.forEach(function (kid) {
       var k = park.keepers[kid];
       if (k.training && park.tick >= k.training.untilTick) {
         k.level = k.training.toLevel;
         k.training = null;
-        if (k.exhibitId) syncKeeper(park, park.exhibits[k.exhibitId]);
+        Staff.addMorale(k, Z.STAFF.keeper.morale.trained);
         events.push({ type: "trained", keeperId: kid, name: k.name, level: k.level });
+        retrained = true;
       }
     });
+    if (retrained) syncDuty(park);
     var proj = park.lab.project;
     if (proj && park.tick >= proj.untilTick) {
       park.lab.levels[proj.dial]++;
@@ -514,63 +904,106 @@
       park.order.forEach(function (id) { if (park.exhibits[id].animal) X.setLab(park.exhibits[id].animal, lab); });
       events.push({ type: "research", dial: proj.dial, level: park.lab.levels[proj.dial], value: lab[proj.dial] });
     }
+    // Investors on site.
+    if (park.tour && park.tick >= park.tour.endTick) events.push(endTour(park));
+    if (!park.tour && park.tick >= park.nextTourTick) {
+      var t = startTour(park);
+      if (t) events.push({ type: "tour-start", tour: t });
+      else park.nextTourTick = tourTickAfter(park, 1); // nothing on show yet
+    }
 
-    if (park.tick % ECO.ticksPerDay === 0) {
-      // Reputation drifts toward the average health of the animals on show.
-      var stocked = park.order.map(function (id) { return park.exhibits[id]; }).filter(function (rec) { return rec.animal; });
-      if (stocked.length) {
-        var avg = stocked.reduce(function (a, rec) { return a + rec.animal.health; }, 0) / stocked.length;
-        park.reputation += (avg - park.reputation) * ECO.reputationDrift;
-      }
-      park.reputation = Math.max(0, Math.min(100, park.reputation));
-      park.yesterday = park.today;
-      events.push({
-        type: "day", day: day(park) - 1, revenue: park.today.revenue, expenses: park.today.expenses,
-        vet: park.today.vet, visitors: park.today.visitors, sick: park.today.sick, reputation: park.reputation
+    if (park.tick % TPD === 0) events = events.concat(endOfDay(park));
+    return events;
+  }
+
+  function endOfDay(park) {
+    var events = [], d = day(park) - 1;
+    // Reputation drifts toward the average health of the animals on show.
+    var stocked = park.order.map(function (id) { return park.exhibits[id]; }).filter(function (rec) { return rec.animal; });
+    if (stocked.length) {
+      var avg = stocked.reduce(function (a, rec) { return a + rec.animal.health; }, 0) / stocked.length;
+      park.reputation += (avg - park.reputation) * ECO.reputationDrift;
+    }
+    park.reputation = Math.max(0, Math.min(100, park.reputation));
+    var t = park.today;
+    park.history.push({ day: d, revenue: t.revenue, expenses: t.expenses, vet: t.vet, sick: t.sick,
+      animals: stocked.reduce(function (a, rec) { return a + rec.animal.k; }, 0) });
+    if (park.history.length > ECO.historyDays) park.history.shift();
+    park.yesterday = t;
+    events.push({ type: "day", day: d, revenue: t.revenue, expenses: t.expenses, vet: t.vet, visitors: t.visitors, sick: t.sick, reputation: park.reputation });
+
+    // Staff: fatigue, holidays, sick days, resignations.
+    var st = staffing(park, false);
+    park.keeperOrder.slice().forEach(function (kid) {
+      var k = park.keepers[kid];
+      if (!k) return;
+      var sickAnimals = k.exhibitIds.reduce(function (a, eid) { return a + (t.sickBy[eid] || 0); }, 0);
+      Staff.daily(k, { day: dayIndex(park), load: st.loads[kid] || 0, sickAnimals: sickAnimals }, park.rng).forEach(function (e) {
+        events.push({ type: "staff", keeperId: kid, name: k.name, kind: e.kind, days: e.days, fromDay: e.fromDay, from: e.from });
+        if (e.kind === "quit") {
+          removeKeeper(park, kid);
+          nudgeConfidence(park, -Z.CONFIDENCE.resignation);
+          park.keeperOrder.forEach(function (o) { Staff.addMorale(park.keepers[o], -Z.STAFF.keeper.morale.colleagueQuit); });
+        }
       });
-      park.today = { revenue: 0, expenses: 0, vet: 0, visitors: 0, sick: 0 };
+    });
+    syncDuty(park);
+    park.today = freshDay();
 
-      var d = day(park) - 1;
-      if (d % DAYS_PER_MONTH === 0) events.push(investorUpdate(park, d / DAYS_PER_MONTH));
+    // Investors: memories fade; roadmap milestones; the month; the raise.
+    park.confidence += (Z.CONFIDENCE.start - park.confidence) * Z.CONFIDENCE.reversion;
+    var f = park.funding;
+    if (f.round < Z.ROUNDS.length) {
+      var rd = Z.ROUNDS[f.round], seen = f.milestones[rd.id] = f.milestones[rd.id] || {};
+      Inv.roadmap(f.round, metrics(park)).items.forEach(function (it) {
+        if (it.met && !seen[it.metric]) {
+          seen[it.metric] = true;
+          nudgeConfidence(park, Z.CONFIDENCE.milestone);
+          events.push({ type: "milestone", round: f.round, label: it.label });
+        }
+      });
+    }
+    if (d % DAYS_PER_MONTH === 0) events.push(monthUpdate(park, d / DAYS_PER_MONTH));
+    if (f.raise && park.tick >= f.raise.untilTick) events.push(finishRaise(park));
 
-      park.daysInDebt = park.cash < 0 ? park.daysInDebt + 1 : 0;
-      if (park.daysInDebt >= ECO.bankruptDays) {
-        park.status = "lost"; park.endDay = d;
-        events.push({ type: "lost", day: d });
-      } else if (park.daysInDebt > 0) {
-        events.push({ type: "debt", daysInDebt: park.daysInDebt, daysLeft: ECO.bankruptDays - park.daysInDebt });
-      } else if (park.status === "playing" && park.cash >= ECO.goal.cash && park.reputation >= ECO.goal.reputation) {
-        park.status = "won"; park.endDay = d;
-        events.push({ type: "won", day: d });
-      }
+    park.daysInDebt = park.cash < 0 ? park.daysInDebt + 1 : 0;
+    if (park.daysInDebt > 0) nudgeConfidence(park, -Z.CONFIDENCE.debtPerDay);
+    if (park.status === "playing" && park.daysInDebt >= ECO.bankruptDays) {
+      park.status = "lost"; park.endDay = d;
+      events.push({ type: "lost", day: d });
+    } else if (park.daysInDebt > 0) {
+      events.push({ type: "debt", daysInDebt: park.daysInDebt, daysLeft: ECO.bankruptDays - park.daysInDebt });
     }
     return events;
   }
 
-  function investorUpdate(park, monthNumber) {
+  function monthUpdate(park, monthNumber) {
     var m = park.month, sickest = null;
     Object.keys(m.sickBy).forEach(function (id) {
       if (park.exhibits[id] && (!sickest || m.sickBy[id] > sickest.count)) sickest = { exhibitId: Number(id), count: m.sickBy[id] };
     });
-    var r = rates(park);
-    var net = m.revenue - m.expenses - m.vet;
-    var dailyNet = net / DAYS_PER_MONTH;
+    var r = rates(park), met = metrics(park);
+    var net = m.revenue - m.expenses - m.vet, dailyNet = net / DAYS_PER_MONTH;
+    nudgeConfidence(park, Z.CONFIDENCE.monthGrowth * Math.max(-1, Math.min(1, 2 * met.growth)));
+    var Q = Z.QUOTES.month;
+    var pool = m.revenue < 1 ? Q.early : net > 0 && m.sick <= 2 ? Q.great : net > 0 ? Q.good
+      : dailyNet < 0 && park.cash / -dailyNet < 60 ? Q.burn : m.vet > m.revenue / 4 ? Q.vet : Q.flat;
     var ev = {
-      type: "investor", month: monthNumber, revenue: m.revenue, expenses: m.expenses, vet: m.vet,
+      type: "month", month: monthNumber, revenue: m.revenue, expenses: m.expenses, vet: m.vet,
       visitors: m.visitors, sick: m.sick, net: net, dailyNet: dailyNet,
       // Runway at this month's average burn (null = not burning cash).
       runwayDays: dailyNet < 0 ? Math.max(0, park.cash) / -dailyNet : null,
-      currentNet: r.net, sickest: sickest
+      currentNet: r.net, growth: met.growth, quote: Inv.pick(pool, park.rng), sickest: sickest
     };
     park.month = freshMonth();
     return ev;
   }
 
-  // Keep playing after a win (the goal is met; there is no further one yet).
+  // Keep playing after the IPO (nothing more to win).
   function continueAfterWin(park) { if (park.status === "won") park.freePlay = true; }
 
   // ---------- save / load ----------
-  var SAVE_VERSION = 3;
+  var SAVE_VERSION = 4;
   // Plain JSON. Animals are stored as ExhibitSim snapshots (decoders, noise
   // models and RNGs are rebuilt on load).
   function save(park) {
@@ -584,21 +1017,26 @@
     return JSON.stringify(park, function (key, value) {
       if (key === "rng") return undefined;
       if (key === "exhibits" && value === park.exhibits) return exhibits;
+      if (value === Infinity || value === -Infinity) return value > 0 ? "Infinity" : "-Infinity";
       return value;
     }).replace(/^\{/, '{"version":' + SAVE_VERSION + ",");
   }
   function load(json, opts) {
     opts = opts || {};
     var data = typeof json === "string" ? JSON.parse(json) : json;
-    if (!data || (data.version !== SAVE_VERSION && data.version !== 2)) throw new Error("Unsupported save version");
-    if (data.version === 2) {
-      // Before the workshop, all five species of the time were known.
-      data.book = freshBook(["tortoise", "owl", "peacock", "pangolin", "axolotl"]);
-    }
+    if (!data || typeof data.version !== "number") throw new Error("Unsupported save version");
+    if (data.version < SAVE_VERSION) throw new Error("This zoo was saved before the funding update (save version " + data.version + ") and can't be loaded.");
+    if (data.version !== SAVE_VERSION) throw new Error("Unsupported save version");
     delete data.version;
     var park = data;
     park.rng = opts.rng || Math.random;
     if (!park.book || !park.book.known || !Array.isArray(park.book.designs) || !park.book.custom) throw new Error("Corrupted save: no book");
+    if (!park.funding || !Array.isArray(park.history)) throw new Error("Corrupted save: no books");
+    park.keeperOrder.forEach(function (kid) {
+      var k = park.keepers[kid];
+      if (!k || !Array.isArray(k.exhibitIds)) throw new Error("Corrupted keeper in save: " + kid);
+      ["lastVacationDay", "lastBonusDay"].forEach(function (f) { if (typeof k[f] === "string") k[f] = Number(k[f]); });
+    });
     park.book.designs.forEach(function (e) {
       if (Hab.malformed(e.layout)) throw new Error("Corrupted design in save: " + e.id);
       if (!Z.SPECIES[e.speciesId] && !park.book.custom[e.speciesId]) throw new Error("Unknown species in save: " + e.speciesId);
@@ -606,16 +1044,17 @@
     Object.keys(park.exhibits).forEach(function (id) {
       var rec = park.exhibits[id];
       if (rec.designId ? !designEntry(park, rec.designId) : !Z.BIOMES[rec.biomeId]) throw new Error("Unknown habitat in save: " + (rec.biomeId || rec.designId));
-      if (rec.keeperId && !park.keepers[rec.keeperId]) throw new Error("Unknown keeper in save: " + rec.keeperId);
+      if (!Array.isArray(rec.keeperIds) || rec.keeperIds.some(function (kid) { return !park.keepers[kid]; })) throw new Error("Unknown keeper in save at " + id);
     });
     Object.keys(park.exhibits).forEach(function (id) {
       var rec = park.exhibits[id];
       if (rec.animal) {
         if (!speciesInfo(park, rec.animal.speciesId)) throw new Error("Unknown species in save: " + rec.animal.speciesId);
         var sim = simFor(park, rec);
-        rec.animal = X.restore(rec.animal, { lab: labValues(park), keeper: keeperOnDuty(park, rec), rng: park.rng, code: sim.code, checks: sim.checks });
+        rec.animal = X.restore(rec.animal, { lab: labValues(park), keeper: null, rng: park.rng, code: sim.code, checks: sim.checks });
       }
     });
+    syncDuty(park);
     return park;
   }
 
@@ -626,19 +1065,24 @@
   function exhibitLabel(park, rec) { return habitatOf(park, rec).name + " #" + rec.number; }
 
   var Park = {
-    createPark: createPark, day: day, hour: hour, footprint: footprint,
-    isKnown: isKnown, speciesInfo: speciesInfo, habitatOf: habitatOf, nativeBiome: nativeBiome, knownCandidates: knownCandidates,
+    createPark: createPark, day: day, hour: hour, dayIndex: dayIndex,
+    isKnown: isKnown, speciesInfo: speciesInfo, speciesDistance: speciesDistance, habitatOf: habitatOf, nativeBiome: nativeBiome,
+    knownCandidates: knownCandidates, isOpen: isOpen, daysLeft: daysLeft,
     canBuild: canBuild, build: build, exhibitAt: exhibitAt, demolish: demolish,
     studyDesign: studyDesign, canBuildDesign: canBuildDesign, buildDesign: buildDesign, renameSpecies: renameSpecies,
-    designEntry: designEntry, animalCount: animalCount, stockCost: stockCost,
-    speciesOptions: speciesOptions, buyAnimal: buyAnimal,
-    keeperSpeed: keeperSpeed, keeperSalary: keeperSalary, keeperOnDuty: keeperOnDuty,
-    hireKeeper: hireKeeper, assignKeeper: assignKeeper, fireKeeper: fireKeeper,
-    canTrain: canTrain, trainKeeper: trainKeeper,
-    labValues: labValues, canResearch: canResearch, startResearch: startResearch,
+    designEntry: designEntry, designInUse: designInUse, deleteDesign: deleteDesign, canForgetSpecies: canForgetSpecies, forgetSpecies: forgetSpecies,
+    animalCount: animalCount, stockCost: stockCost, speciesOptions: speciesOptions, buyAnimal: buyAnimal,
+    keeperSpeed: keeperSpeed, keeperSalary: keeperSalary, keeperPresent: keeperPresent, keeperOnDuty: keeperOnDuty,
+    exhibitWeight: exhibitWeight, staffing: staffing,
+    hireKeeper: hireKeeper, assignKeeper: assignKeeper, unassignKeeper: unassignKeeper, fireKeeper: fireKeeper,
+    canTrain: canTrain, trainKeeper: trainKeeper, sendOnVacation: sendOnVacation,
+    bonusCost: bonusCost, canBonus: canBonus, giveBonus: giveBonus,
+    labValues: labValues, labLevels: labLevels, canResearch: canResearch, startResearch: startResearch,
     exhibitVisitors: exhibitVisitors, exhibitCosts: exhibitCosts, rates: rates,
+    metrics: metrics, currentRound: currentRound, valuation: valuation, canRaise: canRaise, startRaise: startRaise,
+    acceptOffer: acceptOffer, declineOffer: declineOffer, canPerk: canPerk, buyPerk: buyPerk,
     tick: tick, exhibitLabel: exhibitLabel, continueAfterWin: continueAfterWin,
-    save: save, load: load, DAYS_PER_MONTH: DAYS_PER_MONTH
+    save: save, load: load, SAVE_VERSION: SAVE_VERSION, DAYS_PER_MONTH: DAYS_PER_MONTH
   };
   if (isNode) module.exports = Park;
   else root.Park = Park;

@@ -30,7 +30,7 @@
   // each check's support, so they aren't stored here.
   var SPECIES = {
     tortoise: {
-      name: "Repetition Tortoise", glyph: "🐢", tier: 1, cost: 3000, appeal: 40,
+      name: "Repetition Tortoise", glyph: "🐢", tier: 1, cost: 100000, appeal: 40,
       code: Stabilizer.makeCode({
         name: "3-qubit bit-flip code", n: 3,
         stabilizers: ["ZZI", "IZZ"],
@@ -58,7 +58,7 @@
       }
     },
     owl: {
-      name: "Shor Owl", glyph: "🦉", tier: 2, cost: 12000, appeal: 110,
+      name: "Shor Owl", glyph: "🦉", tier: 2, cost: 450000, appeal: 110,
       code: Stabilizer.makeCode({
         name: "Shor code", n: 9,
         stabilizers: [
@@ -88,7 +88,7 @@
       }
     },
     peacock: {
-      name: "Steane Peacock", glyph: "🦚", tier: 2, cost: 15000, appeal: 130,
+      name: "Steane Peacock", glyph: "🦚", tier: 2, cost: 500000, appeal: 130,
       code: Stabilizer.makeCode({
         name: "Steane code", n: 7,
         stabilizers: HAMMING.map(function (h) { return sup(7, "X", h); })
@@ -119,7 +119,7 @@
       }
     },
     pangolin: {
-      name: "Perfect Pangolin", glyph: "🦔", tier: 3, cost: 18000, appeal: 150,
+      name: "Perfect Pangolin", glyph: "🦔", tier: 3, cost: 550000, appeal: 150,
       code: Stabilizer.makeCode({
         name: "Five-qubit code", n: 5,
         stabilizers: ["XZZXI", "IXZZX", "XIXZZ", "ZXIXZ"],
@@ -151,7 +151,7 @@
       }
     },
     axolotl: {
-      name: "Surface Axolotl", glyph: "🦎", tier: 3, cost: 25000, appeal: 180,
+      name: "Surface Axolotl", glyph: "🦎", tier: 3, cost: 800000, appeal: 180,
       code: Stabilizer.makeCode({
         name: "Rotated surface code (d=3)", n: 9,
         // 3×3 data grid, row-major. X-type boundaries top/bottom, Z-type left/right.
@@ -186,7 +186,7 @@
     },
     // Discoverable in the habitat workshop (no one starts out knowing them).
     penguins: {
-      name: "Iceberg Penguins", glyph: "🐧", tier: 1, cost: 4000, appeal: 50,
+      name: "Iceberg Penguins", glyph: "🐧", tier: 1, cost: 120000, appeal: 50,
       code: Stabilizer.makeCode({
         name: "[[4,2,2]] code", n: 4,
         stabilizers: ["XXXX", "ZZZZ"],
@@ -216,7 +216,7 @@
       }
     },
     giant: {
-      name: "Giant Axolotl", glyph: "🐉", tier: 4, cost: 45000, appeal: 320,
+      name: "Giant Axolotl", glyph: "🐉", tier: 4, cost: 1500000, appeal: 320,
       code: (function () { var c = Stabilizer.rotatedSurface(5); c.name = "Rotated surface code (d=5)"; return c; })(),
       params: "[[25,1,5]]",
       layout: range(0, 25).map(function (q) { return [q % 5, Math.floor(q / 5)]; }),
@@ -242,6 +242,9 @@
   };
 
   // ---------- Biomes (enclosures) ----------
+  // cost and upkeep ($/day) are the experiment's; buildDays is how long
+  // construction takes once paid for. A catalogue habitat is quicker to
+  // build than a new design of the same size: the know-how exists.
   // checks: the stabilizers the enclosure physically measures. These are
   // deliberately NOT always the species' own generators — they are
   // different generating sets of the same group — so placement is a real
@@ -250,13 +253,13 @@
   // hardware; the error rates come from the lab (LAB above).
   var BIOMES = {
     riverbank: {
-      name: "Parity Riverbank", native: "tortoise", cost: 5000, upkeep: 40, footprint: [2, 2],
+      name: "Parity Riverbank", native: "tortoise", cost: 300000, upkeep: 800, buildDays: 45, footprint: [2, 2],
       climate: { channel: "bitFlip" },
       checks: ["ZIZ", "IZZ"],
       blurb: "A calm, bit-flip-only stretch of river. Measures pairwise Z parities."
     },
     forest: {
-      name: "Nine-Fold Forest", native: "owl", cost: 12000, upkeep: 120, footprint: [3, 3],
+      name: "Nine-Fold Forest", native: "owl", cost: 1100000, upkeep: 2800, buildDays: 240, footprint: [3, 3],
       climate: { channel: "depolarizing" },
       checks: [
         sup(9, "Z", [0, 2]), sup(9, "Z", [1, 2]), sup(9, "Z", [3, 5]),
@@ -266,7 +269,7 @@
       blurb: "Three groves of three trees. Z parities within each grove, X parities between groves."
     },
     glade: {
-      name: "Hamming Glade", native: "peacock", cost: 14000, upkeep: 100, footprint: [3, 3],
+      name: "Hamming Glade", native: "peacock", cost: 880000, upkeep: 2200, buildDays: 180, footprint: [3, 3],
       climate: { channel: "depolarizing" },
       // Row-reduced differently: rows (1+2), 2, 3 of the Hamming checks.
       checks: [
@@ -276,14 +279,14 @@
       blurb: "A triangular clearing. Every check touches four qubits, in matching X and Z pairs."
     },
     dunes: {
-      name: "Cyclic Dunes", native: "pangolin", cost: 16000, upkeep: 110, footprint: [3, 2],
+      name: "Cyclic Dunes", native: "pangolin", cost: 620000, upkeep: 1500, buildDays: 120, footprint: [3, 2],
       climate: { channel: "depolarizing" },
       // Four of the five cyclic shifts of XZZXI (the fifth is their product).
       checks: ["IXZZX", "XIXZZ", "ZXIXZ", "ZZXIX"],
       blurb: "Wind-sculpted ridges that repeat every five steps. Checks mix X and Z."
     },
     wetlands: {
-      name: "Checkerboard Wetlands", native: "axolotl", cost: 20000, upkeep: 90, footprint: [3, 3],
+      name: "Checkerboard Wetlands", native: "axolotl", cost: 1150000, upkeep: 2800, buildDays: 270, footprint: [3, 3],
       climate: { channel: "depolarizing" },
       checks: [
         sup(9, "X", [0, 2, 3, 4]), sup(9, "X", [4, 5, 7, 8]), sup(9, "X", [1, 2]), sup(9, "X", [6, 7]),
@@ -292,14 +295,14 @@
       blurb: "Square ponds in a checkerboard, each checked only by its nearest neighbours."
     },
     floe: {
-      name: "Iceberg Floe", native: "penguins", cost: 5000, upkeep: 40, footprint: [2, 2],
+      name: "Iceberg Floe", native: "penguins", cost: 400000, upkeep: 1000, buildDays: 70, footprint: [2, 2],
       climate: { channel: "depolarizing" },
       // YYYY is XXXX × ZZZZ (up to a phase): same group, different generators.
       checks: ["XXXX", "YYYY"],
       blurb: "One slab of ice, four qubits, two checks on every one of them."
     },
     marsh: {
-      name: "Grand Marsh", native: "giant", cost: 40000, upkeep: 250, footprint: [5, 5],
+      name: "Grand Marsh", native: "giant", cost: 3200000, upkeep: 8000, buildDays: 400, footprint: [5, 5],
       climate: { channel: "depolarizing" },
       // The species' checks, except that the first two X plaquettes are
       // measured as one and their product.
@@ -327,24 +330,24 @@
   // best one they can run in real time.
   var KEEPER_LEVELS = [
     null,
-    { level: 1, title: "Trainee", algorithm: "lookup", maxWeight: 1, window: 1, work: 1, salary: 120,
+    { level: 1, title: "Trainee", algorithm: "lookup", maxWeight: 1, window: 1, work: 1, salary: 450,
       blurb: "Single-shot lookup: knows the syndrome of every single-qubit error and takes each round's outcomes at face value." },
-    { level: 2, title: "Keeper", algorithm: "lookup", maxWeight: 2, window: 1, work: 1.5, salary: 150,
+    { level: 2, title: "Keeper", algorithm: "lookup", maxWeight: 2, window: 1, work: 1.5, salary: 550,
       blurb: "Single-shot minimum-weight lookup: also knows the likeliest weight-2 explanations, but still trusts every outcome." },
-    { level: 3, title: "Senior keeper", algorithm: "spacetime", window: 2, work: 2, salary: 190,
+    { level: 3, title: "Senior keeper", algorithm: "spacetime", window: 2, work: 2, salary: 700,
       blurb: "Space-time decoding over 2 rounds: a check that flips and then flips back was a misread measurement, not an error." },
-    { level: 4, title: "Head keeper", algorithm: "spacetime", window: 3, work: 3, salary: 240,
+    { level: 4, title: "Head keeper", algorithm: "spacetime", window: 3, work: 3, salary: 850,
       blurb: "Space-time decoding over 3 rounds: more evidence before committing to a correction." }
   ];
   var MAX_KEEPER_LEVEL = KEEPER_LEVELS.length - 1;
   // Training to `level`: experience needed (rounds decoded), days of study, fee.
   var TRAINING = {
-    2: { xp: 150, days: 1, fee: 1000 },
-    3: { xp: 500, days: 2, fee: 2500 },
-    4: { xp: 1200, days: 3, fee: 5000 }
+    2: { xp: 500, days: 3, fee: 20000 },
+    3: { xp: 2000, days: 5, fee: 50000 },
+    4: { xp: 5000, days: 7, fee: 100000 }
   };
   // Decoding speed in work units per hour: base + xp × perXp, capped.
-  var KEEPER_SPEED = { base: 4, perXp: 1 / 300, max: 12 };
+  var KEEPER_SPEED = { base: 4, perXp: 1 / 1000, max: 12 };
   var KEEPER_NAMES = ["Alex", "Sam", "Robin", "Jordan", "Kai", "Noor", "Priya", "Tomás", "Mei", "Yusuf",
     "Inès", "Lars", "Zara", "Felix", "Amara", "Hiro", "Leila", "Owen", "Sana", "Teo", "Wren", "Ola", "Dev", "Rosa"];
 
@@ -368,7 +371,7 @@
       blurb: "Measure more often: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode." }
   };
   // Cost of each research step, by the level being reached.
-  var RESEARCH = [null, { fee: 5000, days: 2 }, { fee: 12000, days: 4 }, { fee: 25000, days: 6 }];
+  var RESEARCH = [null, { fee: 1500000, days: 30 }, { fee: 4000000, days: 60 }, { fee: 10000000, days: 90 }];
 
   // ---------- The habitat workshop (freeform building) ----------
   // A design places data qubits and check ancillas on a grid and wires each
@@ -380,9 +383,13 @@
   var BUILD = {
     grid: 11,               // the workshop grid is grid × grid cells
     maxData: 32, maxChecks: 32,
-    perQubit: 1000, perWire: 100,
-    upkeepPerQubit: 5, upkeepPerWire: 1,
-    qubitsPerTile: 2
+    perQubit: 60000, perWire: 5000,
+    upkeepPerQubit: 150, upkeepPerWire: 10,
+    qubitsPerTile: 2,
+    // Construction time grows with the qubit count (data + ancilla):
+    // days = refDays × (qubits / refQubits)^exponent, clamped. The d = 3
+    // surface code (17 qubits) takes a year to get running.
+    days: { refQubits: 17, refDays: 365, exponent: 1.2, min: 30, max: 540 }
   };
   var START_KNOWN = ["tortoise"];
   // Reference designs of the textbook species: data qubit and check
@@ -426,22 +433,264 @@
   // the table, +40 per step), price per animal = appeal × costPerAppeal.
   var CUSTOM = {
     appealByDistance: [0, 25, 60, 120, 160, 210],
-    costPerAppeal: 100,
+    costPerAppeal: 4000,
     glyphs: ["🦊", "🦦", "🦥", "🦡", "🦫", "🦩", "🦜", "🐸", "🦭", "🦓", "🦒", "🐙", "🦋", "🐞", "🦑", "🐌",
       "🦘", "🦬", "🐿️", "🦨", "🐳", "🦈", "🐠", "🦀"]
   };
 
   // ---------- Economy constants ----------
   var ECONOMY = {
-    startingCash: 50000, startingReputation: 50,
-    ticksPerDay: 24, parkSize: [12, 8],
-    vetBill: 2500, bankruptDays: 7,
-    ticketPrice: 12,          // $ per visitor
-    visitorsPerAppeal: 0.8,   // visitors/day per point of appeal, at full health and reputation 50
+    startingCash: 10000000, startingReputation: 50,
+    ticksPerDay: 24,
+    // The lot grows with each round closed (index = rounds closed after the seed).
+    lots: [[12, 8], [14, 10], [16, 12], [18, 13], [20, 14], [22, 15]],
+    vetBill: 10000, bankruptDays: 7,
+    ticketPrice: 20,          // $ per visitor
+    visitorsPerAppeal: 2,     // visitors/day per point of appeal, at full health and reputation 50
     sickReputationHit: 1.5,    // reputation lost per logical error
     reputationDrift: 0.15,    // daily pull of reputation toward average animal health
     demolishRefund: 0.5,      // fraction of build cost returned
-    goal: { cash: 250000, reputation: 80 }
+    historyDays: 120          // daily books kept for growth and error-rate metrics
+  };
+
+
+  // ---------- Funding: rounds, valuation, investors ----------
+  // The company raises round after round until it lists. A round succeeds
+  // when the valuation investors put on the zoo (Investors.valuation)
+  // reaches its target; the zoo then sells `raise` of itself for cash at
+  // that valuation. Between 60% and 100% of the target, investors offer a
+  // bridge instead: a little cash, no new letter.
+  var ROUNDS = [
+    { id: "seed", name: "Seed", valuation: 40000000, raised: 10000000 }, // closed before day 1
+    { id: "a", name: "Series A", target: 300000000, raise: 0.15, premium: 1,
+      roadmap: [
+        { metric: "species", min: 3, label: "Discover 3 species" },
+        { metric: "logicalQubits", min: 4, label: "4 animals (logical qubits) on show" },
+        { metric: "bestDistance", min: 3, label: "A distance-3 code on show" },
+        { metric: "revenue", min: 20000, label: "$20k a day in ticket sales" }
+      ] },
+    { id: "b", name: "Series B", target: 2000000000, raise: 0.12, premium: 1.25,
+      roadmap: [
+        { metric: "species", min: 5, label: "Discover 5 species" },
+        { metric: "logicalQubits", min: 10, label: "10 animals on show" },
+        { metric: "bestDistance", min: 5, label: "A distance-5 code on show" },
+        { metric: "headKeepers", min: 1, label: "A head keeper on staff" },
+        { metric: "revenue", min: 50000, label: "$50k a day in ticket sales" }
+      ] },
+    { id: "c", name: "Series C", target: 5000000000, raise: 0.1, premium: 1.6,
+      roadmap: [
+        { metric: "species", min: 7, label: "Discover 7 species" },
+        { metric: "logicalQubits", min: 18, label: "18 animals on show" },
+        { metric: "labLevels", min: 6, label: "6 lab upgrades" },
+        { metric: "revenue", min: 90000, label: "$90k a day in ticket sales" }
+      ] },
+    { id: "d", name: "Series D", target: 10000000000, raise: 0.08, premium: 2,
+      roadmap: [
+        { metric: "logicalQubits", min: 26, label: "26 animals on show" },
+        { metric: "errorRate", max: 0.02, label: "Under 0.02 logical errors per animal per day" },
+        { metric: "morale", min: 60, label: "Team morale 60+" },
+        { metric: "revenue", min: 130000, label: "$130k a day in ticket sales" }
+      ] },
+    { id: "ipo", name: "IPO", target: 20000000000, raise: 0.1, premium: 3, ipo: true,
+      roadmap: [
+        { metric: "logicalQubits", min: 34, label: "34 animals on show" },
+        { metric: "species", min: 9, label: "Discover 9 species" },
+        { metric: "labLevels", min: 10, label: "10 lab upgrades" },
+        { metric: "revenue", min: 170000, label: "$170k a day in ticket sales" }
+      ] }
+  ];
+  var FUNDING = {
+    roadshowDays: 21,     // a raise takes this long; investors tour throughout
+    roadshowTourEvery: 3, // days between roadshow tours
+    cooldownDays: 45,     // after a pass or a bridge, before the next attempt
+    afterCloseDays: 300,  // after a round closes: investors want to see the money at work
+    bridgeAt: 0.6,        // fraction of the target that earns a bridge offer
+    bridgeRaise: 0.06     // fraction of the zoo sold in a bridge
+  };
+  // What investors think the zoo is worth:
+  //   (revenue/yr × revenue multiple + tech) × hype × stage premium × roadmap factor
+  // revenue multiple = base + perGrowth × (30-day revenue growth, capped at
+  // 100%); tech = perQubitD2 × Σ animals × d² × health + perSpecies ×
+  // species known + perLabLevel × lab upgrades; hype doubles every
+  // `hypeDoubling` points of confidence above 50 (and halves below);
+  // roadmap factor = 1 − roadmapWeight × (share of milestones missed).
+  var VALUATION = {
+    revMultipleBase: 20, revMultiplePerGrowth: 40,
+    perQubitD2: 6000000, perSpecies: 30000000, perLabLevel: 20000000,
+    hypeDoubling: 30, roadmapWeight: 0.35
+  };
+  // Investor confidence (0–100) moves with tours and news, and drifts back
+  // toward 50 as memories fade.
+  var CONFIDENCE = {
+    start: 50, reversion: 0.01, // per day
+    tourWeight: 0.2,            // confidence += tourWeight × (impression − 50)
+    discovery: 2, milestone: 3, resignation: 3, debtPerDay: 2, monthGrowth: 4
+  };
+  // What investors weigh on a tour. Each fund cares about one thing most.
+  var FOCUS = {
+    health: "healthy animals",
+    errors: "low logical error rates",
+    team: "a happy team",
+    roadmap: "hitting the roadmap",
+    growth: "growth",
+    wow: "big codes and rare species"
+  };
+  var INVESTORS = [
+    { fund: "Hockey Stick Ventures", focus: "growth" },
+    { fund: "Exit Velocity Partners", focus: "growth" },
+    { fund: "Asymptote Capital", focus: "errors" },
+    { fund: "Five Nines Fund", focus: "errors" },
+    { fund: "Unicorn Ranch", focus: "wow" },
+    { fund: "Moonshot & Sons", focus: "wow" },
+    { fund: "First Principles Capital", focus: "roadmap" },
+    { fund: "Gantt Chart Partners", focus: "roadmap" },
+    { fund: "Culture Eats Strategy LP", focus: "team" },
+    { fund: "Founder Friendly Fund", focus: "team" },
+    { fund: "Bedside Manner Ventures", focus: "health" },
+    { fund: "Synergy Growth Fund IV", focus: "health" }
+  ];
+  var INVESTOR_NAMES = ["Chad", "Brooke", "Thaddeus", "Skylar", "Preston", "Margaux", "Biff", "Paloma", "Kip", "Sloane",
+    "Rajiv", "Ingrid", "Hunter", "Courtney", "Dmitri", "Blair"];
+  // Tours: an investor walks past up to `stops` exhibits between the
+  // opening and closing hours. A logical error on the route while they
+  // watch costs `incidentPenalty` impression points.
+  var TOURS = { everyDays: [15, 25], start: 10, end: 18, stops: 3, incidentPenalty: 25 };
+  // Wining and dining: one per tour, a flat boost to the impression.
+  var PERKS = [
+    { id: "steak", name: "Steak dinner", cost: 15000, boost: 6,
+      blurb: "Dry-aged ribeye, a bottle you can't pronounce, and a TAM slide on a napkin." },
+    { id: "omakase", name: "Omakase", cost: 45000, boost: 10,
+      blurb: "Twenty courses at an unmarked door. The chef has a waitlist and an NDA." },
+    { id: "cabin", name: "Ski weekend", cost: 140000, boost: 15,
+      blurb: "The founder's 'cabin' has a helipad. Nobody mentions the burn rate." }
+  ];
+
+  // Lines investors say. Round outcomes by tier (valuation ÷ target), tour
+  // impressions by score, the monthly update by how the month went.
+  var QUOTES = {
+    round: {
+      legendary: [
+        "This is a generational company. Possibly a generational zoo.",
+        "We're not investing in a zoo. We're investing in the concept of zoos.",
+        "I told my LPs this is the next internet. Then I told them it's bigger.",
+        "Frankly the term sheet is a formality. Here are four of them.",
+        "We'd like to lead, co-lead and also follow.",
+        "I haven't felt like this since I passed on that search engine.",
+        "Category-defining. Category-creating. Honestly, category-eating.",
+        "We ran the numbers. Then we stopped, because numbers are for later-stage companies.",
+        "You're the Steve Jobs of stabilizers. The Oprah of observables.",
+        "Our partners cleared their calendars. Then we cleared out a few partners to make room."
+      ],
+      great: [
+        "Rare to see this much founder-market fit. Is the market zoos or quantum? Yes.",
+        "There's a clear path to a trillion-dollar TAM if you squint at the logical qubits.",
+        "The axolotls tested off the charts with our focus group.",
+        "Your burn rate is aggressive in exactly the way we like.",
+        "We see a platform here. Every zoo will need a quantum zoo.",
+        "Moats don't get deeper than a distance-5 surface code.",
+        "We usually don't do zoos. We usually don't do quantum. Two negatives make a term sheet."
+      ],
+      good: [
+        "Strong team, strong tortoise. We're in.",
+        "We like the logical error rates. We like the vibes more.",
+        "Solid execution. Let's not tell the other partners we understood the decoder slide.",
+        "The deck had a hockey stick and an actual animal on it. Rare combination.",
+        "Diligence confirmed the animals are, in fact, logical qubits. Wiring the money.",
+        "Disciplined, capital-efficient and adorable."
+      ],
+      bridge: [
+        "We love it, but we'd love it more at a lower price.",
+        "Have you considered adding AI? Not to the zoo. To the deck.",
+        "It's a great science project. Science projects need bridges.",
+        "We'd like to stay close. Close enough to watch, far enough not to wire much.",
+        "Can you send the deck again, but make the line go up?",
+        "Let's call it a Series A-minus. Very fashionable right now."
+      ],
+      pass: [
+        "We're going to pass for now, but please keep us updated. (We won't read the updates.)",
+        "The pangolin bit our associate. That's a no from us.",
+        "Who's the competition? Oh, entropy. Tough market.",
+        "Come back when the logical error rate has fewer digits.",
+        "This feels early. Like, Big Bang early.",
+        "We only invest in companies that are already successful."
+      ],
+      ipo: [
+        "The bell rang. Mostly it was the vets' pagers, but it rang.",
+        "Analysts rate the stock 'Strong Buy', citing 'the vibes' and 'that one axolotl'.",
+        "First-day pop: 80%. The tortoise remains unbothered.",
+        "A bank analyst asked what a stabilizer is. The roadshow worked."
+      ]
+    },
+    tour: {
+      dazzled: [
+        "I came for the axolotls and stayed for the syndrome extraction.",
+        "My kids are going to want a Pauli frame for Christmas.",
+        "Every animal was healthy. Are they AI-generated?",
+        "That's the most coherent thing I've seen all quarter.",
+        "I didn't see a single logical error. I saw my next fund."
+      ],
+      pleased: [
+        "Lovely zoo. The gift shop needs a Steane Peacock plushie.",
+        "Good energy. Good error rates. Good parking.",
+        "The keepers seemed happy. Suspiciously happy.",
+        "I'm going to say 'fault-tolerant' at dinner tonight and see what happens."
+      ],
+      neutral: [
+        "Fine. Very fine. Medium-fine.",
+        "I didn't understand the decoder, but I nodded at the right times.",
+        "Has anyone tried this with fewer qubits and more blockchain?",
+        "Nice zoo. Is it a zoo, though? Strategically?"
+      ],
+      worried: [
+        "The animal in the third enclosure looked… decohered.",
+        "Is it normal for the keepers to cry?",
+        "I asked about the roadmap and someone handed me a map of the zoo.",
+        "My associate counted the logical errors. My associate is now on leave."
+      ],
+      appalled: [
+        "An animal got sick right in front of my LP.",
+        "The Owl looked at me like I was a measurement error.",
+        "I've seen better error rates on a coin toss.",
+        "We'll be in touch. (We will not be in touch.)"
+      ],
+      incident: [
+        "I watched a logical error happen live. Riveting. Terrifying. Mostly terrifying.",
+        "A vet ran past me shouting 'Z-bar! Z-bar!' Is that good?"
+      ]
+    },
+    month: {
+      great: ["Textbook fault tolerance. We're very excited about this team.", "Up and to the right, as the qubits intended."],
+      good: ["Revenue looks great, but walk us through those logical errors.", "Solid month. Please stop calling the board 'the stabilizers'."],
+      burn: ["We need to talk about your burn rate.", "Default alive or default dead? Asking for the board."],
+      vet: ["Those vet bills are eating your margins. Who's minding the animals?"],
+      early: ["Pre-revenue is fine at this stage. Keep building.", "Construction is a phase. So is runway. Keep an eye on both."],
+      flat: ["Growth is expensive. Show us the path to profitability.", "Flat is the new up, said nobody on our board."]
+    }
+  };
+
+  // ---------- Staff wellbeing ----------
+  // Every staff role shares one model (staff.js): work builds fatigue,
+  // rest and holidays take it away; tired staff fall sick or burn out;
+  // morale follows fatigue, and staff with very low morale quit. Only
+  // keepers exist so far; other roles (tour guides, …) plug in here.
+  var STAFF = {
+    keeper: {
+      // Load = Σ over the stocked exhibits a keeper looks after of
+      // weight / (keepers present there); weight = base + perCheck × checks.
+      exhibitWeight: { base: 0.5, perCheck: 1 / 16 },
+      fatiguePerDay: 0.45, loadExponent: 1.5, // fatigue/day = fatiguePerDay × load^loadExponent
+      restPerDay: 2,                           // in the staff room
+      perSickAnimal: 1,                        // a logical error on their watch is stressful
+      vacation: { allowance: 21, chunk: 7, autoAt: 40, notice: 3, minGap: 30, recovery: 10 },
+      sick: { at: 60, per: 150, days: [2, 5], recovery: 6 },        // daily chance (fatigue − at) / per
+      burnout: { at: 85, per: 50, days: 14, recovery: 5, morale: 30 },
+      morale: { start: 75, base: 85, perFatigue: 0.6, drift: 0.1, trained: 10, colleagueQuit: 5,
+        quitBelow: 25, quitPer: 80 },
+      bonus: { salaryDays: 20, morale: 20, cooldownDays: 60 }
+    },
+    // Scaffold: tour guides will steer investor tours (choose the route,
+    // add charm). Not hireable yet.
+    guide: { scaffold: true }
   };
 
   // Can species `speciesId` live in biome `biomeId`? Returns
@@ -476,6 +725,8 @@
     KEEPER_LEVELS: KEEPER_LEVELS, MAX_KEEPER_LEVEL: MAX_KEEPER_LEVEL, TRAINING: TRAINING,
     KEEPER_SPEED: KEEPER_SPEED, KEEPER_NAMES: KEEPER_NAMES, LAB: LAB, RESEARCH: RESEARCH,
     BUILD: BUILD, START_KNOWN: START_KNOWN, DESIGNS: DESIGNS, CUSTOM: CUSTOM,
+    ROUNDS: ROUNDS, FUNDING: FUNDING, VALUATION: VALUATION, CONFIDENCE: CONFIDENCE, FOCUS: FOCUS,
+    INVESTORS: INVESTORS, INVESTOR_NAMES: INVESTOR_NAMES, TOURS: TOURS, PERKS: PERKS, QUOTES: QUOTES, STAFF: STAFF,
     checkPlacement: checkPlacement
   };
   if (typeof module !== "undefined" && module.exports) module.exports = ZooData;

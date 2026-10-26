@@ -235,6 +235,7 @@
         ["Type", a.n && a.m && !a.problems.length || a.clash ? (a.css ? "CSS (X and Z checks separate)" : "non-CSS (checks mix X and Z)") : "—"],
         ["Wires (CNOTs/round)", String(a.wires)],
         ["Cost", money(a.cost) + " + " + money(a.upkeep) + "/day"],
+        ["Build time", a.days + " days"],
         ["Size", a.footprint[0] + "×" + a.footprint[1] + " tiles (" + (a.n + a.m) + " qubits)"]
       ];
       html += '<dl class="facts">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; }).join("") + "</dl>";
@@ -300,7 +301,7 @@
       undoB.disabled = !history.length;
       var spot = a.valid && park.cash >= a.cost;
       place.disabled = !spot;
-      place.textContent = a.valid ? "Place in park · " + money(a.cost) + " · " + a.footprint.join("×") : "Place in park";
+      place.textContent = a.valid ? "Place in park · " + money(a.cost) + " · " + a.footprint.join("×") + " · " + a.days + " days" : "Place in park";
       place.title = !a.valid ? (a.problems[0] || "") : park.cash < a.cost ? "Not enough funding." : "";
     }
     renderTools();

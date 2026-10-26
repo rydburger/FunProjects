@@ -5,33 +5,81 @@ to [`../stabilizer.js`](../stabilizer.js) and [`../detectors.js`](../detectors.j
 
 A Zoo Tycoon–style management game where the zoo is a quantum startup. The animals are
 quantum error-correcting codes, the habitats are the stabilizer checks an enclosure measures,
-and the zookeepers are decoders. Keep your logical qubits alive, keep the visitors coming, and
-close your Series A before the money runs out.
+and the zookeepers are decoders. You start with a $10M seed round. Keep your logical qubits
+alive, keep your keepers from burning out, keep investors impressed, and raise round after round
+(Series A at $300M, up to an IPO at $20B) before the money runs out.
 
 ## How to play
 
 1. **Build an enclosure.** Pick a habitat from the palette and click the park to place it. At
-   first you only know how to keep the Repetition Tortoise.
+   first you only know how to keep the Repetition Tortoise. Prices are at AMO-lab scale (a
+   tortoise is about $400k all in, a d = 3 surface code about $2M), and **construction takes
+   time**: 45 days for the riverbank, a year for a new surface code. You pay up front; upkeep
+   starts when it opens.
 2. **Buy an animal.** Click the enclosure. An animal can only live in a habitat that measures
    exactly its stabilizer group. Every other species is listed with the physics reason it
    can't move in. A code with k logical qubits holds k animals, each with its own health.
-3. **Discover species in the habitat workshop** (see below). Building a working habitat for a
-   code discovers its species and unlocks its catalogue habitat.
-4. **Hire a keeper.** Without one, nobody measures the checks, errors pile up, and an unkept
-   code does *worse* than a bare qubit. Keepers are hired as trainees and learn (see below).
+3. **Discover species in the habitat workshop** (see below). A habitat you design discovers its
+   species when it opens (if the code works), and unlocks its catalogue habitat.
+4. **Hire keepers.** Without one, nobody measures the checks, errors pile up, and an unkept
+   code does *worse* than a bare qubit. Keepers are hired as trainees and learn; one keeper can
+   look after several exhibits, and several keepers can share one (see below).
 5. **Fund the lab.** Research lowers the hardware's error rates for every enclosure at once.
 6. **Watch the books.** Healthy, rare animals draw visitors. Each logical error costs a vet bill
    and some reputation. Salaries and upkeep are paid continuously.
+7. **Raise money.** Investors tour the zoo; when their valuation beats the next round's target,
+   start a roadshow (see below).
 
-- **Win:** end a day with **$250,000** in the bank and **reputation ≥ 80**: "Series A closed". You
-  can keep playing afterwards.
+- **Win:** list on the stock market: the **IPO** at a **$20B** valuation. You can keep playing
+  afterwards.
 - **Lose:** end **7 days in a row** in debt: "ran out of runway".
-- Every 30 days an **investor update** summarises the month: revenue, costs, vet bills, runway,
-  and your sickest exhibit.
-- The game **autosaves** in your browser at the end of every day and after every action.
-  **New game** starts over.
-- Keys: <kbd>space</kbd> pause/resume, <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> speed,
-  <kbd>Esc</kbd> cancel building / close the inspector.
+- Every 30 days a **monthly report** in the news summarises revenue, costs, vet bills and runway,
+  with a line from the board.
+- The game **autosaves** in your browser every few seconds and when you leave. **New game**
+  starts over. Saves from before the funding update can't be loaded.
+- Keys: <kbd>space</kbd> pause/resume, <kbd>1</kbd>–<kbd>4</kbd> speed (up to about a year a
+  minute), <kbd>Esc</kbd> cancel building / close the inspector.
+
+### Investors, rounds and the IPO
+
+| Round | Target valuation | Sells | Roadmap (examples) |
+|---|---|---|---|
+| Seed | $40M (done) | 25% for $10M | |
+| Series A | $300M | 15% | 3 species, 4 animals on show, a d = 3 code, $20k/day tickets |
+| Series B | $2B | 12% | 5 species, 10 animals, a d = 5 code, a head keeper |
+| Series C | $5B | 10% | 7 species, 18 animals, 6 lab upgrades |
+| Series D | $10B | 8% | 26 animals, < 0.02 logical errors per animal per day, morale 60+ |
+| IPO | $20B | 10% | 34 animals, 9 species, 10 lab upgrades |
+
+- **The valuation** is (ticket sales × a multiple that grows with revenue growth + animals × d² ×
+  health + species + lab upgrades) × hype × a stage premium × a roadmap factor. Hype doubles every
+  30 points of **investor confidence** above 50. Missing roadmap milestones costs up to 35%. The
+  investors panel shows each part.
+- **Raising** starts a 21-day roadshow; investors tour every 3 days, and at the end they name their
+  price. At or above the target the round closes: cash in, part of the company sold, and a
+  **bigger lot**. Investors then want to see the money at work for 300 days. At 60–100% of the
+  target they offer a **bridge** (a little cash, no new letter); below that they pass, and you
+  can try again in 45 days. The better the round, the more effusive the quotes.
+- **Tours.** Every few weeks an investor walks past up to three exhibits (the biggest draws).
+  Each fund cares most about one thing: healthy animals, low logical error rates, a happy team,
+  the roadmap, growth, or big codes and rare species. A logical error on the route while they
+  watch costs a lot. You can take them out (steak, omakase, a ski weekend) for a better impression.
+  Tour guides will choose the route in a later version.
+
+### Staff: load, holidays, burnout
+
+A keeper's time is split between the stocked exhibits they look after, in proportion to each
+one's weight (0.5 + checks/16: a tortoise 0.6, a d = 3 surface code 1, the d = 5 one 2), shared
+with any other keeper there. Spread a keeper thin and each exhibit gets less decoding: first they
+fall back to cheaper decoders, then they only get to some of the rounds, and unattended rounds
+let errors pile up. Two keepers on one exhibit pool their time.
+
+The same load tires them: fatigue grows as load^1.5 a day (a logical error on their watch adds
+to it), and rest in the staff room or on holiday takes it away. Everyone has 21 days of holiday a
+year; tired keepers book a week three days ahead (cover their exhibits!), or you can send them
+off now. Tired keepers fall sick, very tired ones burn out for two weeks, and keepers whose
+morale sinks quit, which hurts everyone's morale and investor confidence. A bonus (20 days'
+salary) lifts morale.
 
 The **exhibit sandbox** (`sandbox.html`, linked from every enclosure) follows one animal round by
 round: noise lands, the checks are measured (some outcomes misread), the keeper corrects. You can
@@ -67,8 +115,12 @@ the price and the footprint. It also names the species, if it's one the zoo know
   its checks. Its appeal grows with distance.
 - **Every design you build goes into your blueprint book** (it appears in the build menu) and
   can be built again without the workshop.
-- **What a habitat costs:** $1,000 per qubit (data or ancilla) plus $100 per wire, with upkeep
-  of $5 per qubit and $1 per wire a day. Two qubits take a tile of park.
+- **What a habitat costs:** $60,000 per qubit (data or ancilla) plus $5,000 per wire, with upkeep
+  of $150 per qubit and $10 per wire a day. Two qubits take a tile of park. Construction takes
+  365 × (qubits / 17)^1.2 days, between 30 and 540: a year for the 17-qubit surface code.
+- **Blueprints can be deleted** from the build menu (×). One still in use leaves the menu now and
+  the book once its last enclosure is gone. A species you discovered can be dropped from the
+  field guide once nothing in the zoo holds it.
 - **What can't be built:** checks that anticommute (measuring one would scramble the other), a
   check with no wires, or checks that leave no room for an animal (k = 0). Redundant checks
   are allowed (a second opinion against misreads), and so are poor codes: at d = 1 the animal
@@ -82,10 +134,10 @@ while they keep working) to learn the next decoder.
 
 | Level | Title | Decoder | Salary |
 |---|---|---|---|
-| 1 | Trainee | Single-shot lookup of single-qubit errors; trusts every outcome | $120/day |
-| 2 | Keeper | Single-shot minimum-weight lookup (up to weight 2) | $150/day |
-| 3 | Senior keeper | Space-time decoding over 2 rounds | $190/day |
-| 4 | Head keeper | Space-time decoding over 3 rounds | $240/day |
+| 1 | Trainee | Single-shot lookup of single-qubit errors; trusts every outcome | $450/day |
+| 2 | Keeper | Single-shot minimum-weight lookup (up to weight 2) | $550/day |
+| 3 | Senior keeper | Space-time decoding over 2 rounds | $700/day |
+| 4 | Head keeper | Space-time decoding over 3 rounds | $850/day |
 
 Measurements are noisy: a check outcome can be misread. A single-shot keeper takes a misread
 at face value and "fixes" a qubit that was fine (and has to fix it back next round). A
@@ -101,7 +153,7 @@ falling behind, so slow keepers fall back to faster decoders.)
 
 ### The lab
 
-One research project at a time, each with a fee and a few days' wait:
+One research project at a time: $1.5M for 30 days, $4M for 60 days, then $10M for 90 days:
 
 | Dial | What it does |
 |---|---|
@@ -110,10 +162,10 @@ One research project at a time, each with a fee and a few days' wait:
 | Readout | Fewer misread outcomes |
 | Syndrome cycle | More rounds per hour: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode |
 
-Seeded bot players pin the incentives (see the balance tests): a zoo that trains its keepers
-where animals keep getting sick and funds the lab closes the Series A around day 90; one that
-never invests in either takes over 200 days or goes bankrupt; a zoo with no keepers goes
-bankrupt within about 25 days.
+Seeded bot players pin the incentives (see the balance tests): a zoo that builds steadily, staffs
+bigger codes with two keepers, trains them, funds the lab and discovers new codes raises its
+Series A in 7–13 months and lists in about 5.5–7.5 years; a zoo with no keepers goes bankrupt in
+its first year; one that never trains, researches or looks after its staff doesn't list.
 
 ## Under the hood
 
@@ -125,7 +177,9 @@ Everything the player sees is physically correct:
 - **Measurements** follow the detector paradigm. The first round sets the reference; a
   *detector* is a check's outcome compared with the previous round's. Each outcome can be
   misread (phenomenological noise: the measurement circuit itself isn't simulated yet).
-  **Corrections** go into a software Pauli frame, as on real hardware.
+  **Corrections** go into a software Pauli frame, as on real hardware: nothing is applied to the
+  qubits, and later outcomes (and the final readout) are reinterpreted through the frame. A
+  detector firing is not a logical error; the vet below decides that.
 - **Identifying a built code** searches for a qubit relabelling and per-qubit Pauli swaps that map
   every built check into the species' stabilizer group (the groups have the same size, so that
   makes them equal). The tests check it on scrambled copies of every species and that equal
@@ -152,7 +206,9 @@ Everything the player sees is physically correct:
 | `habitat.js` | Workshop designs: analysis, price, footprint, identifying a code up to relabelling |
 | `placard.js` | Zoo placards (written facts plus parameters computed from the checks) |
 | `exhibit-sim.js` | One exhibit: noise → measure → correct rounds, keeper speed, the vet, health |
-| `park.js` | The zoo: grid, building, staff, lab, money, reputation, clock, win/lose, investor updates, save/load |
+| `staff.js` | Staff wellbeing for any role: fatigue, holidays, sick days, burnout, morale, resignations |
+| `investors.js` | Valuation, roadmaps, tour impressions, round outcomes and quotes (pure functions) |
+| `park.js` | The zoo: lot, construction, staffing, lab, money, investors, rounds, clock, save/load |
 | `exhibit-view.js` | SVG drawing of an exhibit ("really there" / "keeper sees") |
 | `workshop.js` | The habitat workshop editor |
 | `zoo.css` | Shared theme and styles |
@@ -172,5 +228,6 @@ node quantum-games/tests/zoo-tycoon.test.js   # exhibit sim, keepers, lab, park 
 ## Status
 
 v0 (M0–M3) and v1's M4–M7 (factual placards, the detector engine, learning keepers and the lab,
-the habitat workshop with discovery) are done; see [`PLAN.md`](PLAN.md). Next: circuit-level
-noise (M8).
+the habitat workshop with discovery) are done, plus the funding update (AMO-scale economy,
+construction, rounds to an IPO, investor tours, shared keepers and staff wellbeing); see
+[`STATUS.md`](STATUS.md). Next: circuit-level noise (M8).

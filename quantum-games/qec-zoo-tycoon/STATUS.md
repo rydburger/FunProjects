@@ -1,13 +1,14 @@
 # Zoo Tycoon — status & handoff
 
-Last updated: 2026-10-13 (M7). Written so a new session can resume without the original chat.
+Last updated: 2026-10-26 (funding update, after M7). Written so a new session can resume without the original chat.
 Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan**) and
 [`README.md`](README.md) (player-facing rules and how it works).
 
 ## Where things stand
 
 **v0 is complete (M0–M3). v1 is under way: M4 (placards), M5 (engine), M6 (learning keepers
-and the lab) and M7 (the habitat workshop and discovery) are done.**
+and the lab) and M7 (the habitat workshop and discovery) are done. After the owner's first
+playtest (2026-10-26) the "funding update" reworked the economy and goal; see below.**
 The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan" before continuing.
 
 - **PR history:**
@@ -16,12 +17,41 @@ The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
   - [#4](https://github.com/rydburger/FunProjects/pull/4) added CLAUDE.md and this file.
   - [#5](https://github.com/rydburger/FunProjects/pull/5) merged M4 + M5.
   - [#6](https://github.com/rydburger/FunProjects/pull/6) merged M6.
-  - M7 is on branch `claude/epic-ride-l7e51i` (restarted from `main` after #6).
-- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 72 in
-  `tests/zoo-tycoon.test.js`, all passing.
-- **Browser checks:** park (workshop, discovery, field guide, two-animal exhibit, staff, lab) and
-  sandbox verified in headless Chromium in light and dark themes and at 390px width, with no
-  console errors.
+  - [#7](https://github.com/rydburger/FunProjects/pull/7) merged M7.
+  - The funding update is on branch `claude/gifted-darwin-pd1muz`.
+- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 88 in
+  `tests/zoo-tycoon.test.js`, all passing (the zoo suite takes ~10 s: its bots play up to ten
+  game years).
+- **Browser checks:** park (construction, staffing, tours and perks, a raise and its verdict,
+  demolish, blueprint delete, a two-year bot save at 60× speed: steady 60 fps) and sandbox (0.1×)
+  verified in headless Chromium in light and dark themes and at 390px width, with no console errors.
+
+### The funding update (2026-10-26)
+
+The owner's playtest asked for: an easier, AMO-realistic economy ($10M seed, ~$2M per surface-code
+experiment, construction timers: a year for the surface code); rounds up to an IPO at $20B with
+investor praise that scales with the result; routine investor tours (scaffolded for tour guides)
+with steak dinners; deleting blueprints; a working demolish button (a `var label = label(rec)`
+shadowing bug); keepers on several exhibits with diluted decoding; fatigue, holidays (21 days a
+year in chunks), sickness, burnout and resignation for keepers (scaffolded for other staff); a
+0.1× sandbox speed; and a performance pass. All done:
+- `staff.js` (new): role-generic wellbeing. `investors.js` (new): valuation, roadmap, tour
+  impressions, round tiers and quotes as pure functions over `Park.metrics`.
+- `park.js`: construction (`rec.building`, `buildUntil`; designs discover their species when they
+  open), many-to-many keepers (`rec.keeperIds`, `keeper.exhibitIds`, `staffing()` splits each
+  keeper's speed by exhibit weight), tours, raises (`startRaise` → roadshow → `round` event:
+  closed / bridge / pass), the growing lot (`setLot`), `deleteDesign`, `forgetSpecies`, daily
+  `history` for metrics, save version 4 (older saves are rejected with a clear message).
+- `exhibit-sim.js`: `attendance` — a keeper below the cheapest decoder's cost attends only that
+  fraction of rounds (deterministic credit); unattended rounds aren't measured or corrected.
+- `detectors.js`: per-model memo (`mem.memo`: model key, matchability) and per-decoder graph
+  handles, so matching no longer rebuilds a long JSON key every round.
+- UI: valuation and next-round KPIs, an investors panel (roadmap, valuation breakdown, raise,
+  bridge offers, round history), a tour banner with perks, round/IPO dialogs, construction tiles,
+  a multi-keeper inspector, a staff panel with fatigue/morale, holiday, bonus and two-click
+  let-go, blueprint delete, speeds up to 60× (a year in ~73 s), cached tile DOM, incremental news,
+  throttled saves.
+- The sandbox narrates corrections as Pauli frame updates.
 
 | Milestone | Delivered |
 |---|---|
@@ -85,13 +115,16 @@ The game files build on it:
   finds flipped is one sick animal. `noiseModel` turns lab values into per-qubit/per-check rates; `effectiveLevel`
   is the best decoder the keeper can run in real time; `advancePhase` steps noise → measure →
   correct; `snapshot`/`restore` for saves.
-- `park.js` runs the whole zoo: building (catalogue habitats need their species known;
-  `studyDesign` / `buildDesign` for designs), the book (`park.book`: known species, designs,
-  uncatalogued species), animals, staff (`hireKeeper`, `assignKeeper`,
-  `fireKeeper`, `canTrain`/`trainKeeper`), the lab (`canResearch`/`startResearch`), `tick`
-  (events: `sick`, `day`, `debt`, `investor`, `won`, `lost`, `trained`, `research`), and
-  `save`/`load` (version 3; version 2 saves are migrated with the five original species known; v1
-  saves are rejected).
+- `park.js` runs the whole zoo: the lot (grows with each round), building with construction
+  times (catalogue habitats need their species known; `studyDesign` / `buildDesign` for designs),
+  the book (`park.book`: known species, designs, uncatalogued species; `deleteDesign`,
+  `forgetSpecies`), animals, staff (`hireKeeper`, `assignKeeper`/`unassignKeeper` (many-to-many),
+  `fireKeeper`, `canTrain`/`trainKeeper`, `sendOnVacation`, `giveBonus`, `staffing`), the lab
+  (`canResearch`/`startResearch`), investors (`metrics`, `valuation`, `startRaise`,
+  `acceptOffer`/`declineOffer`, `buyPerk`), `tick` (events: `sick`, `built`, `discovered`, `day`,
+  `month`, `debt`, `lost`, `trained`, `research`, `staff`, `tour-start`, `tour`, `milestone`,
+  `round`), and `save`/`load` (version 4; older saves are rejected).
+- `staff.js` is the wellbeing model for any staff role; `investors.js` judges the zoo.
 - Everything above is DOM-free and loads in Node.
 - `exhibit-view.js` does the SVG drawing (species layouts, or a design's own positions),
   `workshop.js` is the editor, and the two HTML pages are UI only.
@@ -130,8 +163,36 @@ The game files build on it:
 
 ## Current numbers (zoo-data.js)
 
-- **Start:** $50k and reputation 50. **Goal:** $250k with reputation ≥ 80 at the end of a day.
-  **Lose:** 7 consecutive days in debt. **Time:** 24 ticks per day; 1× speed = 2 ticks per second.
+- **Start:** a $10M seed round at $40M (founders keep 75%), reputation 50, investor confidence 50,
+  a 12×8 lot. **Goal:** the IPO ($20B). **Lose:** 7 consecutive days in debt. **Time:** 24 ticks
+  per day; 1× speed = 2 ticks per second; speeds 1/5/20/60×.
+- **Rounds:** A $300M (sells 15%), B $2B (12%), C $5B (10%), D $10B (8%), IPO $20B (10%), stage
+  premiums ×1, 1.25, 1.6, 2, 3. Roadshow 21 days (tours every 3); after a close, 300 days before
+  the next raise; bridge at 60–100% of target (sells 6%); pass → 45-day cooldown. Lots 12×8 →
+  14×10 → 16×12 → 18×13 → 20×14 → 22×15.
+- **Valuation:** (revenue/yr × (20 + 40 × growth) + $6M × Σ k·d²·health + $30M × species + $20M
+  × lab levels) × 2^((confidence − 50)/30) × premium × (1 − 0.35 × share of milestones missed).
+  Growth is the 30-day revenue change (capped at 100%; from a standing start it counts as 100%).
+- **Confidence:** tours move it by 0.2 × (impression − 50); +2 per discovery, +3 per milestone,
+  −3 per resignation, −2 per day in debt, ±4 a month with revenue growth, +5/−5 on a close/pass;
+  1% a day back toward 50. Impression = weighted mean of health, error rate, morale, roadmap,
+  growth and wow (the fund's focus ×3), −25 per logical error on the route, + perk (6/10/15 for
+  $15k/$45k/$140k).
+- **Prices:** catalogue habitats $300k (riverbank, 45 days) to $3.2M (marsh, 400 days); animals
+  $100k (tortoise) to $1.5M (giant); workshop $60k/qubit + $5k/wire, 365 × (qubits/17)^1.2 days
+  (30–540). Upkeep ~$800–8,000/day. Vet bill $10k. Tickets $20, 2 visitors per appeal point.
+- **Staff:** salaries $450/$550/$700/$850 a day; training needs 500/2000/5000 rounds and costs
+  $20k/3 days, $50k/5 days, $100k/7 days; speed 4 + xp/1000 (max 12). Load weight 0.5 +
+  checks/16. Fatigue 0.45 × load^1.5 a day (+1 per logical error on their watch), −2 a day
+  resting, −10 a day on holiday. Holiday 21 days a year, booked a week at a time 3 days ahead
+  once fatigue ≥ 40 (30 days apart). Sick past fatigue 60, burnout past 85 (14 days, −30 morale);
+  morale drifts to 85 − 0.6 × fatigue; quits possible below 25. Bonus = 20 days' salary, +20
+  morale, every 60 days at most.
+- **Lab:** research $1.5M/30 days, $4M/60 days, $10M/90 days per level.
+- **Balance result (2026-10-26):** the test bot (see the balance tests) raises the Series A in
+  7–13 months and lists in 5.5–7.5 years (3 of 5 seeds within ten years; the others hover around
+  $20B); no keepers → bankrupt in year 1; no training/research/care → never lists.
+- *Below: physics and older notes (the dollar figures in them are pre-update).*
 - **Lab** (per level 0 → 3): coherence 0.8% → 0.55% → 0.35% → 0.2% per qubit per hour; gates
   0.08% → 0.06% → 0.04% → 0.02% per CNOT; readout 1% → 0.7% → 0.45% → 0.25%; cycle 1 → 2 → 3
   rounds/hour. Research costs $5k/2 days, $12k/4 days, $25k/6 days for levels 1/2/3. Channels:
@@ -164,8 +225,14 @@ The game files build on it:
 
 - The game ends at midnight, so the top bar reads "Day N+1" while the dialog says it ended on
   day N.
-- $50k can't afford the Wetlands + Axolotl + keeper at the start. This is intentional (you
-  earn your way to the flagship) but worth revisiting.
+- **Early valuations are growth-driven:** from a standing start revenue growth counts as 100%, so
+  the first months' valuations jump when the first animals go on show. Satirically apt; revisit
+  if it feels arbitrary.
+- **Late game cash piles up** (billions after Series C). Lot space, construction time, staff and
+  error rates are the constraints then. More late sinks (guides, shops, bigger lab tiers) would help.
+- **d = 2 codes are money pits** (many animals, constantly sick). Honest; postselection would fix it.
+- Tour routes are picked by appeal; tour guides (scaffolded in `STAFF.guide`, `tour.guide`,
+  `chooseRoute`) should choose them.
 - The Steane Peacock's X/Z check pairs sit close together in the drawing (readable, but busy).
 - The Pangolin uses 🦔 because there is no pangolin emoji.
 - **Tortoise spam.** A bot allowed unlimited copies fills the park with ~20 Tortoises: cheap,
@@ -193,8 +260,10 @@ Follow the v1 milestones in PLAN.md:
 4. Subsystem codes (Bacon–Shor): anticommuting checks measured on purpose; postselection for
    detection codes; more discoverable species (color codes, [[8,3,2]], [[15,1,3]]).
 
-Still open from v0: guests with needs (funding agencies, investors, academics, press), park design
-(paths, guest flow, tour guides, shops), climates (biased noise, erasure, leakage).
+Also: tour guides (route choice, charm; the scaffolding is in place), other staff roles on the
+shared wellbeing model, holiday requests the player approves. Still open from v0: other guests
+(funding agencies, academics, press), park design (paths, guest flow, shops), climates (biased
+noise, erasure, leakage).
 
 ## Starter prompt for a new session
 

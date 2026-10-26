@@ -75,7 +75,8 @@
         <div class="field">
           <span class="label">Speed</span>
           <div class="seg" id="speedSeg">
-            <button type="button" data-speed="watch">Watch</button>
+            <button type="button" data-speed="slow" title="Watch, one step every 7 seconds">0.1×</button>
+            <button type="button" data-speed="watch" title="Watch, one step every 0.7 seconds">Watch</button>
             <button type="button" data-speed="1">1×</button>
             <button type="button" data-speed="10">10×</button>
             <button type="button" data-speed="100">100×</button>
@@ -123,7 +124,7 @@
           <span><i class="sq" style="border:2px solid var(--check-z)"></i>Z check</span>
           <span><i class="sq" style="border:2px solid var(--check-mix)"></i>mixed check</span>
           <span><i class="sq" style="background:var(--lit)"></i>check fired</span>
-          <span><i style="border:3px solid var(--fix)"></i>keeper's correction</span>
+          <span><i style="border:3px solid var(--fix)"></i>keeper's correction (Pauli frame update)</span>
         </div>
       </div>
 
@@ -244,7 +245,8 @@
     var fix = ev.correction && !S.isIdentity(ev.correction);
     var note = !keeper ? "Errors are left to pile up."
       : ev.shrug ? name + " doesn't recognise this pattern and leaves it."
-      : fix ? name + " applies <b>" + describe(ev.correction) + "</b>" + (W > 1 ? " (for what happened " + (W - 1) + " round" + (W > 2 ? "s" : "") + " ago)." : ".")
+      : fix ? name + " records <b>" + describe(ev.correction) + "</b> in the Pauli frame" + (W > 1 ? " (for what happened " + (W - 1) + " round" + (W > 2 ? "s" : "") + " ago)" : "") +
+        ". Nothing touches the qubits: the frame is bookkeeping that later outcomes and the final readout are reinterpreted through."
       : W > 1 && !ev.committed ? name + " waits for more rounds before deciding anything."
       : W > 1 ? name + " decides that nothing needs fixing yet" + (ev.syndrome ? ": a lone flip is usually a misread, and the next rounds will tell." : ".")
       : ev.syndrome === 0 ? "Nothing to fix." : name + " sees nothing to fix.";
@@ -369,7 +371,9 @@
     Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
       b.classList.toggle("on", b.dataset.speed === state.speed);
     });
-    $("speedMsg").textContent = state.speed === "watch"
+    $("speedMsg").textContent = state.speed === "slow"
+      ? "Slow watch: one step every " + (WATCH_MS * SLOW_FACTOR / 1000) + " seconds, time to read each one. Step moves on sooner."
+      : state.speed === "watch"
       ? "Watch mode walks through each round: noise → checks → correction."
       : "About " + state.speed + " tick" + (state.speed === "1" ? "" : "s") + " per second.";
     var sp = SPECIES[state.speciesId];
@@ -378,7 +382,8 @@
 
   // ---------- time ----------
   var lastFrame = 0, acc = 0;
-  var WATCH_MS = 700;
+  var WATCH_MS = 700, SLOW_FACTOR = 10;
+  function watching() { return state.speed === "watch" || state.speed === "slow"; }
   function setRunning(on) {
     state.running = on && placement().ok;
     lastFrame = 0; acc = 0;
@@ -390,8 +395,8 @@
     if (!lastFrame) lastFrame = t;
     acc += t - lastFrame;
     lastFrame = t;
-    if (state.speed === "watch") {
-      if (acc >= WATCH_MS) {
+    if (watching()) {
+      if (acc >= WATCH_MS * (state.speed === "slow" ? SLOW_FACTOR : 1)) {
         acc = 0;
         stepPhase();
         if (justSick && state.pauseOnSick) setRunning(false);

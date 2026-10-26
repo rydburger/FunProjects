@@ -16,9 +16,13 @@
 // Without a keeper nobody measures: errors just pile up.
 //
 // Keepers. A keeper has a level (an algorithm: KEEPER_LEVELS in
-// zoo-data.js) and a speed. Decoding costs work every round, so a keeper
-// who can't keep up with an algorithm at this exhibit's cycle rate uses
-// the best one they can run in real time (effectiveLevel). Space-time
+// zoo-data.js) and a speed (the share of their time this exhibit gets;
+// the park splits a keeper's time between exhibits). Decoding costs work
+// every round, so a keeper who can't keep up with an algorithm at this
+// exhibit's cycle rate uses the best one they can run in real time
+// (effectiveLevel). Below even the single-shot lookup's cost they attend
+// only a fraction of the rounds (attendance): unattended rounds aren't
+// measured or corrected, so errors pile up for longer. Space-time
 // decoders look `window` rounds ahead, so they commit corrections for a
 // round only once later rounds are in.
 //
@@ -90,7 +94,7 @@
     var mem = ex.mem;
     if (mem.checks.length * window <= 32) return true;
     var css = mem.checks.every(function (c) { return c.x === 0 || c.z === 0; });
-    return css && D.isMatchable(mem.impl.dem(mem, 2, { openTop: true, decompose: true }));
+    return css && D.matchable(mem);
   }
   // Can this algorithm be run on this code at all (at any speed)?
   function canRun(ex, level) {
@@ -106,8 +110,15 @@
       ? D.lookupDecoder(ex.mem, L.maxWeight)
       : D.spacetimeDecoder(ex.mem, { window: L.window });
   }
+  // Fraction of rounds a keeper can attend (1 unless spread too thin for
+  // even the cheapest decoder).
+  function attendance(ex, keeper) {
+    if (!keeper) return 0;
+    return Math.min(1, keeper.speed / (workPerRound(ex, 1) * roundsPerTick(ex)));
+  }
   // (Re)build the decoder if the effective level changed (or `force`).
   function refreshDecoder(ex, force) {
+    ex.attendance = attendance(ex, ex.keeper);
     var lvl = effectiveLevel(ex, ex.keeper);
     if (!force && lvl === ex.level) return;
     ex.level = lvl;
@@ -127,7 +138,7 @@
     var ex = {
       speciesId: opts.speciesId, code: code, k: k, channel: opts.channel || "depolarizing", lab: lab, rng: rng,
       mem: D.createMemory({ code: code, checks: checks, model: noiseModel(code, checks, opts.channel, lab), rng: rng }),
-      keeper: null, level: 0, dec: null, Ehist: [],
+      keeper: null, level: 0, dec: null, Ehist: [], attendance: 0, credit: 0, attended: false,
       phase: "idle", roundInTick: 0, pending: null,
       ticks: 0, rounds: 0, decoded: 0, sick: 0, health: 100, healths: healths,
       lastNoise: null, lastRound: null, lastCorrection: null,
@@ -139,6 +150,9 @@
     return ex;
   }
   function setKeeper(ex, keeper) {
+    var old = ex.keeper;
+    if (old && keeper && old.level === keeper.level && old.speed === keeper.speed) return;
+    if (!old && !keeper && ex.dec === null && ex.level === 0) return;
     ex.keeper = keeper ? { level: keeper.level, speed: keeper.speed } : null;
     refreshDecoder(ex, false);
   }
@@ -168,8 +182,15 @@
   // kind is "X̄", "Z̄" or "Ȳ" (with the animal's number when k > 1); the
   // event's kind is the first sick animal's.
   function advancePhase(ex) {
-    var code = ex.code, mem = ex.mem, keeper = ex.level > 0;
+    var code = ex.code, mem = ex.mem;
     if (ex.phase === "idle" || ex.phase === "correct") {
+      // Does the keeper make it to this round? (Deterministic: attendance
+      // accumulates as credit.)
+      ex.attended = false;
+      if (ex.level > 0) {
+        ex.credit += ex.attendance;
+        if (ex.credit >= 1 - 1e-9) { ex.credit -= 1; ex.attended = true; }
+      }
       ex.pending = D.sampleDataNoise(mem);
       ex.lastNoise = ex.pending;
       ex.lastRound = null; ex.lastCorrection = null;
@@ -178,6 +199,7 @@
       mem.E = S.multiply(mem.E, ex.pending);
       return { phase: "noise", noise: ex.pending };
     }
+    var keeper = ex.attended;
     if (ex.phase === "noise") {
       ex.phase = "measure";
       if (!keeper) return { phase: "measure", syndrome: null, flips: null, detectors: null };
@@ -188,7 +210,7 @@
     ex.phase = "correct";
     var r = ex.lastRound;
     var ev = {
-      phase: "correct", keeper: keeper, level: ex.level, syndrome: r ? r.outcomes : null, flips: r ? r.flips : null,
+      phase: "correct", keeper: keeper, level: keeper ? ex.level : 0, syndrome: r ? r.outcomes : null, flips: r ? r.flips : null,
       correction: null, shrug: false, before: residual(ex), committed: false,
       sick: null, leftover: null, clean: false, tickDone: false
     };
@@ -273,7 +295,7 @@
     return {
       speciesId: ex.speciesId, channel: ex.channel, E: ex.mem.E, frame: ex.mem.frame, last: ex.mem.last,
       round: ex.mem.round, ticks: ex.ticks, rounds: ex.rounds, decoded: ex.decoded, sick: ex.sick,
-      health: ex.health, healths: ex.healths.slice(), roundInTick: ex.roundInTick, incident: ex.incident
+      health: ex.health, healths: ex.healths.slice(), roundInTick: ex.roundInTick, incident: ex.incident, credit: ex.credit
     };
   }
   // opts: { lab, keeper, rng, code, checks } (code and checks as for
@@ -283,6 +305,7 @@
       lab: opts.lab, keeper: null, rng: opts.rng });
     ex.mem.E = snap.E; ex.mem.frame = snap.frame; ex.mem.last = snap.last; ex.mem.round = snap.round;
     ["ticks", "rounds", "decoded", "sick", "health", "roundInTick", "incident"].forEach(function (k) { ex[k] = snap[k]; });
+    ex.credit = snap.credit || 0;
     ex.healths = Array.isArray(snap.healths) && snap.healths.length === ex.k ? snap.healths.slice()
       : ex.healths.map(function () { return snap.health; });
     setKeeper(ex, opts.keeper || null);

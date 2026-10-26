@@ -186,7 +186,8 @@
       noise: expandModel(opts.model, opts.code.n, checks.length),
       schedule: opts.schedule || defaultSchedule(checks),
       rng: opts.rng || Math.random,
-      E: S.identity(opts.code.n), frame: S.identity(opts.code.n), last: 0, round: 0
+      E: S.identity(opts.code.n), frame: S.identity(opts.code.n), last: 0, round: 0,
+      memo: {} // per-model facts decoders share (model key, matchability)
     };
   }
   function measureRound(mem, opts) { return mem.impl.sampleRound(mem, opts); }
@@ -196,6 +197,19 @@
     mem.impl = modelImpl(model);
     mem.model = model;
     mem.noise = expandModel(model, mem.code.n, mem.checks.length);
+    mem.memo = {};
+  }
+  // Cache key of the noise model, and whether every fault lights at most
+  // two detectors (CSS split), both computed once per model.
+  function modelKey(mem) {
+    if (!mem.memo) mem.memo = {};
+    if (mem.memo.key === undefined) mem.memo.key = JSON.stringify(mem.model);
+    return mem.memo.key;
+  }
+  function memMatchable(mem) {
+    if (!mem.memo) mem.memo = {};
+    if (mem.memo.matchable === undefined) mem.memo.matchable = isMatchable(mem.impl.dem(mem, 2, { openTop: true, decompose: true }));
+    return mem.memo.matchable;
   }
   function applyCorrection(mem, C) { mem.frame = S.multiply(mem.frame, C); }
   function residual(mem) { return S.multiply(mem.E, mem.frame); }
@@ -336,17 +350,21 @@
     // Graphs depend only on the checks, the model and the window shape:
     // share them between decoders (e.g. keepers swapping exhibits).
     if (!graphCache.has(mem.checks)) graphCache.set(mem.checks, {});
-    var cache = graphCache.get(mem.checks), modelKey = JSON.stringify(mem.model);
+    var cache = graphCache.get(mem.checks), mKey = modelKey(mem), local = {};
+    // The shared cache is keyed by the (long) model string; this decoder
+    // keeps its own handles so each round's lookup is cheap.
     function graphFor(L, openTop) {
-      var key = modelKey + L + (openTop ? "o" : "c");
+      var lk = L + (openTop ? "o" : "c");
+      if (local[lk]) return local[lk];
+      var key = mKey + lk;
       if (!cache[key]) {
         var dem = mem.impl.dem(mem, L, { openTop: openTop, decompose: true });
         cache[key] = { dem: dem, g: buildGraph(dem) };
       }
-      return cache[key];
+      return (local[lk] = cache[key]);
     }
     // Probe once so an unmatchable code fails at hire time, not mid-run.
-    if (!isMatchable(mem.impl.dem(mem, 2, { openTop: true, decompose: true }))) {
+    if (!memMatchable(mem)) {
       throw new Error("Not matchable: some fault lights more than two detectors");
     }
     function solve(L, openTop) {
@@ -403,7 +421,7 @@
     var m = mem.checks.length, n = mem.code.n, hist = [];
     if (m * W > 32) throw new Error("Space-time lookup needs checks × window <= 32");
     if (!tableCache.has(mem.checks)) tableCache.set(mem.checks, {});
-    var cache = tableCache.get(mem.checks), key = JSON.stringify(mem.model) + W + ":" + maxFaults;
+    var cache = tableCache.get(mem.checks), key = modelKey(mem) + W + ":" + maxFaults;
     if (!cache[key]) {
       var dem = mem.impl.dem(mem, W, { openTop: true, decompose: false });
       var F = dem.faults.map(function (f) {
@@ -454,8 +472,7 @@
   // separately, which is only sound when X and Z checks are separate.)
   function spacetimeDecoder(mem, opts) {
     var css = mem.checks.every(function (c) { return c.x === 0 || c.z === 0; });
-    var probe = mem.impl.dem(mem, 2, { openTop: true, decompose: true });
-    return css && isMatchable(probe) ? matchingDecoder(mem, opts) : spacetimeLookupDecoder(mem, opts);
+    return css && memMatchable(mem) ? matchingDecoder(mem, opts) : spacetimeLookupDecoder(mem, opts);
   }
 
   // ---------- Memory experiment ----------
@@ -477,7 +494,7 @@
     createMemory: createMemory, measureRound: measureRound, applyCorrection: applyCorrection, setModel: setModel,
     sampleDataNoise: sampleDataNoise, spacetimeLookupDecoder: spacetimeLookupDecoder, spacetimeDecoder: spacetimeDecoder,
     residual: residual, resetMemory: resetMemory,
-    phenoDEM: phenoDEM, isMatchable: isMatchable, buildGraph: buildGraph, matchDefects: matchDefects,
+    phenoDEM: phenoDEM, isMatchable: isMatchable, matchable: memMatchable, modelKey: modelKey, buildGraph: buildGraph, matchDefects: matchDefects,
     lookupDecoder: lookupDecoder, matchingDecoder: matchingDecoder, runMemory: runMemory
   };
   if (isNode) module.exports = Detectors;
