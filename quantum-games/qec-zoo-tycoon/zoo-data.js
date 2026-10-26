@@ -245,6 +245,9 @@
   // cost and upkeep ($/day) are the experiment's; buildDays is how long
   // construction takes once paid for. A catalogue habitat is quicker to
   // build than a new design of the same size: the know-how exists.
+  // shape: the plot it takes, row by row ("#" = a tile); it can be
+  // rotated when placed (cells and footprint, its bounding box, are
+  // filled in below).
   // checks: the stabilizers the enclosure physically measures. These are
   // deliberately NOT always the species' own generators — they are
   // different generating sets of the same group — so placement is a real
@@ -253,13 +256,13 @@
   // hardware; the error rates come from the lab (LAB above).
   var BIOMES = {
     riverbank: {
-      name: "Parity Riverbank", native: "tortoise", cost: 300000, upkeep: 800, buildDays: 45, footprint: [2, 2],
+      name: "Parity Riverbank", native: "tortoise", cost: 300000, upkeep: 800, buildDays: 7, shape: ["####"],
       climate: { channel: "bitFlip" },
       checks: ["ZIZ", "IZZ"],
       blurb: "A calm, bit-flip-only stretch of river. Measures pairwise Z parities."
     },
     forest: {
-      name: "Nine-Fold Forest", native: "owl", cost: 1100000, upkeep: 2800, buildDays: 240, footprint: [3, 3],
+      name: "Nine-Fold Forest", native: "owl", cost: 1100000, upkeep: 2800, buildDays: 25, shape: ["##.", "###", ".##"],
       climate: { channel: "depolarizing" },
       checks: [
         sup(9, "Z", [0, 2]), sup(9, "Z", [1, 2]), sup(9, "Z", [3, 5]),
@@ -269,7 +272,7 @@
       blurb: "Three groves of three trees. Z parities within each grove, X parities between groves."
     },
     glade: {
-      name: "Hamming Glade", native: "peacock", cost: 880000, upkeep: 2200, buildDays: 180, footprint: [3, 3],
+      name: "Hamming Glade", native: "peacock", cost: 880000, upkeep: 2200, buildDays: 21, shape: ["#..", "##.", "###"],
       climate: { channel: "depolarizing" },
       // Row-reduced differently: rows (1+2), 2, 3 of the Hamming checks.
       checks: [
@@ -279,14 +282,14 @@
       blurb: "A triangular clearing. Every check touches four qubits, in matching X and Z pairs."
     },
     dunes: {
-      name: "Cyclic Dunes", native: "pangolin", cost: 620000, upkeep: 1500, buildDays: 120, footprint: [3, 2],
+      name: "Cyclic Dunes", native: "pangolin", cost: 620000, upkeep: 1500, buildDays: 14, shape: ["###.", ".###"],
       climate: { channel: "depolarizing" },
       // Four of the five cyclic shifts of XZZXI (the fifth is their product).
       checks: ["IXZZX", "XIXZZ", "ZXIXZ", "ZZXIX"],
       blurb: "Wind-sculpted ridges that repeat every five steps. Checks mix X and Z."
     },
     wetlands: {
-      name: "Checkerboard Wetlands", native: "axolotl", cost: 1150000, upkeep: 2800, buildDays: 270, footprint: [3, 3],
+      name: "Checkerboard Wetlands", native: "axolotl", cost: 1150000, upkeep: 2800, buildDays: 28, shape: ["###", "###", "###"],
       climate: { channel: "depolarizing" },
       checks: [
         sup(9, "X", [0, 2, 3, 4]), sup(9, "X", [4, 5, 7, 8]), sup(9, "X", [1, 2]), sup(9, "X", [6, 7]),
@@ -295,21 +298,24 @@
       blurb: "Square ponds in a checkerboard, each checked only by its nearest neighbours."
     },
     floe: {
-      name: "Iceberg Floe", native: "penguins", cost: 400000, upkeep: 1000, buildDays: 70, footprint: [2, 2],
+      name: "Iceberg Floe", native: "penguins", cost: 400000, upkeep: 1000, buildDays: 10, shape: ["##", "##"],
       climate: { channel: "depolarizing" },
       // YYYY is XXXX × ZZZZ (up to a phase): same group, different generators.
       checks: ["XXXX", "YYYY"],
       blurb: "One slab of ice, four qubits, two checks on every one of them."
     },
     marsh: {
-      name: "Grand Marsh", native: "giant", cost: 3200000, upkeep: 8000, buildDays: 400, footprint: [5, 5],
+      name: "Grand Marsh", native: "giant", cost: 3200000, upkeep: 8000, buildDays: 75, shape: [".###.", "#####", "#####", "#####", ".###."],
       climate: { channel: "depolarizing" },
-      // The species' checks, except that the first two X plaquettes are
-      // measured as one and their product.
+      // The species' checks, except that one X plaquette is measured
+      // together with the boundary pair beside it (their product: a bent
+      // plaquette of the same weight). The product is chosen so that every
+      // single error still lights at most two detectors of each type;
+      // other products would break matching decoders and keep the big code
+      // above threshold whatever the hardware.
       checks: (function () {
         var st = Stabilizer.rotatedSurface(5).stabilizers.slice();
-        var xs = st.map(function (P, i) { return P.z === 0 ? i : -1; }).filter(function (i) { return i >= 0; });
-        st[xs[0]] = Stabilizer.multiply(st[xs[0]], st[xs[1]]);
+        st[5] = Stabilizer.multiply(st[5], st[1]);
         return st.map(Stabilizer.toString);
       })(),
       blurb: "A wide checkerboard of ponds, five by five, still checked only between neighbours."
@@ -318,6 +324,9 @@
   Object.keys(BIOMES).forEach(function (id) {
     var b = BIOMES[id];
     b.checkOps = b.checks.map(Stabilizer.fromString);
+    b.cells = [];
+    b.shape.forEach(function (row, y) { for (var x = 0; x < row.length; x++) if (row[x] === "#") b.cells.push([x, y]); });
+    b.footprint = [b.shape[0].length, b.shape.length];
   });
 
   // ---------- Keepers (decoders) ----------
@@ -340,11 +349,12 @@
       blurb: "Space-time decoding over 3 rounds: more evidence before committing to a correction." }
   ];
   var MAX_KEEPER_LEVEL = KEEPER_LEVELS.length - 1;
-  // Training to `level`: experience needed (rounds decoded), days of study, fee.
+  // Training to `level`: experience needed (rounds decoded), days of study
+  // (courses run for weeks; the keeper is off duty meanwhile), fee.
   var TRAINING = {
-    2: { xp: 500, days: 3, fee: 20000 },
-    3: { xp: 2000, days: 5, fee: 50000 },
-    4: { xp: 5000, days: 7, fee: 100000 }
+    2: { xp: 500, days: 7, fee: 20000 },
+    3: { xp: 2000, days: 14, fee: 50000 },
+    4: { xp: 5000, days: 21, fee: 100000 }
   };
   // Decoding speed in work units per hour: base + xp × perXp, capped.
   var KEEPER_SPEED = { base: 4, perXp: 1 / 1000, max: 12 };
@@ -360,12 +370,18 @@
   // This is the phenomenological model with a rough charge for the CNOTs
   // in each round; circuit-level noise (CNOT order, hook errors) is a
   // later milestone.
+  // The starting hardware is NISQ-grade: about 3% error per data qubit and
+  // 4% per check outcome every round on a surface code, close enough to
+  // threshold that a distance-5 code is no better than a distance-3 one
+  // even with a head keeper. Each research step pushes the rates further
+  // below threshold, and only then does a bigger code pay
+  // (zoo-tycoon.test.js pins both ends).
   var LAB = {
-    coherence: { name: "Coherence", values: [0.008, 0.0055, 0.0035, 0.002], unit: "idle error per qubit per hour",
+    coherence: { name: "Coherence", values: [0.02, 0.012, 0.006, 0.0025], unit: "idle error per qubit per hour",
       blurb: "Longer-lived qubits: less error on every data qubit while it waits." },
-    gates: { name: "Two-qubit gates", values: [0.0008, 0.0006, 0.0004, 0.0002], unit: "error per CNOT",
+    gates: { name: "Two-qubit gates", values: [0.0028, 0.0016, 0.0008, 0.0003], unit: "error per CNOT",
       blurb: "Cleaner CNOTs between ancillas and data. Every round, each data qubit pays once per check it is wired to." },
-    readout: { name: "Readout", values: [0.01, 0.007, 0.0045, 0.0025], unit: "chance a check is misread",
+    readout: { name: "Readout", values: [0.028, 0.016, 0.008, 0.004], unit: "chance a check is misread",
       blurb: "Fewer misreported check outcomes." },
     cycle: { name: "Syndrome cycle", values: [1, 2, 3], unit: "rounds per hour",
       blurb: "Measure more often: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode." }
@@ -388,8 +404,8 @@
     qubitsPerTile: 2,
     // Construction time grows with the qubit count (data + ancilla):
     // days = refDays × (qubits / refQubits)^exponent, clamped. The d = 3
-    // surface code (17 qubits) takes a year to get running.
-    days: { refQubits: 17, refDays: 365, exponent: 1.2, min: 30, max: 540 }
+    // surface code (17 qubits) takes a month to get running.
+    days: { refQubits: 17, refDays: 30, exponent: 1, min: 7, max: 90 }
   };
   var START_KNOWN = ["tortoise"];
   // Reference designs of the textbook species: data qubit and check
@@ -444,7 +460,7 @@
     ticksPerDay: 24,
     // The lot grows with each round closed (index = rounds closed after the seed).
     lots: [[12, 8], [14, 10], [16, 12], [18, 13], [20, 14], [22, 15]],
-    vetBill: 10000, bankruptDays: 7,
+    vetBill: 1500, bankruptDays: 7,
     ticketPrice: 20,          // $ per visitor
     visitorsPerAppeal: 2,     // visitors/day per point of appeal, at full health and reputation 50
     sickReputationHit: 1.5,    // reputation lost per logical error
@@ -460,38 +476,50 @@
   // reaches its target; the zoo then sells `raise` of itself for cash at
   // that valuation. Between 60% and 100% of the target, investors offer a
   // bridge instead: a little cash, no new letter.
+  // The ladder follows real deep-tech companies that reached ~$20B:
+  // PsiQuantum (Series A ~$14M at ~$40M, 2016; D $450M at $3.2B, 2021;
+  // E $1B at $7B, 2025), Snowflake ($5M A; $263M at ~$1.5B; $479M at
+  // $12.4B; IPO in 2020) and Quantinuum ($600M at $10B, 2025). Early
+  // rounds sell 20–25% of the company, late ones 8–10%.
   var ROUNDS = [
     { id: "seed", name: "Seed", valuation: 40000000, raised: 10000000 }, // closed before day 1
-    { id: "a", name: "Series A", target: 300000000, raise: 0.15, premium: 1,
+    { id: "a", name: "Series A", target: 100000000, raise: 0.2, premium: 1,
       roadmap: [
-        { metric: "species", min: 3, label: "Discover 3 species" },
-        { metric: "logicalQubits", min: 4, label: "4 animals (logical qubits) on show" },
+        { metric: "species", min: 2, label: "Discover 2 species" },
+        { metric: "logicalQubits", min: 3, label: "3 animals (logical qubits) on show" },
         { metric: "bestDistance", min: 3, label: "A distance-3 code on show" },
-        { metric: "revenue", min: 20000, label: "$20k a day in ticket sales" }
+        { metric: "revenue", min: 10000, label: "$10k a day in ticket sales" }
       ] },
-    { id: "b", name: "Series B", target: 2000000000, raise: 0.12, premium: 1.25,
+    { id: "b", name: "Series B", target: 400000000, raise: 0.15, premium: 1.2,
+      roadmap: [
+        { metric: "species", min: 4, label: "Discover 4 species" },
+        { metric: "logicalQubits", min: 7, label: "7 animals on show" },
+        { metric: "labLevels", min: 2, label: "2 lab upgrades" },
+        { metric: "revenue", min: 30000, label: "$30k a day in ticket sales" }
+      ] },
+    { id: "c", name: "Series C", target: 1500000000, raise: 0.12, premium: 1.6,
       roadmap: [
         { metric: "species", min: 5, label: "Discover 5 species" },
-        { metric: "logicalQubits", min: 10, label: "10 animals on show" },
+        { metric: "logicalQubits", min: 12, label: "12 animals on show" },
         { metric: "bestDistance", min: 5, label: "A distance-5 code on show" },
         { metric: "headKeepers", min: 1, label: "A head keeper on staff" },
-        { metric: "revenue", min: 50000, label: "$50k a day in ticket sales" }
+        { metric: "revenue", min: 60000, label: "$60k a day in ticket sales" }
       ] },
-    { id: "c", name: "Series C", target: 5000000000, raise: 0.1, premium: 1.6,
+    { id: "d", name: "Series D", target: 4000000000, raise: 0.1, premium: 2.2,
       roadmap: [
         { metric: "species", min: 7, label: "Discover 7 species" },
         { metric: "logicalQubits", min: 18, label: "18 animals on show" },
         { metric: "labLevels", min: 6, label: "6 lab upgrades" },
         { metric: "revenue", min: 90000, label: "$90k a day in ticket sales" }
       ] },
-    { id: "d", name: "Series D", target: 10000000000, raise: 0.08, premium: 2,
+    { id: "e", name: "Series E", target: 10000000000, raise: 0.08, premium: 3.5,
       roadmap: [
         { metric: "logicalQubits", min: 26, label: "26 animals on show" },
         { metric: "errorRate", max: 0.02, label: "Under 0.02 logical errors per animal per day" },
         { metric: "morale", min: 60, label: "Team morale 60+" },
         { metric: "revenue", min: 130000, label: "$130k a day in ticket sales" }
       ] },
-    { id: "ipo", name: "IPO", target: 20000000000, raise: 0.1, premium: 3, ipo: true,
+    { id: "ipo", name: "IPO", target: 20000000000, raise: 0.1, premium: 6, ipo: true,
       roadmap: [
         { metric: "logicalQubits", min: 34, label: "34 animals on show" },
         { metric: "species", min: 9, label: "Discover 9 species" },
@@ -503,21 +531,22 @@
     roadshowDays: 21,     // a raise takes this long; investors tour throughout
     roadshowTourEvery: 3, // days between roadshow tours
     cooldownDays: 45,     // after a pass or a bridge, before the next attempt
-    afterCloseDays: 300,  // after a round closes: investors want to see the money at work
+    afterCloseDays: 150,  // after a round closes: investors want to see the money at work
     bridgeAt: 0.6,        // fraction of the target that earns a bridge offer
     bridgeRaise: 0.06     // fraction of the zoo sold in a bridge
   };
   // What investors think the zoo is worth:
   //   (revenue/yr × revenue multiple + tech) × hype × stage premium × roadmap factor
   // revenue multiple = base + perGrowth × (30-day revenue growth, capped at
-  // 100%); tech = perQubitD2 × Σ animals × d² × health + perSpecies ×
+  // 100%, measured against at least growthFloor a day); tech = perQubitD2 × Σ animals × d² × health + perSpecies ×
   // species known + perLabLevel × lab upgrades; hype doubles every
   // `hypeDoubling` points of confidence above 50 (and halves below);
   // roadmap factor = 1 − roadmapWeight × (share of milestones missed).
   var VALUATION = {
-    revMultipleBase: 20, revMultiplePerGrowth: 40,
-    perQubitD2: 6000000, perSpecies: 30000000, perLabLevel: 20000000,
-    hypeDoubling: 30, roadmapWeight: 0.35
+    revMultipleBase: 12, revMultiplePerGrowth: 18,
+    perQubitD2: 2000000, perSpecies: 10000000, perLabLevel: 8000000,
+    hypeDoubling: 30, roadmapWeight: 0.35,
+    growthFloor: 20000 // $/day: growth is measured against at least this much revenue
   };
   // Investor confidence (0–100) moves with tours and news, and drifts back
   // toward 50 as memories fade.

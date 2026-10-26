@@ -7,15 +7,19 @@ A Zoo Tycoon–style management game where the zoo is a quantum startup. The ani
 quantum error-correcting codes, the habitats are the stabilizer checks an enclosure measures,
 and the zookeepers are decoders. You start with a $10M seed round. Keep your logical qubits
 alive, keep your keepers from burning out, keep investors impressed, and raise round after round
-(Series A at $300M, up to an IPO at $20B) before the money runs out.
+(Series A at $100M, up to an IPO at $20B, a ladder modelled on real deep-tech companies) before
+the money runs out.
 
 ## How to play
 
-1. **Build an enclosure.** Pick a habitat from the palette and click the park to place it. At
-   first you only know how to keep the Repetition Tortoise. Prices are at AMO-lab scale (a
-   tortoise is about $400k all in, a d = 3 surface code about $2M), and **construction takes
-   time**: 45 days for the riverbank, a year for a new surface code. You pay up front; upkeep
-   starts when it opens.
+1. **Build an enclosure.** Pick a habitat from the palette and click the park to place it. Every
+   plot has a **shape** (the riverbank is a long strip, the glade a triangle, the marsh a
+   rounded square; your own designs get a random shape sized by their qubit count). Turn it with
+   <kbd>R</kbd> or the Rotate button, and fit shapes together like an inventory puzzle: only
+   the tiles themselves have to be free. At first you only know how to keep the Repetition
+   Tortoise. Prices are at AMO-lab scale (a tortoise is about $400k all in, a d = 3 surface code
+   about $2M), and **construction takes time**: a week for the riverbank, about a month for a
+   new surface code. You pay up front; upkeep starts when it opens.
 2. **Buy an animal.** Click the enclosure. An animal can only live in a habitat that measures
    exactly its stabilizer group. Every other species is listed with the physics reason it
    can't move in. A code with k logical qubits holds k animals, each with its own health.
@@ -24,7 +28,10 @@ alive, keep your keepers from burning out, keep investors impressed, and raise r
 4. **Hire keepers.** Without one, nobody measures the checks, errors pile up, and an unkept
    code does *worse* than a bare qubit. Keepers are hired as trainees and learn; one keeper can
    look after several exhibits, and several keepers can share one (see below).
-5. **Fund the lab.** Research lowers the hardware's error rates for every enclosure at once.
+5. **Fund the lab.** The starting hardware is NISQ-grade: close to threshold, so a bigger code
+   is no better than a smaller one and animals get sick about once a day. Research lowers the
+   error rates for every enclosure at once and pushes the hardware below threshold, where every
+   step in distance pays.
 6. **Watch the books.** Healthy, rare animals draw visitors. Each logical error costs a vet bill
    and some reputation. Salaries and upkeep are paid continuously.
 7. **Raise money.** Investors tour the zoo; when their valuation beats the next round's target,
@@ -38,18 +45,25 @@ alive, keep your keepers from burning out, keep investors impressed, and raise r
 - The game **autosaves** in your browser every few seconds and when you leave. **New game**
   starts over. Saves from before the funding update can't be loaded.
 - Keys: <kbd>space</kbd> pause/resume, <kbd>1</kbd>–<kbd>4</kbd> speed (up to about a year a
-  minute), <kbd>Esc</kbd> cancel building / close the inspector.
+  minute), <kbd>R</kbd> rotate the plot you're placing, <kbd>Esc</kbd> cancel building / close
+  the inspector.
 
 ### Investors, rounds and the IPO
 
 | Round | Target valuation | Sells | Roadmap (examples) |
 |---|---|---|---|
 | Seed | $40M (done) | 25% for $10M | |
-| Series A | $300M | 15% | 3 species, 4 animals on show, a d = 3 code, $20k/day tickets |
-| Series B | $2B | 12% | 5 species, 10 animals, a d = 5 code, a head keeper |
-| Series C | $5B | 10% | 7 species, 18 animals, 6 lab upgrades |
-| Series D | $10B | 8% | 26 animals, < 0.02 logical errors per animal per day, morale 60+ |
+| Series A | $100M | 20% | 2 species, 3 animals on show, a d = 3 code, $10k/day tickets |
+| Series B | $400M | 15% | 4 species, 7 animals, 2 lab upgrades |
+| Series C | $1.5B | 12% | 5 species, 12 animals, a d = 5 code, a head keeper |
+| Series D | $4B | 10% | 7 species, 18 animals, 6 lab upgrades |
+| Series E | $10B | 8% | 26 animals, < 0.02 logical errors per animal per day, morale 60+ |
 | IPO | $20B | 10% | 34 animals, 9 species, 10 lab upgrades |
+
+The ladder follows real companies that reached about $20B: PsiQuantum raised a ~$14M Series A
+at ~$40M (2016), $450M at $3.2B (2021) and $1B at $7B (2025); Snowflake went from a $5M Series A
+through $263M at ~$1.5B and $479M at $12.4B to its 2020 IPO; Quantinuum raised $600M at $10B
+(2025). Typical rounds sell 20–25% early and 8–10% late.
 
 - **The valuation** is (ticket sales × a multiple that grows with revenue growth + animals × d² ×
   health + species + lab upgrades) × hype × a stage premium × a roadmap factor. Hype doubles every
@@ -57,7 +71,7 @@ alive, keep your keepers from burning out, keep investors impressed, and raise r
   investors panel shows each part.
 - **Raising** starts a 21-day roadshow; investors tour every 3 days, and at the end they name their
   price. At or above the target the round closes: cash in, part of the company sold, and a
-  **bigger lot**. Investors then want to see the money at work for 300 days. At 60–100% of the
+  **bigger lot**. Investors then want to see the money at work for 180 days. At 60–100% of the
   target they offer a **bridge** (a little cash, no new letter); below that they pass, and you
   can try again in 45 days. The better the round, the more effusive the quotes.
 - **Tours.** Every few weeks an investor walks past up to three exhibits (the biggest draws).
@@ -106,7 +120,7 @@ Place data qubits and check ancillas on an 11×11 grid. A new check is wired to 
 around it; select a check and tap data qubits to add or remove wires, or set its Pauli on each
 qubit letter by letter (so checks can mix X, Y and Z). The readout updates as you go: do the
 checks commute, how many are independent, how many animals fit (k), the distance d, CSS or not,
-the price and the footprint. It also names the species, if it's one the zoo knows about.
+the price and the plot (its tile count and shape). It also names the species, if it's one the zoo knows about.
 
 - **Identification** is up to relabelling: your qubits can be numbered any way, and a qubit's
   checks may swap X, Y and Z consistently (a local Clifford). Such codes behave identically
@@ -116,8 +130,10 @@ the price and the footprint. It also names the species, if it's one the zoo know
 - **Every design you build goes into your blueprint book** (it appears in the build menu) and
   can be built again without the workshop.
 - **What a habitat costs:** $60,000 per qubit (data or ancilla) plus $5,000 per wire, with upkeep
-  of $150 per qubit and $10 per wire a day. Two qubits take a tile of park. Construction takes
-  365 × (qubits / 17)^1.2 days, between 30 and 540: a year for the 17-qubit surface code.
+  of $150 per qubit and $10 per wire a day. Two qubits take a tile of park, in a random connected
+  shape about √tiles + 1 on a side; the shape is seeded by the design, so a blueprint always
+  builds the same shape. Construction takes 30 × qubits / 17 days, between 7 and 90: a month
+  for the 17-qubit surface code.
 - **Blueprints can be deleted** from the build menu (×). One still in use leaves the menu now and
   the book once its last enclosure is gone. A species you discovered can be dropped from the
   field guide once nothing in the zoo holds it.
@@ -129,8 +145,8 @@ the price and the footprint. It also names the species, if it's one the zoo know
 ### Keepers are decoders, and they learn
 
 Every keeper is hired as a trainee. Each round they decode earns experience, which makes them
-faster; with enough experience they can take a training course (a fee and a few days of study
-while they keep working) to learn the next decoder.
+faster; with enough experience they can take a training course (a fee and one, two or three
+weeks of study while they keep working) to learn the next decoder.
 
 | Level | Title | Decoder | Salary |
 |---|---|---|---|
@@ -153,7 +169,9 @@ falling behind, so slow keepers fall back to faster decoders.)
 
 ### The lab
 
-One research project at a time: $1.5M for 30 days, $4M for 60 days, then $10M for 90 days:
+One research project at a time: $1.5M for 30 days, $4M for 60 days, then $10M for 90 days.
+The starting hardware is about 3% error per data qubit and 4% per check outcome every round on
+a surface code; fully researched, about ten times less.
 
 | Dial | What it does |
 |---|---|
@@ -164,7 +182,7 @@ One research project at a time: $1.5M for 30 days, $4M for 60 days, then $10M fo
 
 Seeded bot players pin the incentives (see the balance tests): a zoo that builds steadily, staffs
 bigger codes with two keepers, trains them, funds the lab and discovers new codes raises its
-Series A in 7–13 months and lists in about 5.5–7.5 years; a zoo with no keepers goes bankrupt in
+Series A in its second month and lists in about 2.5–4 years; a zoo with no keepers goes bankrupt in
 its first year; one that never trains, researches or looks after its staff doesn't list.
 
 ## Under the hood
