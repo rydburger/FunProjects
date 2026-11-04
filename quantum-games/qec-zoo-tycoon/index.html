@@ -24,20 +24,72 @@
   .speed { display: flex; gap: 6px; }
   .speed button { min-width: 48px; }
 
-  /* ---- main layout ---- */
-  .park-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
-  @media (max-width: 1180px) {
-    .park-layout { grid-template-columns: 230px minmax(0, 1fr); }
-    .park-layout .inspector-col { grid-column: 1 / -1; }
+  /* ---- main layout ----
+     Phones and small windows: one column (map, panel tabs, panel, inspector).
+     Desktop (app mode): the page fills the window and never scrolls, like a
+     tycoon game: a tab rail and one side panel on the left, the map in the
+     middle, the inspector on the right; panels scroll inside themselves. */
+  .park-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+  .park-layout .park-wrap { order: -1; }
+  .rail { display: flex; gap: 6px; }
+  .rail button {
+    flex: 1 1 0; position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    font: inherit; color: var(--ink-dim); cursor: pointer; padding: 6px 2px 5px; min-width: 0;
+    background: var(--bg-panel); border: 1px solid var(--line); border-radius: 10px;
   }
-  @media (max-width: 760px) {
-    .park-layout { grid-template-columns: minmax(0, 1fr); }
-    .park-layout .park-wrap { order: -1; } /* map first on phones */
+  .rail button .ic { font-size: 19px; line-height: 1.2; }
+  .rail button .tl { font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-mono); }
+  .rail button:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .rail button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg-panel); }
+  .rail .dot { position: absolute; top: 4px; right: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: var(--lit); }
+  .rail .dot.n { font: 700 9.5px/14px var(--font-mono); height: 14px; padding: 0 4px; color: #1b1300; font-style: normal; top: 2px; right: 3px; }
+  .rail .dot[hidden] { display: none; }
+  .drawer[hidden] { display: none; }
+  .drawer .panel { margin-top: 0; }
+  .tab-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tab-head .x-btn { display: none; }
+  .park-box { position: relative; }
+  .log { max-height: none; }
+  .tab[data-tab="news"] .log { max-height: 340px; }
+
+  @media (min-width: 1000px) and (min-height: 600px) {
+    body:has(.wrap.app) { overflow: hidden; }
+    .wrap.app { max-width: 1800px; height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding: 10px 14px 12px; box-sizing: border-box; }
+    .wrap.app header.top { padding-bottom: 6px; margin-bottom: 8px; align-items: center; }
+    .wrap.app header.top .eyebrow { display: none; }
+    .wrap.app h1 { font-size: 21px; }
+    .wrap.app .topbar { margin-bottom: 10px; padding: 7px 14px; }
+    .wrap.app .kpi .n { font-size: 17px; }
+    .park-layout {
+      flex: 1; min-height: 0; align-items: stretch; gap: 12px;
+      grid-template-columns: 62px 300px minmax(0, 1fr) 370px;
+    }
+    .park-layout.nodrawer { grid-template-columns: 62px minmax(0, 1fr) 370px; }
+    .park-layout .park-wrap { order: 0; }
+    .rail { flex-direction: column; }
+    .rail button { flex: 0 0 auto; padding: 8px 2px 6px; }
+    .rail button .ic { font-size: 21px; }
+    .drawer, .inspector-col { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .drawer .panel, .inspector-col .panel { padding: 14px; }
+    .tab-head .x-btn { display: block; }
+    .tab[data-tab="news"] .log { max-height: none; }
+    .park-wrap { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .park-box { flex: 1; min-height: 0; container-type: size; display: flex; align-items: center; justify-content: center; }
+    .park-box .park { width: min(100cqw, 100cqh * var(--cols) / var(--rows)); }
+    .ticker { margin-top: 8px; max-height: 4.4em; overflow: hidden; }
+    .tour { margin-bottom: 8px; }
+    .inspector-col .inspector .views { grid-template-columns: 1fr 1fr; }
+    .inspector-col .inspector .view svg { max-height: 140px; }
+  }
+  @media (min-width: 1000px) and (max-width: 1279px) and (min-height: 600px) {
+    .park-layout { grid-template-columns: 58px 260px minmax(0, 1fr) 320px; }
+    .park-layout.nodrawer { grid-template-columns: 58px minmax(0, 1fr) 320px; }
+    .wrap.app .kpis { gap: 6px 16px; }
   }
 
   /* ---- palette ---- */
   .tools { display: flex; flex-direction: column; gap: 8px; }
-  @media (max-width: 760px) { .tools { flex-direction: row; flex-wrap: wrap; } .tools .tool { flex: 1 1 150px; } }
+  @media (max-width: 999px) { .tools { flex-direction: row; flex-wrap: wrap; } .tools .tool { flex: 1 1 150px; } }
   .tool {
     text-align: left; font: inherit; color: var(--ink); cursor: pointer;
     border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
@@ -126,11 +178,17 @@
   .insp-head .sub { font-size: 12.5px; color: var(--ink-dim); }
   .x-btn { background: none; border: none; font-size: 20px; color: var(--ink-dim); cursor: pointer; line-height: 1; padding: 2px 6px; }
   .section { margin-top: 16px; }
+  .inspector details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  details.section > summary::-webkit-details-marker { display: none; }
+  details.section > summary::before { content: "▸"; font-size: 10px; transition: transform 0.15s; display: inline-block; }
+  details.section[open] > summary::before { transform: rotate(90deg); }
+  .inspector details.section:not([open]) > summary { margin-bottom: 0; }
+  details.section > summary .more { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 11.5px; }
   .section > .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 8px; display: block; }
   /* Stacked, so long thin layouts (the Tortoise's line) get the full width. */
   .inspector .views { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 8px; }
   .inspector .view svg { max-height: 170px; }
-  @media (min-width: 761px) and (max-width: 1180px) { .inspector .views { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 600px) and (max-width: 999px) { .inspector .views { grid-template-columns: 1fr 1fr; } }
   .inspector .health { min-width: 0; flex: none; margin-top: 12px; }
   .species-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .species-list li { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg-panel-2); }
@@ -319,12 +377,12 @@
   .tool-row .tool { flex: 1 1 auto; min-width: 0; }
   .tool-del { border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--ink-dim); cursor: pointer; padding: 0 9px; font: inherit; }
   .tool-del.armed { background: var(--sick); color: var(--bg-panel); border-color: var(--sick); font-size: 12px; }
-  @media (max-width: 760px) { .tools .tool-row { flex: 1 1 150px; } }
+  @media (max-width: 999px) { .tools .tool-row { flex: 1 1 150px; } }
   button:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap app">
   <header class="top">
     <div>
       <span class="eyebrow">Quantum Games · A quantum startup, but it's a zoo</span>
@@ -358,11 +416,18 @@
     </div>
   </div>
 
-  <div class="park-layout">
-    <!-- palette -->
-    <div>
-      <div class="panel">
-        <h2>Build an enclosure</h2>
+  <div class="park-layout" id="layout">
+    <!-- one side panel at a time, picked from the rail (B I S L N) -->
+    <nav class="rail" id="rail" aria-label="Panels">
+      <button type="button" data-tab="build" title="Build (B)"><span class="ic">🏗</span><span class="tl">Build</span></button>
+      <button type="button" data-tab="investors" title="Investors (I)"><span class="ic">💼</span><span class="tl">Investors</span><i class="dot" id="dotInvestors" hidden></i></button>
+      <button type="button" data-tab="staff" title="Staff (S)"><span class="ic">🧑‍🔬</span><span class="tl">Staff</span><i class="dot" id="dotStaff" hidden></i></button>
+      <button type="button" data-tab="lab" title="Lab (L)"><span class="ic">🔬</span><span class="tl">Lab</span><i class="dot" id="dotLab" hidden></i></button>
+      <button type="button" data-tab="news" title="Zoo news (N)"><span class="ic">📰</span><span class="tl">News</span><i class="dot n" id="dotNews" hidden></i></button>
+    </nav>
+    <div class="drawer" id="drawer">
+      <div class="panel tab" data-tab="build">
+        <div class="tab-head"><h2>Build an enclosure</h2><button class="x-btn" type="button" data-close title="Hide panel" aria-label="Hide panel">‹</button></div>
         <div class="btn-row build-top">
           <button class="btn" id="workshopBtn" type="button">🛠 Habitat workshop</button>
           <button class="btn quiet" id="guideBtn" type="button">📖 Field guide</button>
@@ -370,25 +435,25 @@
         <div class="tools" id="tools"></div>
         <div class="hint" id="toolHint">Pick a habitat, then click the park to place it. <span class="kbd">Esc</span> cancels.</div>
       </div>
-      <div class="panel">
-        <h2>Investors</h2>
+      <div class="panel tab" data-tab="investors" hidden>
+        <div class="tab-head"><h2>Investors</h2><button class="x-btn" type="button" data-close title="Hide panel" aria-label="Hide panel">‹</button></div>
         <div id="investors"></div>
       </div>
-      <div class="panel">
-        <h2>Staff</h2>
+      <div class="panel tab" data-tab="staff" hidden>
+        <div class="tab-head"><h2>Staff</h2><button class="x-btn" type="button" data-close title="Hide panel" aria-label="Hide panel">‹</button></div>
         <ul class="staff-list" id="staff"></ul>
         <div class="btn-row"><button class="btn quiet" id="hireBtn" type="button">Hire a trainee</button></div>
         <div class="hint" id="staffHint"></div>
       </div>
-      <div class="panel">
-        <h2>Lab</h2>
+      <div class="panel tab" data-tab="lab" hidden>
+        <div class="tab-head"><h2>Lab</h2><button class="x-btn" type="button" data-close title="Hide panel" aria-label="Hide panel">‹</button></div>
         <ul class="lab-list" id="lab"></ul>
         <div class="hint">One project at a time. New hardware reaches every enclosure when it's done.
-          The starting hardware is NISQ-grade, right at threshold: a bigger code is no better than a smaller one.
-          Research pushes it below threshold, where every step in distance cuts logical errors.</div>
+          The starting hardware is NISQ-grade: CNOTs fail 2% of the time, so a surface code is above threshold and does worse
+          than a bare qubit. Repetition codes cope. Research the gates first; below threshold every step in distance cuts logical errors.</div>
       </div>
-      <div class="panel">
-        <h2>Zoo news</h2>
+      <div class="panel tab" data-tab="news" hidden>
+        <div class="tab-head"><h2>Zoo news</h2><button class="x-btn" type="button" data-close title="Hide panel" aria-label="Hide panel">‹</button></div>
         <ul class="log" id="log"></ul>
       </div>
     </div>
@@ -396,7 +461,7 @@
     <!-- park -->
     <div class="park-wrap">
       <div class="tour" id="tour" hidden></div>
-      <div class="park" id="park" aria-label="Park map"></div>
+      <div class="park-box"><div class="park" id="park" aria-label="Park map"></div></div>
       <div class="ticker" id="ticker"></div>
     </div>
 
@@ -472,8 +537,20 @@
     armedDemolish: false,
     sickFlash: {},     // exhibit id -> until timestamp
     modalOpen: false,
-    speedBeforeModal: 1
+    speedBeforeModal: 1,
+    tab: "build",      // side panel showing (null = hidden)
+    sections: {},      // inspector section key -> open?
+    unread: 0          // news posted while the news panel was hidden
   };
+  // Per-viewer layout preferences (which panel, which sections are folded).
+  try {
+    var prefs = JSON.parse(localStorage.getItem("qecZooUi") || "{}");
+    if (prefs.tab === null || ["build", "investors", "staff", "lab", "news"].indexOf(prefs.tab) >= 0) ui.tab = prefs.tab;
+    if (prefs.sections && typeof prefs.sections === "object") ui.sections = prefs.sections;
+  } catch (e) { /* storage unavailable */ }
+  function saveUiPrefs() {
+    try { localStorage.setItem("qecZooUi", JSON.stringify({ tab: ui.tab, sections: ui.sections })); } catch (e) { /* ignore */ }
+  }
   var TICKS_PER_SECOND_AT_1X = 2;
   var FOCUS = Z.FOCUS;
 
@@ -486,6 +563,7 @@
     var ul = $("log");
     ul.insertBefore(newsItem(n), ul.firstChild);
     if (news.length > 80) { news.pop(); if (ul.lastChild) ul.removeChild(ul.lastChild); }
+    if (ui.tab !== "news") { ui.unread++; updateBadges(); }
     var tk = $("ticker");
     tk.className = "ticker " + (kind || "");
     tk.innerHTML = '<span class="t">' + clock(park.tick) + "</span>" + text;
@@ -496,6 +574,37 @@
     var frag = document.createDocumentFragment();
     news.forEach(function (n) { frag.appendChild(newsItem(n)); });
     ul.appendChild(frag);
+  }
+
+  // ---------- side panels ----------
+  function setTab(t) {
+    ui.tab = t;
+    if (t === "news") ui.unread = 0;
+    Array.prototype.forEach.call(document.querySelectorAll("#rail button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.tab === t)); });
+    Array.prototype.forEach.call(document.querySelectorAll("#drawer .tab"), function (p) { p.hidden = p.dataset.tab !== t; });
+    $("drawer").hidden = !t;
+    $("layout").classList.toggle("nodrawer", !t);
+    saveUiPrefs();
+    updateBadges();
+  }
+  function toggleTab(t) { setTab(ui.tab === t ? null : t); }
+  Array.prototype.forEach.call(document.querySelectorAll("#rail button"), function (b) {
+    b.addEventListener("click", function () { toggleTab(b.dataset.tab); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#drawer [data-close]"), function (b) {
+    b.addEventListener("click", function () { setTab(null); });
+  });
+  // Dots on the rail: something there wants attention.
+  function show(id, on, text) { var e = $(id); if (!e) return; e.hidden = !on; if (text !== undefined) e.textContent = text; }
+  function updateBadges() {
+    if (!park) return;
+    show("dotNews", ui.unread > 0 && ui.tab !== "news", ui.unread > 99 ? "99+" : String(ui.unread));
+    show("dotInvestors", ui.tab !== "investors" && (Park.canRaise(park).ok || !!park.funding.offer));
+    show("dotLab", ui.tab !== "lab" && !park.lab.project && Object.keys(LAB).some(function (d) { return Park.canResearch(park, d).ok; }));
+    show("dotStaff", ui.tab !== "staff" && park.keeperOrder.some(function (id) {
+      var k = park.keepers[id];
+      return k.fatigue >= 70 || k.morale <= 30 || (!k.exhibitIds.length && !k.absence);
+    }));
   }
 
   // ---------- palette ----------
@@ -748,6 +857,7 @@
     select(rec ? rec.id : null);
   });
   function select(id) {
+    if (id !== ui.selected) document.querySelector(".inspector-col").scrollTop = 0;
     ui.selected = id;
     ui.armedDemolish = false;
     renderInspector();
@@ -756,6 +866,15 @@
 
   // ---------- inspector ----------
   var insp = $("inspector");
+  // A foldable inspector section; whether it's open is remembered per key.
+  function section(key, title, defOpen, more) {
+    var d = h("details", "section");
+    d.dataset.sec = key;
+    d.open = ui.sections[key] !== undefined ? ui.sections[key] : defOpen !== false;
+    d.appendChild(h("summary", "label", title + (more ? '<span class="more">' + more + "</span>" : "")));
+    d.addEventListener("toggle", function () { ui.sections[key] = d.open; saveUiPrefs(); });
+    return d;
+  }
   function renderInspector() {
     insp.innerHTML = "";
     var rec = ui.selected !== null ? park.exhibits[ui.selected] : null;
@@ -776,8 +895,7 @@
 
     if (rec.building) {
       var future = rec.biomeId ? spOf(BIOMES[rec.biomeId].native) : spOf(habOf(rec).entry.speciesId);
-      var bs = h("div", "section");
-      bs.appendChild(h("span", "label", "Construction"));
+      var bs = section("build", "Construction");
       bs.appendChild(h("div", "health", '<div class="row"><span>Opens on day ' + (Math.floor(rec.buildUntil / ECO.ticksPerDay) + 1) +
         '</span><span class="mono" id="iBuild"></span></div><div class="bar"><div class="fill mid" id="iBuildFill"></div></div>'));
       bs.appendChild(h("div", "hint", "Paid " + big(biome.cost) + " up front; no upkeep until it opens. " +
@@ -795,8 +913,16 @@
         (rec.animal.k > 1 ? '<div class="hint mono" id="iHealths"></div>' : ""));
       insp.appendChild(hb);
 
-      var sec = h("div", "section");
-      sec.appendChild(h("span", "label", 'Last incident <span id="iIncident"></span>'));
+      var st = h("div", "section mini-stats");
+      st.innerHTML =
+        '<div class="stat"><span class="n" id="iSick"></span><span class="l">Logical errors</span></div>' +
+        '<div class="stat"><span class="n" id="iVis"></span><span class="l">Visitors / day</span></div>' +
+        '<div class="stat"><span class="n" id="iCost"></span><span class="l">Costs / day</span></div>';
+      insp.appendChild(st);
+      insp.appendChild(h("div", "hint", "", ""));
+      insp.lastChild.id = "iVsBare";
+
+      var sec = section("incident", 'Last incident <span id="iIncident"></span>');
       var views = h("div", "views");
       views.innerHTML =
         '<div class="view"><div class="cap"><span>Really there</span></div><svg id="iGod" role="img" aria-label="Errors in the last incident"></svg></div>' +
@@ -804,13 +930,6 @@
         '<div class="overlay" id="iNoKeeper"' + (rec.animal.level ? " hidden" : "") + "><span>No keeper on duty: nobody is measuring.</span></div></div>";
       sec.appendChild(views);
       insp.appendChild(sec);
-
-      var st = h("div", "section mini-stats");
-      st.innerHTML =
-        '<div class="stat"><span class="n" id="iSick"></span><span class="l">Logical errors</span></div>' +
-        '<div class="stat"><span class="n" id="iVis"></span><span class="l">Visitors / day</span></div>' +
-        '<div class="stat"><span class="n" id="iCost"></span><span class="l">Costs / day</span></div>';
-      insp.appendChild(st);
     }
 
     // Keeper
@@ -818,8 +937,7 @@
 
     // Animal purchase
     if (!rec.animal && !rec.building) {
-      var ps = h("div", "section");
-      ps.appendChild(h("span", "label", "Buy an animal"));
+      var ps = section("buy", "Buy an animal");
       var ul = h("ul", "species-list");
       // A designed habitat holds just the species it was built for.
       Park.speciesOptions(park, rec.id).filter(function (o) { return o.ok || !rec.designId; }).forEach(function (o) {
@@ -850,8 +968,7 @@
     }
 
     // Habitat info + placard
-    var hs = h("div", "section");
-    hs.appendChild(h("span", "label", "Habitat"));
+    var hs = section("habitat", "Habitat", false, channelName(biome.channel) + " · " + money(biome.upkeep) + "/day");
     var nm = rec.animal ? rec.animal.mem.noise : null;
     var noiseText = "";
     if (nm) {
@@ -866,16 +983,19 @@
     hs.appendChild(h("div", "hint", biome.blurb + "<br>Noise: " + channelName(biome.channel) + ". Upkeep " + money(biome.upkeep) + "/day." + noiseText));
     insp.appendChild(hs);
     if (sp) {
-      var d = h("details", "placard-d section");
-      d.innerHTML = "<summary>Zoo placard</summary><div class=\"placard\">" + Placard.html(sp) + "</div>";
+      var d = section("placard", "Zoo placard", false);
+      d.appendChild(h("div", "placard", Placard.html(sp)));
       insp.appendChild(d);
     }
 
     var foot = h("div", "insp-foot");
     if (rec.animal && rec.biomeId) {
+      // The sandbox has one data rate and one misread rate: pass this
+      // exhibit's averages per round (idle and gate errors together).
+      var nz = rec.animal.mem.noise, avg = function (a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; };
       var q = new URLSearchParams({
-        species: rec.animal.speciesId, keeper: String(rec.animal.level || "none"),
-        channel: biome.channel, p: String(Park.labValues(park).coherence), q: String(Park.labValues(park).readout)
+        species: rec.animal.speciesId, keeper: String(rec.animal.level || "none"), channel: biome.channel,
+        p: avg(nz.rates.map(function (r) { return r.pX + r.pY + r.pZ; })).toFixed(4), q: avg(nz.q).toFixed(4)
       });
       var a = h("a", "ghost", "Watch closely in the sandbox →");
       a.href = "sandbox.html?" + q.toString();
@@ -910,8 +1030,7 @@
     return st;
   }
   function renderKeeperSection(rec) {
-    var ks = h("div", "section");
-    ks.appendChild(h("span", "label", "Zookeepers"));
+    var ks = section("keepers", "Zookeepers", true, rec.keeperIds.length ? String(rec.keeperIds.length) : "none");
     ks.appendChild(h("div", "duty", "", ""));
     ks.lastChild.id = "kDuty";
     var here = rec.keeperIds.map(function (kid) { return park.keepers[kid]; });
@@ -978,8 +1097,8 @@
       add.appendChild(sel);
     }
     ks.appendChild(add);
-    ks.appendChild(h("div", "hint", "A keeper's time is split between their exhibits (bigger codes take more). Spread them thin and decoding " +
-      "slows down; tired keepers also burn out. Two keepers on one exhibit pool their time and cover each other's holidays."));
+    ks.appendChild(h("div", "hint", "Keepers split their time between exhibits (bigger codes take more); spread thin, they decode worse and burn out. " +
+      "Two on one exhibit pool their time and cover each other's holidays."));
     return ks;
   }
   function updateKeeperSection(rec) {
@@ -1150,7 +1269,8 @@
         "2. Hire a keeper (a decoder) so errors get corrected before they turn into logical errors. Keepers learn: train them as they gain experience.<br>" +
         "3. Discover more species in the <b>habitat workshop</b>: place qubits and checks, wire them up, and build a habitat whose checks make a working code. " +
         "The field guide has hints.<br>" +
-        "4. Fund the lab to lower the hardware's error rates.<br>" +
+        "4. Fund the lab. Your CNOTs fail 2% of the time, which is above the surface code's threshold: a surface code does worse than a bare qubit " +
+        "until you research the two-qubit gates (the Tortoise copes). Each upgrade reaches every enclosure.<br>" +
         "5. Keep investors impressed. They tour the zoo; when the valuation beats the next round's target, start raising.</p>" +
         "<p class=\"hint\">Healthy, rare animals draw visitors. Sick ones cost vet bills and reputation. " +
         "The <a href=\"sandbox.html\">exhibit sandbox</a> shows one enclosure round by round.</p>"));
@@ -1212,6 +1332,16 @@
         (inc.flips ? " · " + popcount(inc.flips) + " misread" : "") : "";
     }
     $("iSick").textContent = an.sick;
+    var recent = Park.recentErrors(park, rec), bare = Park.bareQubitErrors(park), vs = $("iVsBare");
+    if (recent === null) vs.textContent = "A bare qubit on this hardware would fail about " + bare.toFixed(2) + " times a day.";
+    else {
+      // Break-even with an unencoded qubit: is the code helping at all?
+      var verdict = recent < 0.8 * bare ? '<span class="pos-t">The code is beating a bare qubit.</span>'
+        : recent <= 1.25 * bare ? "About break-even: the code isn't helping yet. Train the keepers or improve the lab."
+        : '<span class="neg-t">Worse than no code at all: ' + (an.level ? "this hardware is too noisy for the code to break even. Improve the lab (two-qubit gates first) or train the keepers."
+          : "nobody is decoding.") + "</span>";
+      vs.innerHTML = "Lately " + recent.toFixed(2) + " logical errors a day per animal; a bare qubit on this hardware fails about " + bare.toFixed(2) + ". " + verdict;
+    }
     $("iVis").textContent = Math.round(Park.exhibitVisitors(park, rec));
     $("iCost").textContent = money(Park.exhibitCosts(park, rec));
   }
@@ -1381,6 +1511,7 @@
     renderLab();
     renderPark();
     renderInspector();
+    updateBadges();
     saveSoon();
   }
 
@@ -1703,7 +1834,7 @@
       if (acc > 4 * msPerTick) acc = 4 * msPerTick; // don't bank time the browser couldn't keep up with
       if (redraw) refreshAll();
       else if (n) {
-        renderTopbar(); updateToolAffordability(); updateLabButtons(); updateInspector(); updateStaff(); updateInvestors();
+        renderTopbar(); updateToolAffordability(); updateLabButtons(); updateInspector(); updateStaff(); updateInvestors(); updateBadges();
         if (park.tour && !wasTour) renderTour();
         if (Math.floor(park.tick / ECO.ticksPerDay) !== ui.lastDayDrawn) { ui.lastDayDrawn = Math.floor(park.tick / ECO.ticksPerDay); renderInvestors(); }
       }
@@ -1715,7 +1846,7 @@
   Array.prototype.forEach.call(document.querySelectorAll("#speedSeg button"), function (b) {
     b.addEventListener("click", function () { setSpeed(Number(b.dataset.speed)); });
   });
-  var lastSpeed = 1;
+  var lastSpeed = 1, TAB_KEYS = { b: "build", i: "investors", s: "staff", l: "lab", n: "news" };
   document.addEventListener("keydown", function (e) {
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
     if (ui.modalOpen) return;
@@ -1729,6 +1860,7 @@
     else if (e.key === "2") setSpeed(5);
     else if (e.key === "3") setSpeed(20);
     else if (e.key === "4") setSpeed(60);
+    else if (!e.ctrlKey && !e.metaKey && !e.altKey && TAB_KEYS[e.key.toLowerCase()]) toggleTab(TAB_KEYS[e.key.toLowerCase()]);
   });
 
   // Theme toggle: auto -> light -> dark. Remembered per viewer if storage works.
@@ -1747,6 +1879,7 @@
   });
 
   applyTheme();
+  setTab(ui.tab);
   if (loadGame()) {
     refreshAll();
     renderNews();

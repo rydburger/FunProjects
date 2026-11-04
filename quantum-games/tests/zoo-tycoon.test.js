@@ -67,10 +67,12 @@ test("the lab's noise model: idle + gate error per wire, readout + gate error pe
   var code = Z.SPECIES.axolotl.code, lab = { coherence: 0.009, gates: 0.001, readout: 0.012, cycle: 3 };
   var m = X.noiseModel(code, code.stabilizers, "depolarizing", lab);
   // The centre qubit (4) sits in four checks; corner qubit 0 in two.
-  assert.ok(Math.abs(m.rates[4].pX * 3 - (0.003 + 4 * 0.001)) < 1e-12);
-  assert.ok(Math.abs(m.rates[0].pX * 3 - (0.003 + 2 * 0.001)) < 1e-12);
-  assert.ok(Math.abs(m.q[0] - (0.012 + 4 * 0.001)) < 1e-12);
-  assert.ok(Math.abs(m.q[2] - (0.012 + 2 * 0.001)) < 1e-12);
+  // A failed CNOT (15 Paulis) touches the data qubit 12/15 of the time and
+  // flips the ancilla's readout 8/15 of the time.
+  assert.ok(Math.abs(m.rates[4].pX * 3 - (0.003 + 4 * 0.001 * 12 / 15)) < 1e-12);
+  assert.ok(Math.abs(m.rates[0].pX * 3 - (0.003 + 2 * 0.001 * 12 / 15)) < 1e-12);
+  assert.ok(Math.abs(m.q[0] - (0.012 + 4 * 0.001 * 8 / 15)) < 1e-12);
+  assert.ok(Math.abs(m.q[2] - (0.012 + 2 * 0.001 * 8 / 15)) < 1e-12);
   var bf = X.noiseModel(Z.SPECIES.tortoise.code, Z.SPECIES.tortoise.code.stabilizers, "bitFlip", lab);
   assert.strictEqual(bf.rates[0].pZ, 0);
 });
@@ -434,21 +436,40 @@ test("demolish frees the cells, refunds part of the cost (even mid-construction)
   var b = Park.build(P, "dunes", 4, 4).exhibit;
   assert.ok(b.building && Park.demolish(P, b.id).ok);
 });
-test("a starter zoo about breaks even on NISQ hardware and turns a profit once the lab improves it", function () {
-  function month(levels) {
+test("a starter zoo of tortoises about breaks even on NISQ hardware; an Axolotl only pays once the lab improves", function () {
+  function month(levels, axolotl) {
     var P = park(5);
     P.lab.levels = levels;
     var a = built(P, "riverbank", 0, 0);
     assert.ok(Park.buyAnimal(P, a.id, "tortoise").ok); Park.hireKeeper(P, a.id);
-    var b = built(P, "wetlands", 4, 0);
-    assert.ok(Park.buyAnimal(P, b.id, "axolotl").ok); Park.hireKeeper(P, b.id);
+    if (axolotl) {
+      var b = built(P, "wetlands", 4, 0);
+      assert.ok(Park.buyAnimal(P, b.id, "axolotl").ok); Park.hireKeeper(P, b.id);
+    }
     var cash0 = P.cash;
     runDays(P, 30);
     return P.cash - cash0;
   }
-  var nisq = month({ coherence: 0, gates: 0, readout: 0, cycle: 0 }), better = month({ coherence: 2, gates: 2, readout: 2, cycle: 0 });
-  assert.ok(nisq > -300000, "a month on starting hardware costs " + nisq + ": years of runway");
-  assert.ok(better > 0 && better > nisq, "upgraded: " + better + " vs starting " + nisq);
+  var NISQ = { coherence: 0, gates: 0, readout: 0, cycle: 0 }, BETTER = { coherence: 2, gates: 3, readout: 2, cycle: 0 };
+  var tort = month(NISQ, false), axo = month(NISQ, true), better = month(BETTER, true);
+  assert.ok(tort > -60000, "a tortoise for a month on starting hardware: " + tort);
+  assert.ok(axo < tort && axo > -300000, "adding an Axolotl above threshold costs money, but not the company: " + axo);
+  assert.ok(better > 0 && better > tort, "upgraded: " + better + " vs a tortoise alone " + tort);
+});
+
+test("each exhibit keeps its last 14 days of logical errors, to compare with a bare qubit", function () {
+  var P = park(9);
+  var a = built(P, "wetlands", 0, 0);
+  Park.buyAnimal(P, a.id, "axolotl"); Park.hireKeeper(P, a.id);
+  assert.strictEqual(Park.recentErrors(P, a), null, "no whole day yet");
+  runDays(P, 20);
+  assert.strictEqual(a.sickDays.length, 14);
+  var avg = a.sickDays.reduce(function (x, y) { return x + y; }, 0) / 14;
+  assert.ok(Math.abs(Park.recentErrors(P, a) - avg) < 1e-12);
+  assert.ok(Math.abs(Park.bareQubitErrors(P) - 24 * Z.LAB.coherence.values[0]) < 1e-12);
+  assert.ok(Park.recentErrors(P, a) > Park.bareQubitErrors(P), "an Axolotl on 2% CNOTs does worse than a bare qubit");
+  var B = Park.load(Park.save(P), { rng: S.seededRng(2) });
+  assert.deepStrictEqual(B.exhibits[a.id].sickDays, a.sickDays);
 });
 
 console.log("Staff wellbeing");
@@ -1029,15 +1050,23 @@ test("below threshold a space-time keeper makes the Giant Axolotl (d = 5) beat t
   assert.ok(st[1] * 2 < st[0], "space-time: d=3 " + st[0] + " vs d=5 " + st[1]);
   assert.ok(ss[1] > ss[0], "single-shot: d=3 " + ss[0] + " vs d=5 " + ss[1]);
 });
-test("the starting hardware is above threshold: research is what makes bigger codes pay", function () {
-  var start = [sickIn("axolotl", 4, BASE, 60), sickIn("giant", 4, BASE, 60)];
-  assert.ok(start[1] > 0.85 * start[0], "starting hardware: d=3 " + start[0] + " vs d=5 " + start[1]);
-  var top = X.labValues({ coherence: 3, gates: 3, readout: 3, cycle: 2 });
-  var end = [sickIn("axolotl", 4, top, 60), sickIn("giant", 4, top, 60)];
+test("the starting hardware (2% CNOTs) is above threshold for surface codes; research is what makes bigger codes pay", function () {
+  var days = 60, bare = Z.ECONOMY.ticksPerDay * BASE.coherence; // what the park shows: an unencoded qubit's errors a day
+  var start = [sickIn("axolotl", 4, BASE, days), sickIn("giant", 4, BASE, days)];
+  assert.ok(start[1] > start[0], "starting hardware: d=3 " + start[0] + " vs d=5 " + start[1]);
+  assert.ok(start[0] / (3 * days) > bare, "even a head keeper's Axolotl does worse than a bare qubit: " + (start[0] / (3 * days)).toFixed(2) + " vs " + bare);
+  // The repetition code (two wires per qubit, bit flips only) is below its threshold: a trainee's
+  // single-shot decoding about breaks even with a bare qubit, a head keeper's space-time decoding beats it.
+  var tort = [sickIn("tortoise", 1, BASE, days) / (3 * days), sickIn("tortoise", 4, BASE, days) / (3 * days)];
+  assert.ok(tort[0] < 1.25 * bare, "a trainee's Tortoise at the start: " + tort[0].toFixed(2) + " a day");
+  assert.ok(tort[1] < 0.8 * bare, "a head keeper's Tortoise at the start: " + tort[1].toFixed(2) + " a day");
+  // Above threshold the code is saturated, so bills are bounded: a few logical errors a day, not dozens.
+  var t = sickIn("axolotl", 1, BASE, days) / (3 * days);
+  assert.ok(t > 1 && t < 5, "trainee's Axolotl at the start: " + t.toFixed(2) + " a day");
+  var top = X.labValues({ coherence: 3, gates: 4, readout: 3, cycle: 2 });
+  var end = [sickIn("axolotl", 4, top, days), sickIn("giant", 4, top, days)];
   assert.ok(end[1] * 2 < end[0], "fully researched: d=3 " + end[0] + " vs d=5 " + end[1]);
-  // NISQ-bad but survivable: a d = 3 code with a trainee gets sick most days, not many times a day.
-  var t = sickIn("axolotl", 1, BASE, 60) / 180;
-  assert.ok(t > 0.5 && t < 1.6, "trainee at the start: " + t.toFixed(2) + " a day");
+  assert.ok(end[0] / (3 * days) < Z.ECONOMY.ticksPerDay * top.coherence / 3, "and the Axolotl beats a bare qubit by far");
 });
 test("every catalogue habitat lets a head keeper decode in space-time", function () {
   Object.keys(Z.BIOMES).forEach(function (b) {
@@ -1048,14 +1077,16 @@ test("every catalogue habitat lets a head keeper decode in space-time", function
 });
 
 console.log("Balance (seeded bot players, up to ten years)");
-// A scripted player. Each day it builds what it can afford while keeping
-// six months of costs in reserve (at most three projects at once), first
-// discovering each species from its reference design (ZooData.DESIGNS),
+// A scripted player. While CNOTs are worse than 0.5% (above the surface
+// code's threshold) it builds only Tortoises and researches the gates.
+// Then each day it builds what it can afford while keeping six months of
+// costs in reserve (at most three projects at once), discoveries first:
+// each species from its reference design (ZooData.DESIGNS),
 // then using the catalogue habitat; later it discovers rectangular surface
 // codes nobody has catalogued. It stocks what opens, staffs it (two keepers
 // for bigger codes, so holidays are covered), replaces whoever quits, gives
-// bonuses to unhappy keepers, trains them, funds the lab (at most one cycle
-// upgrade), buys investors a steak, and raises once the valuation clears the
+// bonuses to unhappy keepers, trains them, funds the lab (its least
+// researched dial; at most one cycle upgrade), buys investors a steak, and raises once the valuation clears the
 // next target by 10% (or, when it's short of runway, the bridge threshold).
 function freeSpot(P, cells) { // first free spot, scanning row by row, in any of the four turns
   for (var y = 0; y < P.height; y++) for (var x = 0; x < P.width; x++) {
@@ -1089,7 +1120,10 @@ function bot(seed, opt) {
   for (var d = 0; d < 3650; d++) {
     var reserve = Math.max(2e6, 180 * Park.rates(P).costs);
     var building = P.order.filter(function (id) { return P.exhibits[id].building; }).length;
-    prefs.forEach(function (sp) {
+    var aboveThreshold = P.lab.levels.gates < 2; // CNOTs worse than 0.5%: only repetition codes are worth keeping
+    // Discoveries first, then more of what it knows.
+    prefs.filter(function (sp) { return !Park.isKnown(P, sp); }).concat(prefs.filter(function (sp) { return Park.isKnown(P, sp); })).forEach(function (sp) {
+      if (aboveThreshold && opt.care !== false && sp !== "tortoise") return;
       var mine = P.order.filter(function (id) { return speciesOf(P, P.exhibits[id]) === sp; }).length;
       if (mine >= 3 + P.lotLevel || building >= 3) return;
       var known = Park.isKnown(P, sp);
@@ -1111,8 +1145,8 @@ function bot(seed, opt) {
       if (spot) { var res = Park.buildDesign(P, ds, spot[0], spot[1], { rot: spot[2] }); if (res.ok) Park.hireKeeper(P, res.exhibit.id); }
     });
     P.order.forEach(function (id) {
-      var e = P.exhibits[id];
-      if (!e.building && !e.animal) Park.buyAnimal(P, id, speciesOf(P, e));
+      var e = P.exhibits[id], sp = speciesOf(P, e);
+      if (!e.building && !e.animal) Park.buyAnimal(P, id, sp);
       if (opt.keepers !== false && opt.care !== false && !e.building && !e.keeperIds.length) Park.hireKeeper(P, id);
     });
     P.keeperOrder.forEach(function (kid) {
@@ -1121,10 +1155,12 @@ function bot(seed, opt) {
       if (opt.train !== false && c.ok && P.cash > c.course.fee + reserve) Park.trainKeeper(P, kid);
     });
     if (opt.research !== false && !P.lab.project) {
-      var dials = ["readout", "coherence", "gates", "cycle"].filter(function (x) { return x !== "cycle" || P.lab.levels.cycle < 1; });
-      var dial = dials.sort(function (a, b) { return P.lab.levels[a] - P.lab.levels[b]; })[0];
-      var rr = Park.canResearch(P, dial);
-      if (rr.ok && P.cash > rr.step.fee + reserve) Park.startResearch(P, dial);
+      var dials = ["readout", "coherence", "gates", "cycle"].filter(function (x) {
+        return (x !== "cycle" || P.lab.levels.cycle < 1) && P.lab.levels[x] + 1 < Z.LAB[x].values.length;
+      });
+      var dial = P.lab.levels.gates < 2 ? "gates" : dials.sort(function (a, b) { return P.lab.levels[a] - P.lab.levels[b]; })[0];
+      var rr = dial && Park.canResearch(P, dial);
+      if (rr && rr.ok && P.cash > rr.step.fee + reserve) Park.startResearch(P, dial);
     }
     var want = P.cash < 60 * Park.rates(P).costs ? Z.FUNDING.bridgeAt * 1.1 : 1.1; // short of runway: a bridge will do
     if (Park.canRaise(P).ok && Park.valuation(P).value >= Park.currentRound(P).target * want) Park.startRaise(P);

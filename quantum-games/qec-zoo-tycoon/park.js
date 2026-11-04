@@ -454,6 +454,7 @@
     if (park.cash < cost) return { ok: false, reason: "Not enough funding (" + dollars(cost) + " needed)." };
     park.cash -= cost;
     rec.animalTick = park.tick;
+    rec.sickDays = [];
     var sim = simFor(park, rec);
     rec.animal = X.createExhibit({
       speciesId: speciesId, code: sim.code, checks: sim.checks, channel: habitatOf(park, rec).channel,
@@ -610,6 +611,17 @@
 
   // ---------- the lab ----------
   function labValues(park) { return X.labValues(park.lab.levels); }
+  // Logical errors per animal per day at this exhibit over its last
+  // RECENT_DAYS whole days (null before its first), and what an unencoded
+  // qubit idling on the same hardware would suffer: a coherence error each
+  // hour with probability `coherence`, so ticksPerDay × coherence a day.
+  var RECENT_DAYS = 14;
+  function recentErrors(park, rec) {
+    var days = rec.sickDays || [];
+    if (!rec.animal || !days.length) return null;
+    return days.reduce(function (a, v) { return a + v; }, 0) / days.length / rec.animal.k;
+  }
+  function bareQubitErrors(park) { return ECO.ticksPerDay * labValues(park).coherence; }
   function labLevels(park) { var n = 0; for (var d in park.lab.levels) n += park.lab.levels[d]; return n; }
   function canResearch(park, dial) {
     var d = Z.LAB[dial];
@@ -944,6 +956,9 @@
     }
     park.reputation = Math.max(0, Math.min(100, park.reputation));
     var t = park.today;
+    stocked.forEach(function (rec) {
+      rec.sickDays = (rec.sickDays || []).concat([t.sickBy[rec.id] || 0]).slice(-RECENT_DAYS);
+    });
     park.history.push({ day: d, revenue: t.revenue, expenses: t.expenses, vet: t.vet, sick: t.sick,
       animals: stocked.reduce(function (a, rec) { return a + rec.animal.k; }, 0) });
     if (park.history.length > ECO.historyDays) park.history.shift();
@@ -1097,7 +1112,7 @@
     hireKeeper: hireKeeper, assignKeeper: assignKeeper, unassignKeeper: unassignKeeper, fireKeeper: fireKeeper,
     canTrain: canTrain, trainKeeper: trainKeeper, sendOnVacation: sendOnVacation,
     bonusCost: bonusCost, canBonus: canBonus, giveBonus: giveBonus,
-    labValues: labValues, labLevels: labLevels, canResearch: canResearch, startResearch: startResearch,
+    labValues: labValues, labLevels: labLevels, recentErrors: recentErrors, bareQubitErrors: bareQubitErrors, canResearch: canResearch, startResearch: startResearch,
     exhibitVisitors: exhibitVisitors, exhibitCosts: exhibitCosts, rates: rates,
     metrics: metrics, currentRound: currentRound, valuation: valuation, canRaise: canRaise, startRaise: startRaise,
     acceptOffer: acceptOffer, declineOffer: declineOffer, canPerk: canPerk, buyPerk: buyPerk,

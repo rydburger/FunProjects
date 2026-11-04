@@ -28,10 +28,13 @@ the money runs out.
 4. **Hire keepers.** Without one, nobody measures the checks, errors pile up, and an unkept
    code does *worse* than a bare qubit. Keepers are hired as trainees and learn; one keeper can
    look after several exhibits, and several keepers can share one (see below).
-5. **Fund the lab.** The starting hardware is NISQ-grade: close to threshold, so a bigger code
-   is no better than a smaller one and animals get sick about once a day. Research lowers the
-   error rates for every enclosure at once and pushes the hardware below threshold, where every
-   step in distance pays.
+5. **Fund the lab.** The starting hardware is NISQ-grade: CNOTs fail 2% of the time. That is
+   above the surface code's threshold, so a surface-code animal gets sick a few times a day,
+   does worse than a bare qubit, and a bigger code is worse still. The Repetition Tortoise
+   (bit flips only, two wires per qubit) copes. Research lowers the error rates for every
+   enclosure at once: two gate upgrades (to 0.5%) bring surface codes near threshold, and the
+   rest push the hardware below it, where every step in distance pays. The inspector compares
+   each exhibit's logical errors with what a bare qubit on the same hardware would suffer.
 6. **Watch the books.** Healthy, rare animals draw visitors. Each logical error costs a vet bill
    and some reputation. Salaries and upkeep are paid continuously.
 7. **Raise money.** Investors tour the zoo; when their valuation beats the next round's target,
@@ -44,9 +47,14 @@ the money runs out.
   with a line from the board.
 - The game **autosaves** in your browser every few seconds and when you leave. **New game**
   starts over. Saves from before the funding update can't be loaded.
+- **Screen:** on a computer the game fills the window and never scrolls, like a tycoon game: a
+  tab rail on the left opens one panel at a time (Build, Investors, Staff, Lab, News; click the
+  open tab again to hide it and give the map more room), the map sits in the middle, and the
+  inspector on the right has foldable sections. Dots on the rail flag a raise you can start, an
+  idle lab, a tired or idle keeper, and unread news. On a phone the same panels stack under the map.
 - Keys: <kbd>space</kbd> pause/resume, <kbd>1</kbd>–<kbd>4</kbd> speed (up to about a year a
-  minute), <kbd>R</kbd> rotate the plot you're placing, <kbd>Esc</kbd> cancel building / close
-  the inspector.
+  minute), <kbd>R</kbd> rotate the plot you're placing, <kbd>B</kbd> <kbd>I</kbd> <kbd>S</kbd>
+  <kbd>L</kbd> <kbd>N</kbd> open a panel, <kbd>Esc</kbd> cancel building / close the inspector.
 
 ### Investors, rounds and the IPO
 
@@ -169,9 +177,18 @@ falling behind, so slow keepers fall back to faster decoders.)
 
 ### The lab
 
-One research project at a time: $1.5M for 30 days, $4M for 60 days, then $10M for 90 days.
-The starting hardware is about 3% error per data qubit and 4% per check outcome every round on
-a surface code; fully researched, about ten times less.
+One research project at a time: $600k for 14 days, $2M for 30 days, $6M for 60 days, then (gates
+only) $15M for 90 days. The starting hardware has 2% error per CNOT, 2% idle error per qubit per
+hour and 2.8% readout error: about 8% error per data qubit and 7% per check outcome every round
+on a surface code, well above threshold. Fully researched it's about twenty times less.
+
+| Level | Coherence (per hour) | Gates (per CNOT) | Readout | Cycle |
+|---|---|---|---|---|
+| 0 | 2% | 2% | 2.8% | 1 round/hour |
+| 1 | 1.2% | 1% | 1.6% | 2 |
+| 2 | 0.6% | 0.5% | 0.8% | 3 |
+| 3 | 0.25% | 0.2% | 0.4% | |
+| 4 | | 0.05% | | |
 
 | Dial | What it does |
 |---|---|
@@ -180,9 +197,10 @@ a surface code; fully researched, about ten times less.
 | Readout | Fewer misread outcomes |
 | Syndrome cycle | More rounds per hour: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode |
 
-Seeded bot players pin the incentives (see the balance tests): a zoo that builds steadily, staffs
-bigger codes with two keepers, trains them, funds the lab and discovers new codes raises its
-Series A in its second month and lists in about 2.5–4 years; a zoo with no keepers goes bankrupt in
+Seeded bot players pin the incentives (see the balance tests): a zoo that fixes the gates first
+on Tortoise tickets, then builds steadily, staffs bigger codes with two keepers, trains them,
+funds the lab and discovers new codes raises its Series A in its third month and usually lists
+in about 2.5–8 years; a zoo with no keepers goes bankrupt in
 its first year; one that never trains, researches or looks after its staff doesn't list.
 
 ## Under the hood
@@ -211,8 +229,14 @@ Everything the player sees is physically correct:
   If not, it's a logical error and the animal is re-prepared. Leftover errors that are
   themselves stabilizers act trivially on the animal and are folded into the frame.
 - **Error rates** come from the lab: per round, data qubit j gets coherence/cycle +
-  (checks wired to j) × gate error, and check i is misread with probability readout +
-  (weight of i) × gate error. This charge for the CNOTs is an approximation.
+  (checks wired to j) × 12/15 × gate error, and check i is misread with probability readout +
+  (weight of i) × 8/15 × gate error. A failed CNOT leaves one of the 15 non-identity two-qubit
+  Paulis: 12 of them touch the data qubit and 8 flip the ancilla in the basis it's read in.
+  Charging each round's CNOTs this way (rather than tracking them through the circuit) is an
+  approximation.
+- **A bare qubit** idling on the same hardware picks up an error each hour with probability
+  equal to the coherence rate, so it fails about 24 × coherence times a day; the inspector
+  compares each exhibit's logical errors (per animal, over its last 14 days) with that.
 
 ### Files
 
