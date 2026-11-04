@@ -1,6 +1,6 @@
 # Zoo Tycoon — status & handoff
 
-Last updated: 2026-10-26 (second playtest update: shaped plots, NISQ lab, real funding ladder). Written so a new session can resume without the original chat.
+Last updated: 2026-11-04 (third playtest update: 2% CNOTs, tycoon-style desktop layout). Written so a new session can resume without the original chat.
 Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan**) and
 [`README.md`](README.md) (player-facing rules and how it works).
 
@@ -19,13 +19,51 @@ The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
   - [#6](https://github.com/rydburger/FunProjects/pull/6) merged M6.
   - [#7](https://github.com/rydburger/FunProjects/pull/7) merged M7.
   - [#8](https://github.com/rydburger/FunProjects/pull/8) merged the funding update.
-  - The second playtest update (below) is on branch `claude/gifted-darwin-pd1muz`.
-- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 91 in
+  - [#9](https://github.com/rydburger/FunProjects/pull/9) merged the second playtest update.
+  - The third playtest update (below) is on branch `claude/gifted-darwin-pd1muz`.
+- **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 92 in
   `tests/zoo-tycoon.test.js`, all passing (the zoo suite takes a few minutes: its bots play up
   to ten game years at NISQ-grade error rates).
-- **Browser checks:** park (construction, staffing, tours and perks, a raise and its verdict,
+- **Browser checks (third update):** the desktop layout at 1440×860 and 1280×720 (no page
+  scroll, every rail tab, foldable inspector sections), the stacked layout at 390px, light and
+  dark, a two-year save at 60× speed (60 fps), no console errors.
+- **Earlier browser checks:** park (construction, staffing, tours and perks, a raise and its verdict,
   demolish, blueprint delete, a two-year bot save at 60× speed: steady 60 fps) and sandbox (0.1×)
   verified in headless Chromium in light and dark themes and at 390px width, with no console errors.
+
+### Third playtest update (2026-11-04)
+
+The owner asked for two-qubit gates to start at 2% per CNOT, and for a desktop UI that doesn't
+need scrolling to reach the exhibit info (like the original tycoon games: compact, side panels,
+collapsible parts). Done:
+- **Gates:** 2% → 1% → 0.5% → 0.2% → 0.05% per CNOT (the gates dial has a fourth research step).
+  The CNOT charge is now physical: a failed CNOT is one of 15 two-qubit Paulis, so it hits the
+  data qubit with 12/15 of the gate error and flips the ancilla's readout with 8/15
+  (`CNOT_ON_DATA`, `CNOT_ON_CHECK` in `exhibit-sim.js`). At the start a surface code sees ~8%
+  error per data qubit and ~7% per outcome each round: above threshold, so the Giant Axolotl is
+  worse than the Axolotl and even a head keeper's Axolotl fails more often than a bare qubit
+  (tests pin this). It's saturated, so a trainee's Axolotl gets sick ~3 times a day (bounded
+  vet bills), not dozens. The Tortoise (two wires per qubit, bit flips only) is below its own
+  threshold: a trainee about breaks even with a bare qubit, a head keeper beats it.
+- **Research is cheaper and quicker** so the gates can be fixed early: $600k/14 days, $2M/30,
+  $6M/60, $15M/90 (gates only).
+- **Break-even readout:** the inspector shows each exhibit's logical errors per animal per day
+  over its last 14 days (`rec.sickDays`, `Park.recentErrors`) against a bare qubit on the same
+  hardware (`Park.bareQubitErrors` = 24 × coherence), and says whether the code is beating it,
+  breaking even, or doing worse (with the likely fix).
+- **Desktop layout ("app mode", ≥ 1000 × 600):** the page fills the window and doesn't scroll.
+  A tab rail (Build, Investors, Staff, Lab, News; keys B I S L N; click the open tab to hide
+  the panel) opens one side panel at a time; the map scales to fit the middle (container query
+  units); the inspector is its own scrolling column with foldable sections (construction,
+  last incident, zookeepers, buy an animal, habitat, placard), whose open state is remembered
+  per viewer (`qecZooUi` in localStorage, wrapped in try/catch). Rail dots flag a raise you can
+  start or a bridge offer, an idle lab with affordable research, a tired, unhappy or idle
+  keeper, and unread news. Below 1000px everything stacks under the map as before, with the
+  rail as a tab bar.
+- The sandbox link now passes the exhibit's average per-round data and readout error (gates
+  included), so the sandbox reproduces what the park simulates.
+- **Bots** research the gates first and build only Tortoises until gates reach 0.5%, then
+  discover new species before building more copies; they skip fully researched dials.
 
 ### Second playtest update (2026-10-26)
 
@@ -228,12 +266,17 @@ The game files build on it:
   once fatigue ≥ 40 (30 days apart). Sick past fatigue 60, burnout past 85 (14 days, −30 morale);
   morale drifts to 85 − 0.6 × fatigue; quits possible below 25. Bonus = 20 days' salary, +20
   morale, every 60 days at most.
-- **Lab:** research $1.5M/30 days, $4M/60 days, $10M/90 days per level. Per level 0 → 3:
-  coherence 2% → 1.2% → 0.6% → 0.25% per qubit per hour; gates 0.28% → 0.16% → 0.08% → 0.03% per
-  CNOT; readout 2.8% → 1.6% → 0.8% → 0.4%; cycle 1 → 2 → 3 rounds/hour. Logical errors per animal
-  per day with a trainee at level 0: tortoise ~0.2, d = 3 codes ~1.2; with a head keeper ~0.6 for
-  both the Axolotl and the Giant Axolotl (at threshold).
-- **Balance result (2026-10-26, second update):** the test bot raises the Series A around day 55,
+- **Lab:** research $600k/14 days, $2M/30 days, $6M/60 days, $15M/90 days (level 4, gates
+  only). Per level: coherence 2% → 1.2% → 0.6% → 0.25% per qubit per hour; gates 2% → 1% → 0.5%
+  → 0.2% → 0.05% per CNOT (×12/15 on each wired data qubit, ×8/15 on each check outcome);
+  readout 2.8% → 1.6% → 0.8% → 0.4%; cycle 1 → 2 → 3 rounds/hour. Logical errors per animal per
+  day at level 0 (trainee / head keeper): Tortoise ~0.5 / ~0.3 (a bare qubit: 0.48), d = 3
+  surface-type codes ~3.3 / ~2, Giant Axolotl ~6 / ~3.
+- **Balance result (2026-11-04, third update):** with 2% gates the test bot fixes the gates
+  first (two steps, ~44 days) on Tortoise tickets, closes the Series A around day 83, then B–D
+  every ~170 days (the post-close wait), and lists in 2.6–7.8 years in 5 of 6 seeds (946, 1371,
+  1638, 2768, 2835 days; the sixth stalls at Series E). The Series E ($10B) is the slow step.
+- **Earlier balance result (2026-10-26, second update):** the test bot raises the Series A around day 55,
   then B–D every ~170 days (the post-close wait), and lists in 2.5–3.2 years in 4 of 6 seeds
   (one more after ~9 years; one stalls short of $20B at Series E). No keepers → bankrupt in
   ~4 months; no training/research/care → bankrupt in year 2.
@@ -270,9 +313,13 @@ The game files build on it:
 - **Early rounds come on the clock.** A strong player's valuation clears Series A–D targets
   before the 150-day post-close wait ends, so those rounds close as soon as investors allow; the
   wait, not the valuation, paces the early game for good play. Weaker play is valuation-gated.
-- **The NISQ start is a trap for fast expansion:** before research, a d = 3 animal's vet bills
-  roughly cancel its tickets, so a zoo that builds wide before funding the lab can run out of
-  runway between Series A and B (the bots show it). Intended, but watch it in playtests.
+- **The NISQ start is a trap for fast expansion:** before the gates are researched, a surface
+  code is above threshold (sick a few times a day, health near zero, ~$4.5k a day in vet bills
+  per animal), so a zoo that stocks surface codes before funding the lab bleeds money. The
+  inspector says so. A bot that stocked everything at once went bankrupt in 2–6 months while
+  this was tuned. Watch it in playtests.
+- The break-even comparison uses the idle error only; a bare qubit that also had to be read out
+  or gated would do worse.
 - **Late game cash piles up** (billions after Series C). Lot space, construction time, staff and
   error rates are the constraints then. More late sinks (guides, shops, bigger lab tiers) would help.
 - **d = 2 codes are money pits** (many animals, constantly sick). Honest; postselection would fix it.

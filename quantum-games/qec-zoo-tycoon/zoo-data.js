@@ -364,30 +364,36 @@
   // ---------- The lab (physical error rates) ----------
   // Each dial has a value per research level (index 0 = starting
   // hardware). Per syndrome round, data qubit j gets
-  //   coherence / cycle  +  (checks wired to j) × gates
+  //   coherence / cycle  +  (checks wired to j) × 12/15 × gates
   // of the enclosure's channel, and check i is misread with probability
-  //   readout + (weight of i) × gates.
-  // This is the phenomenological model with a rough charge for the CNOTs
-  // in each round; circuit-level noise (CNOT order, hook errors) is a
-  // later milestone.
-  // The starting hardware is NISQ-grade: about 3% error per data qubit and
-  // 4% per check outcome every round on a surface code, close enough to
-  // threshold that a distance-5 code is no better than a distance-3 one
-  // even with a head keeper. Each research step pushes the rates further
-  // below threshold, and only then does a bigger code pay
-  // (zoo-tycoon.test.js pins both ends).
+  //   readout + (weight of i) × 8/15 × gates:
+  // a failed CNOT hits the data qubit with probability 12/15 of the
+  // gate error and flips the ancilla's outcome with 8/15 (exhibit-sim.js).
+  // This is the phenomenological model with a charge for the CNOTs in
+  // each round; circuit-level noise (CNOT order, hook errors) is a later
+  // milestone.
+  // The starting hardware is NISQ-grade: 2% error per CNOT. A surface code
+  // wires each data qubit to four checks, so that is about 8% error per
+  // data qubit and 7% per check outcome every round, well above threshold:
+  // a bigger code is worse, and even a head keeper can't keep the Axolotl
+  // healthy. The repetition codes (two wires per qubit, bit flips only)
+  // are below their own, higher threshold. Two gate upgrades (0.5%) bring
+  // surface codes near threshold; the later steps on every dial push them
+  // well below, where each step in distance pays (zoo-tycoon.test.js pins
+  // both ends).
   var LAB = {
     coherence: { name: "Coherence", values: [0.02, 0.012, 0.006, 0.0025], unit: "idle error per qubit per hour",
       blurb: "Longer-lived qubits: less error on every data qubit while it waits." },
-    gates: { name: "Two-qubit gates", values: [0.0028, 0.0016, 0.0008, 0.0003], unit: "error per CNOT",
-      blurb: "Cleaner CNOTs between ancillas and data. Every round, each data qubit pays once per check it is wired to." },
+    gates: { name: "Two-qubit gates", values: [0.02, 0.01, 0.005, 0.002, 0.0005], unit: "error per CNOT",
+      blurb: "Cleaner CNOTs between ancillas and data. Every round, each data qubit pays once per check it is wired to, and each check once per qubit it reads." },
     readout: { name: "Readout", values: [0.028, 0.016, 0.008, 0.004], unit: "chance a check is misread",
       blurb: "Fewer misreported check outcomes." },
     cycle: { name: "Syndrome cycle", values: [1, 2, 3], unit: "rounds per hour",
       blurb: "Measure more often: less idle error per round, but every round brings its own gate and readout errors, and keepers have more rounds to decode." }
   };
   // Cost of each research step, by the level being reached.
-  var RESEARCH = [null, { fee: 1500000, days: 30 }, { fee: 4000000, days: 60 }, { fee: 10000000, days: 90 }];
+  // Only the gates go to level 4.
+  var RESEARCH = [null, { fee: 600000, days: 14 }, { fee: 2000000, days: 30 }, { fee: 6000000, days: 60 }, { fee: 15000000, days: 90 }];
 
   // ---------- The habitat workshop (freeform building) ----------
   // A design places data qubits and check ancillas on a grid and wires each

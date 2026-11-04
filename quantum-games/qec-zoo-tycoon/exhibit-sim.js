@@ -67,15 +67,19 @@
     Object.keys(Z.LAB).forEach(function (k) { v[k] = Z.LAB[k].values[(levels && levels[k]) || 0]; });
     return v;
   }
+  // A CNOT that fails leaves one of the 15 non-identity two-qubit Paulis,
+  // each equally likely. 12 of them act on the data qubit, and 8 flip the
+  // ancilla in the basis it is read out in.
+  var CNOT_ON_DATA = 12 / 15, CNOT_ON_CHECK = 8 / 15;
   function noiseModel(code, checks, channel, lab) {
     var ch = S.channels[channel] ? channel : "depolarizing";
     var rates = [], q = [];
     for (var j = 0; j < code.n; j++) {
       var wired = 0;
       checks.forEach(function (c) { if (((c.x | c.z) >>> j) & 1) wired++; });
-      rates.push(S.channels[ch](lab.coherence / lab.cycle + wired * lab.gates));
+      rates.push(S.channels[ch](lab.coherence / lab.cycle + wired * CNOT_ON_DATA * lab.gates));
     }
-    checks.forEach(function (c) { q.push(lab.readout + S.weight(c) * lab.gates); });
+    checks.forEach(function (c) { q.push(lab.readout + S.weight(c) * CNOT_ON_CHECK * lab.gates); });
     return D.phenomenological(rates, q);
   }
 
