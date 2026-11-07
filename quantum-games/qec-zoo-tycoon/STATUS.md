@@ -1,15 +1,22 @@
 # Zoo Tycoon — status & handoff
 
-Last updated: 2026-11-04 (third playtest update: 2% CNOTs, tycoon-style desktop layout). Written so a new session can resume without the original chat.
+Last updated: 2026-11-07 (handoff refresh after the third playtest update, PR #10). Written so a new session can resume without the original chat.
 Companion docs: [`PLAN.md`](PLAN.md) (design + roadmap, including the **v1 plan**) and
 [`README.md`](README.md) (player-facing rules and how it works).
 
 ## Where things stand
 
 **v0 is complete (M0–M3). v1 is under way: M4 (placards), M5 (engine), M6 (learning keepers
-and the lab) and M7 (the habitat workshop and discovery) are done. After the owner's first
-playtest (2026-10-26) the "funding update" reworked the economy and goal; see below.**
-The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan" before continuing.
+and the lab) and M7 (the habitat workshop and discovery) are done. Since then the owner has
+playtested three times, and each round is merged: the "funding update" (AMO-scale economy,
+rounds to a $20B IPO, investors, staff wellbeing), the second update (shaped plots, NISQ lab,
+a real funding ladder) and the third (2% CNOTs, a tycoon-style desktop layout). Everything is
+on `main`; there is no work in flight.** The next milestone is M8 (circuit-level noise); see
+"Next steps". The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
+before starting a milestone.
+
+The owner plays the published artifact (see "Publishing the artifact" below) and the local
+copy, and reports back in playtest rounds; each round so far became one PR.
 
 - **PR history:**
   - [#2](https://github.com/rydburger/FunProjects/pull/2) merged the plan.
@@ -20,7 +27,9 @@ The v1 design was agreed with the owner on 2026-10-13; read PLAN.md § "v1 plan"
   - [#7](https://github.com/rydburger/FunProjects/pull/7) merged M7.
   - [#8](https://github.com/rydburger/FunProjects/pull/8) merged the funding update.
   - [#9](https://github.com/rydburger/FunProjects/pull/9) merged the second playtest update.
-  - The third playtest update (below) is on branch `claude/gifted-darwin-pd1muz`.
+  - [#10](https://github.com/rydburger/FunProjects/pull/10) merged the third playtest update.
+  - Sessions develop on branch `claude/gifted-darwin-pd1muz`, restarted from `main` after
+    each merge (see CLAUDE.md § Git workflow).
 - **Tests:** 72 in `tests/stabilizer.test.js`, 23 in `tests/detectors.test.js` and 92 in
   `tests/zoo-tycoon.test.js`, all passing (the zoo suite takes a few minutes: its bots play up
   to ten game years at NISQ-grade error rates).
@@ -85,7 +94,7 @@ training courses that last weeks. Done:
   (`Habitat.shapeSvg`) in the build menu and workshop.
 - **Construction:** workshop days = 30 × qubits/17 (7–90); catalogue 7 (riverbank) to 75 days
   (marsh). **Training:** 7 / 14 / 21 days.
-- **Lab:** level 0 is NISQ-grade (coherence 2%/h, gates 0.28%/CNOT, readout 2.8%: ~3% data and
+- **Lab** (gates superseded by the third update): level 0 is NISQ-grade (coherence 2%/h, gates 0.28%/CNOT, readout 2.8%: ~3% data and
   ~4% outcome error per round on a surface code). With a head keeper the d = 5 Giant Axolotl is no
   better than the d = 3 Axolotl there; fully researched it's several times better (tests pin
   both). Health now relaxes toward 100 (2% of the gap + 0.1 per tick; −20 per logical error), so
@@ -187,7 +196,8 @@ The game files build on it:
 - `exhibit-sim.js` runs one exhibit on a `Detectors` memory (a catalogue enclosure measures the
   species' own generators; a designed one measures the player's checks, redundant ones included).
   An exhibit holds k animals (`healths`; `health` is their mean); each logical qubit the vet
-  finds flipped is one sick animal. `noiseModel` turns lab values into per-qubit/per-check rates; `effectiveLevel`
+  finds flipped is one sick animal. `noiseModel` turns lab values into per-qubit/per-check rates
+  (each wire charges 12/15 of the CNOT error to its data qubit and 8/15 to its check); `effectiveLevel`
   is the best decoder the keeper can run in real time; `advancePhase` steps noise → measure →
   correct; `snapshot`/`restore` for saves.
 - `park.js` runs the whole zoo: the lot (grows with each round), building with construction
@@ -198,11 +208,20 @@ The game files build on it:
   (`canResearch`/`startResearch`), investors (`metrics`, `valuation`, `startRaise`,
   `acceptOffer`/`declineOffer`, `buyPerk`), `tick` (events: `sick`, `built`, `discovered`, `day`,
   `month`, `debt`, `lost`, `trained`, `research`, `staff`, `tour-start`, `tour`, `milestone`,
-  `round`), and `save`/`load` (version 4; older saves are rejected).
+  `round`), `recentErrors`/`bareQubitErrors` (the inspector's break-even line), and
+  `save`/`load` (version 4; older saves are rejected; records are saved field by field, so a
+  new per-exhibit field such as `sickDays` needs no version bump if the UI tolerates its absence).
 - `staff.js` is the wellbeing model for any staff role; `investors.js` judges the zoo.
 - Everything above is DOM-free and loads in Node.
 - `exhibit-view.js` does the SVG drawing (species layouts, or a design's own positions),
   `workshop.js` is the editor, and the two HTML pages are UI only.
+- `index.html` layout: `#rail` (tab buttons with `data-tab`) + `#drawer` (one `.panel.tab` per
+  tab; `setTab`/`toggleTab`, dots in `updateBadges`) + `.park-wrap` (tour banner, `.park-box`
+  holding `#park`, ticker) + `.inspector-col`. App mode is a CSS media query (≥ 1000 × 600);
+  below it the same DOM stacks. Inspector sections come from `section(key, title, open, more)`
+  (a `<details>`); `ui.tab` and `ui.sections` persist under `qecZooUi`, the save under
+  `qecZooSave`, the theme under `qecZooTheme`. The render/update split matters for speed:
+  `render*` rebuild DOM (on events), `update*` only patch text (every frame).
 
 ## Key design decisions (and why)
 
@@ -213,7 +232,7 @@ The game files build on it:
   logical it clashes with, or the check that's missing.
 - **The vet.** When the keeper commits a round, the vet takes the true error *at that round*
   times the Pauli frame and asks whether a perfect-information weight-2 table could still
-  decode it. If not: vet bill, −30 health, the animal is re-prepared. Judging the committed
+  decode it. If not: vet bill, −20 health, the animal is re-prepared. Judging the committed
   round (not "now") keeps space-time keepers from being blamed for errors they haven't had the
   chance to see yet. A leftover stabilizer is folded into the frame.
 - **Speed, not backlog.** In a pure memory a slow decoder only delays corrections (Pauli frames
@@ -280,31 +299,30 @@ The game files build on it:
   then B–D every ~170 days (the post-close wait), and lists in 2.5–3.2 years in 4 of 6 seeds
   (one more after ~9 years; one stalls short of $20B at Series E). No keepers → bankrupt in
   ~4 months; no training/research/care → bankrupt in year 2.
-- *Below: physics and older notes (the dollar figures and error rates in them are pre-update).*
+- **Species** (price per animal, appeal; catalogue habitat cost, build days, tiles, upkeep/day):
+  Tortoise $100k, 40 (riverbank $300k, 7 d, 4, $800; bit flips only); Shor Owl $450k, 110
+  (forest $1.1M, 25 d, 7, $2.8k); Steane Peacock $500k, 130 (glade $880k, 21 d, 6, $2.2k);
+  Perfect Pangolin $550k, 150 (dunes $620k, 14 d, 6, $1.5k); Surface Axolotl $800k, 180
+  (wetlands $1.15M, 28 d, 9, $2.8k); Iceberg Penguins $240k for the pair, 50 each (floe $400k,
+  10 d, 4, $1k); Giant Axolotl $1.5M, 320 (marsh $3.2M, 75 d, 21, $8k). Uncatalogued species:
+  appeal 25/60/120/160/210 for d = 1…5 (+40 per step after), $4k per appeal point per animal.
+- **Keeper work per round:** 1 (trainee), 1.5 (keeper), then 2 and 3 × max(1, checks/8) for the
+  space-time levels (the Giant Axolotl's 24 checks: 6 and 9). Speed 4 + xp/1000, max 12.
+- **Logical errors per animal per day** (catalogue habitats, 1 round/hour unless noted, three
+  seeds × 60 days; no keeper / trainee / head keeper; measured 2026-11-07):
+
+  | Lab | Bare qubit | Tortoise | Pangolin | Peacock | Owl | Axolotl | Penguins | Giant |
+  |---|---|---|---|---|---|---|---|---|
+  | Start | 0.48 | 0.88/0.51/0.31 | 3.5/3.3/1.9 | 4.4/4.1/2.6 | 3.6/3.1/2.2 | 3.7/3.3/2.1 | 2.8/2.8/2.2 | 6.6/6.6/3.4 |
+  | Gates 0.5% | 0.48 | 0.63/0.22/0.10 | 1.6/1.0/0.44 | 2.0/1.3/0.71 | 1.8/1.2/0.71 | 1.9/1.3/0.71 | 1.5/1.5/1.3 | 3.3/3.2/0.84 |
+  | All level 2 | 0.14 | 0.27/0.056/0.028 | 0.98/0.36/0.16 | 1.2/0.48/0.19 | 1.1/0.38/0.21 | 1.0/0.49/0.27 | 0.81/0.80/0.75 | 1.9/1.5/0.12 |
+  | Full (cycle 3) | 0.06 | 0.094/0.017/0 | 0.31/0.033/0.011 | 0.43/0.050/0 | 0.32/0.044/0.006 | 0.32/0.033/0.006 | 0.26/0.25/0.25 | 0.66/0.24/0 |
+
+  So the d = 3 codes only beat a bare qubit (break-even) near full research, while the Giant
+  Axolotl with a head keeper gets there at level 2; the Penguins (d = 2) never do. The
+  loop that produced it is the `sickIn` helper in `tests/zoo-tycoon.test.js`, run per species with
+`ExhibitSim.labValues(levels)` and keeper levels 0, 1 and 4.
 - Channels: depolarizing, except bit flips only at the Riverbank.
-- **Keepers:** salaries $120 / $150 / $190 / $240 per day for levels 1–4. Training to level
-  2/3/4 needs 150/500/1200 rounds of experience and costs $1k/1 day, $2.5k/2 days, $5k/3 days.
-  Speed = 4 + xp/300 work per hour, capped at 12. Work per round: 1, 1.5, then 2 and 3 × max(1,
-  checks/8) for the space-time levels (the Giant Axolotl's 24 checks: 6 and 9).
-- **Workshop:** $1,000 per qubit + $100 per wire; upkeep $5 per qubit + $1 per wire a day; half a
-  tile per qubit. Reference designs cost $5.4k (Tortoise), $19.4k (Owl, Axolotl), $15.4k
-  (Peacock), $10.6k (Pangolin), $6.8k (Penguins), $57k (Giant Axolotl). Uncatalogued species:
-  appeal 25/60/120/160/210 for d = 1…5 (+40 per step after), price 100 × appeal per animal.
-- **New species:** Iceberg Penguins $4k per animal (2 per habitat), appeal 50 each; Giant Axolotl
-  $45k, appeal 320. Iceberg Floe $5k, Grand Marsh $40k (5×5).
-- **Vet:** $2.5k and −1.5 reputation per logical error. **Reputation** drifts 15% per day toward
-  average animal health. **Revenue:** 0.8 visitors per appeal point per day × health ×
-  (0.5 + reputation/100), at $12 a ticket.
-- **Sick days per 30 days at starting hardware** (unlimited speed; approximate): trainee →
-  head keeper: Owl ~8 → ~3.5, Peacock ~8 → ~2, Pangolin ~6 → ~1.5, Axolotl ~8 → ~5, Tortoise
-  ~1.5 → ~0. No keeper: ~20 for the d = 3 codes. Giant Axolotl: ~25 (trainee), ~4 (senior), ~1
-  (head keeper) against the Axolotl's ~8 / ~5 / ~5: d = 5 wins only with space-time decoding (a
-  test pins this). Penguins: ~35 at any level (d = 2 can't correct).
-- **Balance result** (seeded bots that keep variety, at most 3 of a species, and discover each
-  species by building its reference design first; pinned by tests): training keepers where
-  animals keep getting sick plus funding the lab closes the Series A around day 90; never investing takes ~170–240 days or goes bankrupt; no keepers goes bankrupt
-  within ~25 days. One seed of three goes bankrupt on day ~31 whatever the strategy: the bot
-  buys the $45k Axolotl first and an early run of vet bills sinks it.
 
 ## Known quirks / small open items
 
@@ -334,7 +352,8 @@ The game files build on it:
   doesn't help. The real jump is to space-time decoding at level 3.
 - The Axolotl gains least from space-time keepers at d = 3 in the phenomenological model.
 - Levels 5–6 of the ladder (correlated matching, maximum likelihood) aren't implemented.
-- **Iceberg Penguins lose money** (d = 2: ~35 vet bills a month). Honest, and the workshop says
+- **Iceberg Penguins lose money** (d = 2: ~2–3 logical errors per animal per day at the start,
+  still ~0.25 fully researched, about four times a bare qubit). Honest, and the workshop says
   "the keeper has to guess", but a postselection mechanic (detected = shrug, not sick) would make
   detection codes worth keeping.
 - The Giant Axolotl needs a keeper with speed ≥ 6 (senior) or 9 (head) at 1 round/hour, and a
@@ -345,19 +364,44 @@ The game files build on it:
 
 ## Next steps
 
-Follow the v1 milestones in PLAN.md:
-1. **Playtest M6 + M7** and adjust numbers (all in `zoo-data.js`; rerun the balance tests).
-2. **M8: circuit-level noise** (option B). Designs already record wire (CNOT) order.
+1. **Playtest the third update** and tune (all numbers in `zoo-data.js`; rerun the balance
+   tests). Things to watch: whether the 2% start feels punishing (new players stocking surface
+   codes early), whether d = 3 codes reaching break-even only near full research feels right,
+   the slow Series E step, and the desktop layout on the owner's screen.
+2. **M8: circuit-level noise** (option B in PLAN.md). Designs already record wire (CNOT) order;
+   `Detectors.circuitLevel` is a scaffold that throws. This would replace the 12/15 and 8/15
+   CNOT charge with real propagation (hook errors, CNOT order).
 3. Keeper levels 5–6 (correlated matching, maximum likelihood).
 4. Subsystem codes (Bacon–Shor): anticommuting checks measured on purpose; postselection for
    detection codes; more discoverable species (color codes, [[8,3,2]], [[15,1,3]]).
 
-Also: tour guides (route choice, charm; the scaffolding is in place), other staff roles on the
-shared wellbeing model, holiday requests the player approves. Still open from v0: other guests
-(funding agencies, academics, press), park design (paths, guest flow, shops), climates (biased
-noise, erasure, leakage).
+Also: a mechanic against Tortoise spam (visitors bored of duplicates), late-game cash sinks,
+tour guides (route choice, charm; the scaffolding is in place), other staff roles on the shared
+wellbeing model, holiday requests the player approves, the sandbox loading a player's design.
+Still open from v0: other guests (funding agencies, academics, press), park design (paths, guest
+flow, shops), climates (biased noise, erasure, leakage).
+
+## Publishing the artifact
+
+The owner plays a private claude.ai artifact: https://claude.ai/artifact/DaU4N8SCKGYhUaEXEY5oF6
+(version 4 is the third update). To update it after a change:
+
+```
+node quantum-games/qec-zoo-tycoon/bundle-artifact.js <scratch-dir>
+```
+
+then publish `<scratch-dir>/zoo-tycoon.html` to that URL with `sandbox.html` as a supporting
+file (`files: { "sandbox.html": "<scratch-dir>/sandbox.html" }`). A session that didn't publish
+it must read the artifact first. Each artifact keeps its own autosave, separate from the local
+copy's.
 
 ## Starter prompt for a new session
 
 > Continue work on Error Correction Zoo Tycoon in `quantum-games/qec-zoo-tycoon/`. Read
 > `STATUS.md` first (then `PLAN.md` only if needed). Next task: <describe>.
+
+Checklist that has worked for each playtest round: restart the branch from `main`; make the
+change with tests; run the three test files (the zoo suite takes a few minutes); for tuning,
+run the balance bot on six seeds; drive the page in Playwright (light, dark, 390px, and a
+desktop size for app mode); update README, STATUS and CLAUDE.md; commit, push, open the PR;
+rebuild and republish the artifact.

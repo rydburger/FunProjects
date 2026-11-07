@@ -17,7 +17,8 @@ step. Open an `index.html` directly.
   the second playtest update (shaped plots, NISQ-grade lab, a real funding ladder) and the third
   (2% CNOTs, a tycoon-style desktop layout).
   **Read `quantum-games/qec-zoo-tycoon/STATUS.md` before working on it.** It has the progress
-  log, design decisions, numbers, and next steps.
+  log, design decisions, numbers, next steps, and how to republish the owner's artifact
+  (`qec-zoo-tycoon/bundle-artifact.js`, a publishing helper, not a build step).
 - `quantum-games/tests/`: plain Node tests, no dependencies.
 
 ## Conventions
