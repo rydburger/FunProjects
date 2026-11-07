@@ -188,6 +188,8 @@ this ordering.
   syndrome checks) side by side, so you can watch the decoder guess — and occasionally guess
   wrong. This is the main teaching surface.
 - Visual language and light/dark theme tokens match `magic-square/index.html`.
+- *(As built since the third playtest update, desktop is a fixed-height screen: a tab rail and one
+  side panel on the left, the map in the middle, a foldable inspector on the right; see STATUS.md.)*
 
 ## 6. Code structure
 
@@ -346,7 +348,12 @@ supersedes the matching items in the roadmap below.
      subsystem codes;
    - space-time decoding work now scales with checks/8 instead of checks/4 so a maxed keeper can
      run the d = 5 surface code in real time (the bots' balance was unchanged).
-5. **M8: circuit-level noise** (option B) as an advanced-lab unlock.
+5. **M8: circuit-level noise** (option B) as an advanced-lab unlock. Next up. Until then the lab
+   charges each round's CNOTs phenomenologically (12/15 of the gate error on each wired data
+   qubit, 8/15 on each check outcome; since the third playtest update the gates start at 2%).
+
+Between M7 and M8 the owner playtested three times; those rounds (economy and IPO, shaped plots,
+NISQ lab, desktop layout) are logged in STATUS.md rather than here.
 
 ## Later roadmap (not in v0)
 

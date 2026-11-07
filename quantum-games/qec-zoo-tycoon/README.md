@@ -79,7 +79,7 @@ through $263M at ~$1.5B and $479M at $12.4B to its 2020 IPO; Quantinuum raised $
   investors panel shows each part.
 - **Raising** starts a 21-day roadshow; investors tour every 3 days, and at the end they name their
   price. At or above the target the round closes: cash in, part of the company sold, and a
-  **bigger lot**. Investors then want to see the money at work for 180 days. At 60–100% of the
+  **bigger lot**. Investors then want to see the money at work for 150 days. At 60–100% of the
   target they offer a **bridge** (a little cash, no new letter); below that they pass, and you
   can try again in 45 days. The better the round, the more effusive the quotes.
 - **Tours.** Every few weeks an investor walks past up to three exhibits (the biggest draws).
@@ -256,10 +256,12 @@ Everything the player sees is physically correct:
 | `zoo.css` | Shared theme and styles |
 | `index.html` | The park UI |
 | `sandbox.html` | Single-exhibit sandbox |
+| `bundle-artifact.js` | Publishing helper: inlines the pages into self-contained HTML for the claude.ai artifact (not a build step) |
 | [`PLAN.md`](PLAN.md) | Design plan and roadmap |
+| [`STATUS.md`](STATUS.md) | Progress log, design decisions, current numbers, next steps (start here to work on the game) |
 
 Everything except the two HTML pages, `exhibit-view.js`, `workshop.js` and `zoo.css` is DOM-free and runs in
-Node:
+Node (`bundle-artifact.js` is Node-only):
 
 ```
 node quantum-games/tests/stabilizer.test.js   # codes, analysis, decoders, group matching, p² scaling
@@ -270,6 +272,7 @@ node quantum-games/tests/zoo-tycoon.test.js   # exhibit sim, keepers, lab, park 
 ## Status
 
 v0 (M0–M3) and v1's M4–M7 (factual placards, the detector engine, learning keepers and the lab,
-the habitat workshop with discovery) are done, plus the funding update (AMO-scale economy,
-construction, rounds to an IPO, investor tours, shared keepers and staff wellbeing); see
-[`STATUS.md`](STATUS.md). Next: circuit-level noise (M8).
+the habitat workshop with discovery) are done, plus three playtest updates: the funding update
+(AMO-scale economy, construction, rounds to an IPO, investor tours, shared keepers and staff
+wellbeing), shaped plots with a real funding ladder, and 2% CNOTs with a tycoon-style desktop
+layout. See [`STATUS.md`](STATUS.md). Next: circuit-level noise (M8).

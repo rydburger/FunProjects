@@ -30,7 +30,7 @@
 // as it was in that round times the Pauli frame, and asks whether a
 // perfect-information minimum-weight decoder (weight ≤ 2) would still
 // recover it. If not, every animal (logical qubit) the leftover flips is
-// sick: a vet bill each, −30 health each, and the code is re-prepared
+// sick: a vet bill each, −SICK_HEALTH_HIT health each, and the code is re-prepared
 // from scratch. A leftover that is itself a stabilizer is harmless and is
 // folded into the frame.
 //
