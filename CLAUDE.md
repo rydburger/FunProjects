@@ -11,7 +11,11 @@ step. Open an `index.html` directly.
   code analysis (logicals, CSS, distance) from a bare list of checks. Used by `qec-zoo-tycoon/`.
 - `quantum-games/detectors.js`: repeated noisy measurement, detectors, detector error models and
   decoders (`Detectors`). Phenomenological noise; circuit-level noise is a scaffold.
-- `quantum-games/magic-square/`: Peres–Mermin magic square game (done).
+- `quantum-games/nonlocal.js`: tasks from arXiv:2512.02284 (`NonLocal`): small statevector,
+  Clifford circuits + Pauli noise with exact fault analysis, magic square Plans I/II, KSB, GHZ, HLF.
+- `quantum-games/magic-square/`: Peres–Mermin magic square game (`index.html`) plus chapters 2–5
+  implementing arXiv:2512.02284 (`lab.html`, `ksb.html`, `ghz.html`, `hlf.html`, sharing
+  `paper.css` and `paper-ui.js`). See its README for numbers, the noise model and performance notes.
 - `quantum-games/qec-zoo-tycoon/`: Error Correction Zoo Tycoon. v0 is complete; v1 is done through M7 (habitat workshop),
   plus the funding update (AMO-scale economy, construction, rounds to an IPO, investors, staff wellbeing),
   the second playtest update (shaped plots, NISQ-grade lab, a real funding ladder) and the third
@@ -34,6 +38,7 @@ step. Open an `index.html` directly.
 ## Checks before pushing
 
 ```
+node quantum-games/tests/nonlocal.test.js
 node quantum-games/tests/stabilizer.test.js
 node quantum-games/tests/detectors.test.js
 node quantum-games/tests/zoo-tycoon.test.js

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GHZ Parity Game</title>
+<link rel="stylesheet" href="paper.css">
+<style>
+  .strat { border-collapse: collapse; font-family: var(--font-mono); font-size: 13px; }
+  .strat th { font-weight: 500; color: var(--ink-dim); font-size: 11px; padding: 4px 6px; text-align: center; }
+  .strat td { padding: 3px 6px; text-align: center; }
+  .strat .pl { color: var(--ink-dim); text-align: right; }
+  .sbtn { font: 700 14px var(--font-mono); width: 46px; height: 36px; border-radius: 8px; cursor: pointer; border: 1.5px solid var(--line); background: var(--bg-panel-2); color: var(--ink); }
+  .sbtn.b0 { border-color: var(--bob); color: var(--bob); }
+  .sbtn.b1 { border-color: var(--alice); color: var(--alice); }
+  .sbtn.X { border-color: var(--bob); color: var(--bob); }
+  .sbtn.Y { border-color: var(--alice); color: var(--alice); }
+  .sbtn.Z { border-color: var(--ink-mute); color: var(--ink-mute); }
+  .round { font-family: var(--font-mono); font-size: 13px; }
+  .round .bits { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+  .round .bit { display: inline-flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 7px; padding: 3px 7px; min-width: 40px; }
+  .round .bit small { color: var(--ink-dim); font-size: 10px; }
+  .chip { width: 100%; max-width: 440px; }
+  .chip svg { width: 100%; height: auto; display: block; }
+  .bigwin { font: 700 30px var(--font-mono); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <span class="eyebrow">Chapter 4 · paper Fig. 3</span>
+    <h1>The GHZ game: <em>N players</em>, one parity</h1>
+    <p>Each of N players gets a secret bit x<sub>j</sub>, with the promise that the bits add up to an even number. Each answers a bit y<sub>j</sub>. They win if the answers add up to half the questions' sum, mod 2. Players with no shared entanglement can't do better than ½ + 2<sup>−⌈N/2⌉</sup>, which falls toward a coin toss as N grows. Players sharing a GHZ state win every time. The paper played it with up to 71 qubits.</p>
+  </header>
+
+  <section class="card">
+    <h2><span class="num">4.1</span>Play it with a few friends</h2>
+    <p class="lede">Set each player's rule for x = 0 and x = 1, then deal some rounds. The win rate shown is exact, averaged over every allowed set of questions.</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Players</span><div id="n-seg"></div></div>
+      <div class="control"><span class="lab">Resources</span><div id="mode-seg"></div></div>
+      <div class="control"><button class="ghost" id="optimal" type="button">Use a best strategy</button></div>
+    </div>
+    <div class="rule-card" id="mode-help"></div>
+    <div class="two-col">
+      <div>
+        <table class="strat" id="strat"></table>
+        <div class="chi-line" style="margin-top:12px"><span class="small mono">exact win rate</span> <span class="bigwin" id="win-rate">—</span></div>
+        <p class="small" id="win-note"></p>
+      </div>
+      <div>
+        <div class="btn-row">
+          <button class="primary" id="deal" type="button">Deal a round</button>
+          <button class="ghost" id="deal100" type="button">Play 100 rounds</button>
+        </div>
+        <div class="round" id="round"></div>
+        <div id="round-circuit"></div>
+        <p class="small" id="tally"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">4.2</span>Grow a GHZ state on the chip</h2>
+    <p class="lede">On a 2D chip each qubit only touches its neighbours. The paper grows the GHZ state outward from one qubit: in each step, every qubit already in the state may entangle one fresh neighbour with a CNOT (H·CZ·H). So N qubits need only about √N steps. Darker rings joined later.</p>
+    <div class="two-col">
+      <div class="chip" id="chip"></div>
+      <div>
+        <div class="controls">
+          <div class="control"><label for="n-range">Players (qubits)</label>
+            <div class="range-row"><input type="range" id="n-range" min="2" max="71" value="40"><output id="n-out" for="n-range">40</output></div></div>
+          <div class="control"><button class="ghost" id="regrow" type="button">New growth pattern</button></div>
+        </div>
+        <div class="tiles" id="chip-tiles"></div>
+        <p class="small">Win probability at the paper's error rates, exact for this growth pattern and averaged over 20 random question sets. Each extra qubit adds gates, idling and a readout, and one error anywhere flips the parity.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">4.3</span>Sweep N up to 71</h2>
+    <p class="lede">The paper's experiment: for each N, 20 random games, each played on many random growth patterns with 1000 shots apiece. In their words, the measured win rate "always stays above the classical winning probability", but "the margin of advantage narrows with the number of players".</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Growth patterns per game</span><div id="pat-seg"></div></div>
+      <div class="control"><button class="primary" id="sweep" type="button">Run the sweep</button></div>
+    </div>
+    <div id="noise"></div>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+    <div id="sweep-chart"></div>
+  </section>
+
+  <footer class="note">Rounds in 4.1 run on a full statevector. The chip results in 4.2 and 4.3 are exact noisy win probabilities from back-propagating the parity through the Clifford circuit (<code>NonLocal.GHZ</code>), with 1000-shot sampling on top.</footer>
+</div>
+
+<script src="../nonlocal.js"></script>
+<script src="paper-ui.js"></script>
+<script>
+(function () {
+  "use strict";
+  var NL = window.NonLocal, UI = window.PaperUI, GHZ = NL.GHZ, C = NL.Clifford;
+  UI.nav("ghz");
+  var rnd = NL.rng();
+
+  // ---------- 4.1 ----------
+  var g = { N: 3, mode: "quantum", cl: null, qb: null, tally: { r: 0, w: 0 } };
+  function defaults() {
+    g.cl = []; g.qb = [];
+    for (var j = 0; j < g.N; j++) { g.cl.push([0, 1]); g.qb.push(["X", "X"]); }
+  }
+  function optimal() {
+    for (var j = 0; j < g.N; j++) {
+      // best classical: half the players (rounded down) answer y = x, the rest answer 0
+      g.cl[j] = j < Math.floor(g.N / 2) ? [0, 1] : [0, 0];
+      g.qb[j] = ["X", "Y"];
+    }
+    bestClassicalSearch();
+  }
+  // The closed-form rule above is optimal for some N; otherwise search the
+  // small strategy space (who copies x, plus a constant) for a best one.
+  function bestClassicalSearch() {
+    if (GHZ.classicalWin(g.cl) >= GHZ.classicalBound(g.N) - 1e-12) return;
+    var ins = GHZ.evenInputs(g.N), best = -1, bestS = 0, bestC = 0;
+    for (var S = 0; S < (1 << g.N); S++) for (var c = 0; c < 2; c++) {
+      var w = 0;
+      ins.forEach(function (x) { if (((NL.popcount(x & S) + c) & 1) === GHZ.target(x)) w++; });
+      if (w > best) { best = w; bestS = S; bestC = c; }
+    }
+    for (var j = 0; j < g.N; j++) g.cl[j] = (bestS >> j) & 1 ? [0, 1] : [0, 0];
+    if (bestC) g.cl[0] = [1 - g.cl[0][0], 1 - g.cl[0][1]];
+  }
+  UI.seg(document.getElementById("n-seg"), [3, 4, 5, 6, 7, 8].map(function (n) { return { value: n, label: String(n) }; }), g.N, function (n) { g.N = n; defaults(); g.tally = { r: 0, w: 0 }; renderStrat(); document.getElementById("round").innerHTML = ""; document.getElementById("round-circuit").innerHTML = ""; });
+  UI.seg(document.getElementById("mode-seg"), [{ value: "classical", label: "Classical" }, { value: "quantum", label: "Shared GHZ state" }], g.mode, function (m) { g.mode = m; g.tally = { r: 0, w: 0 }; renderStrat(); });
+  document.getElementById("optimal").addEventListener("click", function () { optimal(); renderStrat(); });
+
+  function renderStrat() {
+    var t = document.getElementById("strat"), q = g.mode === "quantum";
+    document.getElementById("mode-help").innerHTML = q
+      ? "<b>Shared GHZ state.</b> The players share (|00…0⟩ + |11…1⟩)/√2, one qubit each. Each player picks which axis to measure, X, Y or Z, depending on their bit, and answers 0 for outcome +1 and 1 for −1. Tap a cell to change the axis."
+      : "<b>Classical.</b> Each player answers a fixed bit for each question (shared randomness doesn't help: the best random strategy is no better than the best fixed one). Tap a cell to flip the answer.";
+    var html = "<tr><th></th><th>if x = 0</th><th>if x = 1</th></tr>";
+    for (var j = 0; j < g.N; j++) {
+      html += '<tr><td class="pl">P' + (j + 1) + "</td>";
+      for (var x = 0; x < 2; x++) {
+        var v = q ? g.qb[j][x] : g.cl[j][x];
+        html += '<td><button type="button" class="sbtn ' + (q ? v : "b" + v) + '" data-j="' + j + '" data-x="' + x + '" aria-label="Player ' + (j + 1) + " if x=" + x + ": " + (q ? "measure " + v : "answer " + v) + '">' + (q ? v : v) + "</button></td>";
+      }
+      html += "</tr>";
+    }
+    t.innerHTML = html;
+    Array.prototype.forEach.call(t.querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        var j = +b.getAttribute("data-j"), x = +b.getAttribute("data-x");
+        if (q) g.qb[j][x] = { X: "Y", Y: "Z", Z: "X" }[g.qb[j][x]]; else g.cl[j][x] ^= 1;
+        g.tally = { r: 0, w: 0 };
+        renderStrat();
+      });
+    });
+    var w = q ? GHZ.quantumWin(g.qb) : GHZ.classicalWin(g.cl), bound = GHZ.classicalBound(g.N);
+    var el = document.getElementById("win-rate");
+    el.textContent = UI.pct(w, 1);
+    el.style.color = w > bound + 1e-9 ? "var(--quantum)" : w >= bound - 1e-9 ? "var(--bob)" : "var(--ink)";
+    document.getElementById("win-note").innerHTML = q
+      ? (w > 0.9999 ? "Perfect. The GHZ state is unchanged by any product of X's and Y's with an even number of Y's: its value is −1 when the number of Y's is 2 mod 4, and +1 otherwise. So the parity of the answers is fixed." :
+         "The classical ceiling for " + g.N + " players is " + UI.pct(bound, 2) + ". Try X for x = 0 and Y for x = 1, for everyone.")
+      : (w >= bound - 1e-9 ? "That's the classical ceiling for " + g.N + " players, ½ + 2<sup>−⌈" + g.N + "/2⌉</sup> = " + UI.pct(bound, 2) + ", checked by brute force over all strategies in our tests." :
+         "The best any classical strategy can do for " + g.N + " players is " + UI.pct(bound, 2) + ".");
+    renderTally();
+  }
+  function renderTally() {
+    document.getElementById("tally").textContent = g.tally.r ? "Rounds played: " + g.tally.r + ", won " + g.tally.w + " (" + UI.pct(g.tally.w / g.tally.r, 1) + ")" : "";
+  }
+  function playOne() {
+    var x = GHZ.randomInput(g.N, rnd), y, par;
+    if (g.mode === "quantum") { var res = GHZ.playRound(g.qb, x, rnd); y = res.y; par = res.parity; }
+    else { y = []; par = 0; for (var j = 0; j < g.N; j++) { y.push(g.cl[j][(x >> j) & 1]); par ^= y[j]; } }
+    var target = GHZ.target(x), win = par === target;
+    g.tally.r++; if (win) g.tally.w++;
+    return { x: x, y: y, par: par, target: target, win: win };
+  }
+  function showRound(r) {
+    var sx = NL.popcount(r.x), html = '<div class="bits">';
+    for (var j = 0; j < g.N; j++) html += '<span class="bit"><small>P' + (j + 1) + "</small>x=" + ((r.x >> j) & 1) + "<b>y=" + r.y[j] + "</b>" + (g.mode === "quantum" ? "<small>" + g.qb[j][(r.x >> j) & 1] + "</small>" : "") + "</span>";
+    html += "</div>";
+    html += "<div>Σx = " + sx + ", so the answers must have parity " + sx + "/2 mod 2 = <b>" + r.target + "</b>. They have parity <b>" + r.par + "</b>. " +
+      '<span class="badge ' + (r.win ? "win" : "lose") + '">' + (r.win ? "WIN" : "LOSE") + "</span></div>";
+    document.getElementById("round").innerHTML = html;
+    if (g.mode === "quantum") {
+      var pat = GHZ.growth(g.N, NL.rng(g.N)), Cc = C.circuit(g.N);
+      C.add(Cc, [C.op("H", pat.root)]);
+      pat.layers.forEach(function (layer) { C.cxMoments(layer).forEach(function (m) { C.add(Cc, m); }); });
+      var ss = [], hs = [];
+      for (var k = 0; k < g.N; k++) { var b = g.qb[k][(r.x >> k) & 1]; if (b === "Y") ss.push(C.op("S", k)); if (b !== "Z") hs.push(C.op("H", k)); }
+      C.add(Cc, ss); C.add(Cc, hs);
+      var labels = []; for (var q = 0; q < g.N; q++) labels.push("P" + (q + 1));
+      UI.drawCircuit(document.getElementById("round-circuit"), Cc, labels, { rowH: 24 });
+    } else document.getElementById("round-circuit").innerHTML = "";
+    renderTally();
+  }
+  document.getElementById("deal").addEventListener("click", function () { showRound(playOne()); });
+  document.getElementById("deal100").addEventListener("click", function () { var r; for (var i = 0; i < 100; i++) r = playOne(); showRound(r); });
+  defaults(); renderStrat();
+
+  // ---------- 4.2 chip ----------
+  var chip = { N: 40, pat: null, lat: NL.lattice(72) };
+  function regrow() { chip.pat = GHZ.growth(chip.N, rnd); drawChip(); }
+  function drawChip() {
+    var L = chip.lat, pts = L.pts, minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+    pts.forEach(function (p) { minx = Math.min(minx, p[0]); maxx = Math.max(maxx, p[0]); miny = Math.min(miny, p[1]); maxy = Math.max(maxy, p[1]); });
+    var sc = 34, pad = 18, W = (maxx - minx) * sc + 2 * pad, H = (maxy - miny) * sc + 2 * pad;
+    function X(p) { return pad + (p[0] - minx) * sc; } function Y(p) { return pad + (p[1] - miny) * sc; }
+    var layerOf = {}, pat = chip.pat, nL = pat.layers.length; layerOf[pat.root] = 0;
+    pat.layers.forEach(function (layer, li) { layer.forEach(function (pr) { layerOf[pr[1]] = li + 1; }); });
+    var svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Chip lattice with the GHZ growth pattern">';
+    L.edges.forEach(function (e) { svg += '<line x1="' + X(pts[e.a]) + '" y1="' + Y(pts[e.a]) + '" x2="' + X(pts[e.b]) + '" y2="' + Y(pts[e.b]) + '" stroke="var(--line)" stroke-width="1.5"/>'; });
+    pat.layers.forEach(function (layer) { layer.forEach(function (pr) { svg += '<line x1="' + X(pts[pr[0]]) + '" y1="' + Y(pts[pr[0]]) + '" x2="' + X(pts[pr[1]]) + '" y2="' + Y(pts[pr[1]]) + '" stroke="var(--quantum)" stroke-width="3" stroke-linecap="round"/>'; }); });
+    pts.forEach(function (p, i) {
+      var inG = layerOf[i] !== undefined, op = inG ? (0.35 + 0.65 * layerOf[i] / Math.max(1, nL)).toFixed(2) : 0;
+      svg += '<circle cx="' + X(p) + '" cy="' + Y(p) + '" r="9" fill="' + (inG ? "var(--quantum)" : "var(--bg-panel-2)") + '" fill-opacity="' + (inG ? op : 1) + '" stroke="' + (i === pat.root ? "var(--alice)" : inG ? "var(--quantum)" : "var(--line)") + '" stroke-width="' + (i === pat.root ? 3 : 1.5) + '"><title>qubit ' + i + (inG ? ", joined at step " + layerOf[i] : ", unused") + "</title></circle>";
+    });
+    document.getElementById("chip").innerHTML = svg + "</svg>";
+    var p = 0, r2 = NL.rng(chip.N * 7919);
+    for (var k = 0; k < 20; k++) p += GHZ.winProbBits(pat, GHZ.randomInputBits(chip.N, r2), C.PAPER_NOISE) / 20;
+    var nCZ = pat.layers.reduce(function (s, l) { return s + l.length; }, 0);
+    document.getElementById("chip-tiles").innerHTML =
+      '<div class="tile"><div class="cap">Growth steps</div><div class="val">' + nL + '</div><div class="sub">' + nCZ + " CZ gates in total</div></div>" +
+      '<div class="tile q"><div class="cap">Win prob., paper noise</div><div class="val">' + UI.pct(p, 1) + "</div></div>" +
+      '<div class="tile c"><div class="cap">Best classical</div><div class="val">' + UI.pct(GHZ.classicalBound(chip.N), chip.N > 20 ? 4 : 1) + "</div></div>";
+  }
+  var nr = document.getElementById("n-range");
+  nr.addEventListener("input", function () { chip.N = +nr.value; document.getElementById("n-out").textContent = nr.value; regrow(); });
+  document.getElementById("regrow").addEventListener("click", regrow);
+  regrow();
+
+  // ---------- 4.3 sweep ----------
+  var sw = { patterns: 10, noise: Object.assign({}, C.PAPER_NOISE), job: null, data: [] };
+  UI.seg(document.getElementById("pat-seg"), [{ value: 3, label: "3 (quick)" }, { value: 10, label: "10" }, { value: 50, label: "50 (paper)" }], sw.patterns, function (v) { sw.patterns = v; });
+  UI.noisePanel(document.getElementById("noise"), [
+    { key: "p1", label: "1-qubit gate error", max: 0.02 },
+    { key: "p2", label: "CZ error", max: 0.05 },
+    { key: "readout", label: "Readout error", max: 0.1 },
+    { key: "idle", label: "Idle error / layer", max: 0.02 }
+  ], C.PAPER_NOISE, function (v) { sw.noise = v; startSweep(); });
+  document.getElementById("sweep").addEventListener("click", startSweep);
+  var NS = [];
+  for (var n = 2; n <= 71; n++) NS.push(n);
+  function startSweep() {
+    if (sw.job) sw.job.cancel();
+    sw.data = [];
+    var ni = 0, game = 0, pt = 0, acc = [], GAMES = 20, SHOTS = 1000, r = NL.rng(), lastDraw = 0, xb = null;
+    var total = NS.length * GAMES * sw.patterns, doneUnits = 0;
+    document.getElementById("sweep").disabled = true;
+    sw.job = UI.job(function () {
+      var N = NS[ni];
+      if (pt === 0) xb = GHZ.randomInputBits(N, r);
+      var p = GHZ.winProbBits(GHZ.growth(N, r), xb, sw.noise);
+      acc.push(NL.binomial(SHOTS, p, r) / SHOTS);
+      doneUnits++;
+      if (++pt >= sw.patterns) { pt = 0; game++; }
+      if (game >= GAMES) {
+        var m = acc.reduce(function (s, v) { return s + v; }, 0) / acc.length;
+        var sd = Math.sqrt(acc.reduce(function (s, v) { return s + (v - m) * (v - m); }, 0) / Math.max(1, acc.length - 1));
+        sw.data.push({ N: N, mean: m, se: sd / Math.sqrt(acc.length) });
+        acc = []; game = 0; ni++;
+      }
+      return ni >= NS.length ? 1 : doneUnits / total;
+    }, {
+      onProgress: function (f) {
+        document.getElementById("prog").style.width = (f * 100).toFixed(1) + "%";
+        var now = performance.now(); if (now - lastDraw > 200 || f >= 1) { lastDraw = now; drawSweep(); }
+      },
+      onDone: function () { document.getElementById("sweep").disabled = false; drawSweep(); }
+    });
+  }
+  function drawSweep() {
+    var bound = NS.map(function (N) { return { x: N, y: GHZ.classicalBound(N) }; });
+    UI.lineChart(document.getElementById("sweep-chart"), {
+      height: 300,
+      x: { min: 0, max: 72, label: "players N", fmt: function (v) { return String(v); } },
+      y: { min: 0.4, max: 1.0, label: "win probability", fmt: function (v) { return (v * 100).toFixed(v === 1 || v === 0.4 ? 0 : 1) + "%"; }, fmtErr: function (v) { return (v * 100).toFixed(2) + "%"; } },
+      series: [{ name: "Simulated chip (±1σ)", color: "var(--quantum)", kind: "dots", r: 3.2, points: sw.data.map(function (d) { return { x: d.N, y: d.mean, lo: d.mean - d.se, hi: d.mean + d.se }; }) }],
+      refs: [{ points: bound, name: "Best classical", label: "classical", color: "var(--mismatch)", dash: true },
+             { y: 1, name: "Ideal GHZ", label: "ideal", color: "var(--bob)", dash: true }],
+      tableHead: ["N", "win prob.", "±1σ", "best classical"],
+      tableRows: sw.data.map(function (d) { return [d.N, UI.pct(d.mean, 2), UI.pct(d.se, 2), UI.pct(GHZ.classicalBound(d.N), 4)]; })
+    });
+  }
+  UI.onResize(document.getElementById("sweep-chart"), drawSweep);
+  startSweep();
+})();
+</script>
+</body>
+</html>

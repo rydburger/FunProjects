@@ -878,6 +878,20 @@
     font-family: var(--font-mono); font-size: 9px; color: var(--ink-dim); text-transform: uppercase;
   }
 
+  /* chapter nav (shared with the paper chapters; see paper-ui.js) */
+  .chapters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 0 14px; margin: 0 0 18px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 11.5px; }
+  .chapters .paper-tag { color: var(--ink-dim); margin-right: 6px; letter-spacing: 0.04em; }
+  .chapters .paper-tag a { color: inherit; }
+  .chapters a.ch { color: var(--ink-dim); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+  .chapters a.ch:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .chapters a.ch[aria-current="page"] { color: var(--ink); background: var(--quantum-soft); border-color: var(--quantum); }
+  .chapters a.ch b { color: var(--quantum); font-weight: 700; margin-right: 4px; }
+  .chapters .spacer { flex: 1; }
+  .theme-btn { font: inherit; color: var(--ink-dim); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .theme-btn:hover { color: var(--ink); }
+  .next-chapter { margin-top: 18px; font-size: 14px; color: var(--ink-dim); }
+  .next-chapter a { color: var(--quantum); font-weight: 600; }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
@@ -958,6 +972,7 @@
           </div>
 
           <button class="primary" id="start-btn" type="button">Start Game</button>
+          <p class="next-chapter">Played it? Google Quantum AI ran these exact circuits on a real chip, alongside three more contextuality tasks (<a href="https://arxiv.org/abs/2512.02284" target="_blank" rel="noopener">arXiv:2512.02284</a>). <a href="lab.html">Chapter 2: the magic square on a noisy chip →</a></p>
         </div>
 
         <div class="preview-panel">
@@ -1162,6 +1177,8 @@
 </div>
 
 <script src="../engine.js"></script>
+<script src="paper-ui.js"></script>
+<script>PaperUI.nav("game");</script>
 <script>
 (function () {
   var state = {

@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contextuality Test</title>
+<link rel="stylesheet" href="paper.css">
+<style>
+  .chi-big { font: 700 34px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .chi-line { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .grids { display: flex; gap: 28px; flex-wrap: wrap; }
+  .grids .cap { font: 10.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
+  .ctx-btns { display: grid; grid-template-columns: repeat(3, minmax(0, 72px)); gap: 6px; }
+  .ctx-btns button { font: 700 14px var(--font-mono); padding: 9px 0; border-radius: 8px; cursor: pointer; border: 1.5px solid var(--line); background: var(--bg-panel-2); color: var(--ink); }
+  .ctx-btns button.row { border-color: var(--alice); }
+  .ctx-btns button.col { border-color: var(--bob); }
+  .obs-grid { display: grid; grid-template-columns: repeat(3, 84px); gap: 6px; }
+  .obs { border: 1.5px solid var(--line); border-radius: 9px; padding: 6px 4px; text-align: center; background: var(--bg-panel-2); transition: border-color 0.2s, background 0.2s; }
+  .obs .name { font: 600 12px var(--font-mono); color: var(--ink-dim); }
+  .obs .v { font: 700 20px var(--font-mono); min-height: 28px; }
+  .obs.live { border-color: var(--quantum); background: var(--quantum-soft); }
+  .obs.stale .v { opacity: 0.35; }
+  .obs .tag { font: 10px var(--font-mono); color: var(--ink-mute); min-height: 14px; }
+  .log { font: 12.5px var(--font-mono); max-height: 230px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--bg-panel-2); }
+  .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .log div:last-child { border-bottom: none; }
+  .log .flip { color: var(--alice); font-weight: 700; }
+  .means { font: 12.5px var(--font-mono); border-collapse: collapse; margin-top: 8px; }
+  .means td, .means th { padding: 3px 8px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  .means th { color: var(--ink-dim); font-weight: 500; }
+  @media (max-width: 420px) { .obs-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <span class="eyebrow">Chapter 3 · paper Fig. 2</span>
+    <h1>One system, <em>no fixed answers</em></h1>
+    <p>Same nine observables, but now there is only one player and one pair of qubits. Measure any row or column of the square, in any order, as often as you like. If each observable had a pre-set value waiting to be read, a simple score could never exceed 4. Quantum mechanics scores 6, whatever state the qubits are in. This is the Kochen–Specker–Bell inequality from the paper.</p>
+  </header>
+
+  <section class="card">
+    <h2><span class="num">3.1</span>Try to hide the answers in a table</h2>
+    <p class="lede">A <em>context</em> is one row or one column: three observables that can be measured together. The score is</p>
+    <div class="rule-card"><b>&chi; = &#10216;R1&#10217; + &#10216;R2&#10217; + &#10216;R3&#10217; &minus; &#10216;C1&#10217; &minus; &#10216;C2&#10217; &minus; &#10216;C3&#10217;</b>, where &#10216;R1&#10217; is the average product of the three values read in row 1. Quantum mechanics forces every row product to be +1 and every column product to be &minus;1, so it scores 6.</div>
+    <p class="lede">A noncontextual hidden-variable theory gives each observable one value, whatever else is measured alongside it. Fill in the table below and try to reach 6.</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Values</span><div id="nc-mode"></div></div>
+      <div class="control"><button class="ghost" id="nc-best" type="button">Show a best table</button></div>
+    </div>
+    <div class="grids" id="nc-grids"></div>
+    <div class="chi-line"><span class="lab small mono">&chi; =</span><span class="chi-big" id="nc-chi">—</span><span class="small" id="nc-msg"></span></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3.2</span>Now measure the real thing</h2>
+    <p class="lede">Two qubits plus one helper (ancilla) qubit. Tap a context to measure its three observables one after another. Each observable is copied onto the ancilla, which is then read and reset, exactly as in the paper. The qubits are never re-prepared: each measurement acts on whatever the previous ones left behind.</p>
+    <div class="two-col">
+      <div>
+        <div class="controls">
+          <div class="control"><span class="lab">Device</span><div id="dev-mode"></div></div>
+        </div>
+        <div class="ctx-btns" id="ctx-btns"></div>
+        <div class="btn-row">
+          <button class="ghost" id="rand10" type="button">10 random contexts</button>
+          <button class="ghost" id="dev-reset" type="button">Reset</button>
+        </div>
+        <div class="obs-grid" id="obs-grid" style="margin-top:10px"></div>
+        <p class="small" style="margin-top:8px">A greyed-out value is stale: since it was read, something that doesn't commute with it has been measured. Its next reading is a fresh coin flip.</p>
+      </div>
+      <div>
+        <div class="chi-line"><span class="lab small mono">your &chi; so far =</span><span class="chi-big" id="dev-chi">—</span></div>
+        <table class="means" id="dev-means"></table>
+        <p class="small" style="margin:12px 0 4px">Readings, newest first. <span class="flip">Pink</span> marks an observable that just read differently from its previous value.</p>
+        <div class="log" id="dev-log"><div class="small">No measurements yet.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3.3</span>The paper's protocol</h2>
+    <p class="lede">Each run measures a random sequence of 180 contexts, and the run is repeated. The paper used 1000 runs and found <b>&chi; = 5.618 &plusmn; 0.005</b>, well above the hidden-variable limit of 4. As a sanity check it also asked how often one observable reads the same value twice. That should happen every time when only compatible things were measured in between, and half the time otherwise.</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Runs</span><div id="reps-seg"></div></div>
+      <div class="control"><button class="primary" id="run" type="button">Run the protocol</button></div>
+    </div>
+    <div id="noise"></div>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+    <div class="tiles" id="tiles"></div>
+    <div id="ctx-chart"></div>
+  </section>
+
+  <footer class="note">Statevector simulation of two data qubits and one ancilla with Pauli noise trajectories (<code>quantum-games/nonlocal.js</code>, <code>NonLocal.KSB</code>).</footer>
+</div>
+
+<script src="../nonlocal.js"></script>
+<script src="paper-ui.js"></script>
+<script>
+(function () {
+  "use strict";
+  var NL = window.NonLocal, UI = window.PaperUI, KSB = NL.KSB, Magic = NL.Magic;
+  UI.nav("ksb");
+  var MINUS = "−";
+  function fmt(v) { return v > 0 ? "+1" : MINUS + "1"; }
+  function signed(v, d) { return (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(d); }
+
+  // ---------- 3.1 hidden-variable tables ----------
+  var nc = { contextual: false, v: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], rowV: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], colV: [[1, 1, 1], [1, 1, 1], [1, 1, 1]] };
+  function pmGrid(title, vals, onFlip, showRows, showCols) {
+    var wrap = UI.h("div");
+    wrap.appendChild(UI.h("div", { class: "cap" }, title));
+    var g = UI.h("div", { class: "pm-grid" });
+    g.appendChild(UI.h("span"));
+    for (var c = 0; c < 3; c++) g.appendChild(UI.h("span", { class: "hd" }, "C" + (c + 1)));
+    g.appendChild(UI.h("span"));
+    for (var r = 0; r < 3; r++) {
+      g.appendChild(UI.h("span", { class: "hd" }, "R" + (r + 1)));
+      for (var cc = 0; cc < 3; cc++) {
+        var v = vals[r][cc];
+        var b = UI.h("button", { type: "button", class: "pmbtn " + (v > 0 ? "pos" : "neg"), title: Magic.label(Magic.TABLE[r][cc]), "aria-label": Magic.label(Magic.TABLE[r][cc]) + " = " + fmt(v) }, fmt(v));
+        (function (rr, c2) { b.addEventListener("click", function () { onFlip(rr, c2); }); })(r, cc);
+        g.appendChild(b);
+      }
+      var rp = vals[r][0] * vals[r][1] * vals[r][2];
+      g.appendChild(showRows ? UI.h("span", { class: "prod " + (rp > 0 ? "ok" : "bad") }, "R=" + fmt(rp)) : UI.h("span"));
+    }
+    g.appendChild(UI.h("span"));
+    for (var c3 = 0; c3 < 3; c3++) {
+      var cp = vals[0][c3] * vals[1][c3] * vals[2][c3];
+      g.appendChild(showCols ? UI.h("span", { class: "prod " + (cp < 0 ? "ok" : "bad") }, "C=" + fmt(cp)) : UI.h("span"));
+    }
+    wrap.appendChild(g);
+    return wrap;
+  }
+  function renderNC() {
+    var host = document.getElementById("nc-grids"); host.innerHTML = "";
+    var chi;
+    if (!nc.contextual) {
+      host.appendChild(pmGrid("One value per observable", nc.v, function (r, c) { nc.v[r][c] *= -1; renderNC(); }, true, true));
+      chi = KSB.chiOfAssignment(nc.v);
+    } else {
+      host.appendChild(pmGrid("Value when read in its row", nc.rowV, function (r, c) { nc.rowV[r][c] *= -1; renderNC(); }, true, false));
+      host.appendChild(pmGrid("Value when read in its column", nc.colV, function (r, c) { nc.colV[r][c] *= -1; renderNC(); }, false, true));
+      chi = KSB.chiContextual(nc.rowV, nc.colV);
+    }
+    var el = document.getElementById("nc-chi");
+    el.textContent = (chi > 0 ? "+" : chi < 0 ? MINUS : "") + Math.abs(chi);
+    el.style.color = chi >= 6 ? "var(--quantum)" : chi >= 4 ? "var(--bob)" : "var(--ink)";
+    var msg;
+    if (!nc.contextual) msg = chi === 4
+      ? "That's the ceiling: 4 for every one of the 512 tables. All nine rules multiplied together say the product of all nine values is both +1 (from the rows) and −1 (from the columns), so at least one rule always breaks."
+      : "Each green product adds 1 and each red one subtracts 1. Can you get all six green?";
+    else msg = chi === 6
+      ? "6! Easy once a value may depend on what is measured with it. That context dependence is exactly what quantum mechanics has, and what no fixed table can fake."
+      : "Now each cell has a row reading and a column reading that may differ. Try for 6.";
+    document.getElementById("nc-msg").textContent = msg;
+  }
+  UI.seg(document.getElementById("nc-mode"), [{ value: false, label: "Noncontextual" }, { value: true, label: "Context-dependent" }], false, function (v) { nc.contextual = v; renderNC(); });
+  document.getElementById("nc-best").addEventListener("click", function () {
+    if (nc.contextual) { nc.rowV = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]; nc.colV = [[1, 1, 1], [1, 1, 1], [-1, -1, -1]]; }
+    else nc.v = [[1, 1, 1], [1, 1, 1], [1, 1, -1]];
+    renderNC();
+  });
+  renderNC();
+
+  // ---------- 3.2 interactive device ----------
+  var dv = { noisy: false, rng: NL.rng() };
+  function freshDevice() {
+    dv.dev = KSB.device(dv.noisy ? KSB.PAPER_DEVICE : KSB.IDEAL, dv.rng);
+    dv.tr = KSB.tracker(); dv.sum = [0, 0, 0, 0, 0, 0]; dv.cnt = [0, 0, 0, 0, 0, 0]; dv.log = []; dv.live = -1;
+  }
+  UI.seg(document.getElementById("dev-mode"), [{ value: false, label: "Ideal" }, { value: true, label: "Paper-level noise" }], false, function (v) { dv.noisy = v; freshDevice(); renderDev(); });
+  var btnHost = document.getElementById("ctx-btns");
+  for (var ctx = 0; ctx < 6; ctx++) {
+    var b = UI.h("button", { type: "button", class: ctx < 3 ? "row" : "col" }, KSB.contextName(ctx));
+    (function (k) { b.addEventListener("click", function () { measure(k); renderDev(); }); })(ctx);
+    btnHost.appendChild(b);
+  }
+  function measure(k) {
+    var vals = dv.dev.measureContext(k), evs = dv.tr.record(k, vals);
+    dv.sum[k] += vals[0] * vals[1] * vals[2]; dv.cnt[k]++; dv.live = k;
+    var flipped = {}; evs.forEach(function (e) { if (!e.agree) flipped[e.cell] = 1; });
+    var cells = KSB.contextCells(k), prod = vals[0] * vals[1] * vals[2];
+    var html = "<b>" + KSB.contextName(k) + "</b>: " + cells.map(function (rc, i) {
+      var id = rc[0] * 3 + rc[1], t = Magic.label(Magic.TABLE[rc[0]][rc[1]]) + "=" + fmt(vals[i]);
+      return flipped[id] ? '<span class="flip">' + t + "</span>" : t;
+    }).join(", ") + " &rarr; product " + fmt(prod) + " " + ((k < 3 ? prod > 0 : prod < 0) ? '<span class="ok-text">&#10003;</span>' : '<span class="bad-text">&#10007; noise</span>');
+    dv.log.unshift(html); if (dv.log.length > 60) dv.log.pop();
+  }
+  document.getElementById("rand10").addEventListener("click", function () { for (var i = 0; i < 10; i++) measure(Math.floor(dv.rng() * 6)); renderDev(); });
+  document.getElementById("dev-reset").addEventListener("click", function () { freshDevice(); renderDev(); });
+  function renderDev() {
+    var g = document.getElementById("obs-grid"); g.innerHTML = "";
+    var liveCells = dv.live >= 0 ? KSB.contextCells(dv.live).map(function (rc) { return rc[0] * 3 + rc[1]; }) : [];
+    for (var id = 0; id < 9; id++) {
+      var last = dv.tr.last[id], stale = last !== 0 && dv.tr.dirty[id];
+      var cls = "obs" + (liveCells.indexOf(id) >= 0 ? " live" : "") + (stale ? " stale" : "");
+      g.appendChild(UI.h("div", { class: cls }, '<div class="name">' + Magic.label(Magic.TABLE[Math.floor(id / 3)][id % 3]) + '</div><div class="v">' + (last ? fmt(last) : "&middot;") + '</div><div class="tag">' + (stale ? "stale" : last ? "" : "unread") + "</div>"));
+    }
+    var mean = dv.sum.map(function (s, i) { return dv.cnt[i] ? s / dv.cnt[i] : NaN; });
+    var any = dv.cnt.some(function (c) { return c > 0; });
+    var chi = 0; for (var k = 0; k < 6; k++) if (dv.cnt[k]) chi += k < 3 ? mean[k] : -mean[k];
+    var full = dv.cnt.every(function (c) { return c > 0; });
+    var chiEl = document.getElementById("dev-chi");
+    chiEl.textContent = any ? chi.toFixed(2) + (full ? "" : "*") : "—";
+    chiEl.style.color = chi > 4 ? "var(--quantum)" : "var(--ink)";
+    var t = "<tr><th></th>" + [0, 1, 2, 3, 4, 5].map(function (k) { return "<th>" + KSB.contextName(k) + "</th>"; }).join("") + "</tr>";
+    t += "<tr><th>times</th>" + dv.cnt.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>";
+    t += "<tr><th>&#10216;product&#10217;</th>" + mean.map(function (m) { return "<td>" + (isFinite(m) ? signed(m, 2) : "—") + "</td>"; }).join("") + "</tr>";
+    document.getElementById("dev-means").innerHTML = t + (full || !any ? "" : '<tr><td colspan="7" class="small" style="text-align:left">* until all six contexts have been measured, &chi; counts only the ones you have.</td></tr>');
+    document.getElementById("dev-log").innerHTML = dv.log.length ? dv.log.map(function (l) { return "<div>" + l + "</div>"; }).join("") : '<div class="small">No measurements yet.</div>';
+  }
+  freshDevice(); renderDev();
+
+  // ---------- 3.3 protocol ----------
+  var pr = { reps: 1000, noise: Object.assign({}, KSB.PAPER_DEVICE), job: null, res: null };
+  UI.seg(document.getElementById("reps-seg"), [{ value: 100, label: "100" }, { value: 1000, label: "1000 (paper)" }], pr.reps, function (v) { pr.reps = v; });
+  UI.noisePanel(document.getElementById("noise"), [
+    { key: "p1", label: "1-qubit gate error", max: 0.02 },
+    { key: "p2", label: "CZ error", max: 0.05 },
+    { key: "readout", label: "Readout error", max: 0.1 },
+    { key: "reset", label: "Reset error", max: 0.05 },
+    { key: "idleMeas", label: "Data error per readout", max: 0.05 }
+  ], KSB.PAPER_DEVICE, function (v) { pr.noise = v; startRun(); });
+  document.getElementById("run").addEventListener("click", startRun);
+  function startRun() {
+    if (pr.job) pr.job.cancel();
+    var R = KSB.runner({ noise: pr.noise, length: 180, rng: NL.rng() }), total = pr.reps, lastDraw = 0;
+    document.getElementById("run").disabled = true;
+    pr.job = UI.job(function () { R.step(1); return R.result().reps / total; }, {
+      onProgress: function (f) {
+        document.getElementById("prog").style.width = (f * 100).toFixed(1) + "%";
+        var now = performance.now(); if (now - lastDraw > 150 || f >= 1) { lastDraw = now; pr.res = R.result(); drawProtocol(); }
+      },
+      onDone: function () { document.getElementById("run").disabled = false; pr.res = R.result(); drawProtocol(); }
+    });
+  }
+  function tile(cls, cap, val, sub) { return '<div class="tile ' + cls + '"><div class="cap">' + cap + '</div><div class="val">' + val + '</div><div class="sub">' + sub + "</div></div>"; }
+  function drawProtocol() {
+    var r = pr.res; if (!r) return;
+    // sigma(chi): contexts are independent +-1 products -> var(mean) = (1-m^2)/n
+    var varChi = 0; for (var k = 0; k < 6; k++) if (r.count[k]) varChi += (1 - r.mean[k] * r.mean[k]) / r.count[k];
+    var ac = r.agree.compatible, ai = r.agree.incompatible;
+    document.getElementById("tiles").innerHTML =
+      tile("q", "Simulated &chi;", r.chi.toFixed(3), "&plusmn; " + Math.sqrt(varChi).toFixed(3) + " after " + r.reps + " runs") +
+      tile("p", "Paper &chi;", "5.618", "&plusmn; 0.005, 1000 runs") +
+      tile("c", "Hidden variables", "&le; 4", "noncontextual bound; quantum ideal = 6") +
+      tile("", "Agree, compatible", UI.pct(r.pAgreeCompatible, 2), "paper 96.36% (ideal 100%), n=" + ac[1].toLocaleString()) +
+      tile("", "Agree, incompatible", UI.pct(r.pAgreeIncompatible, 2), "paper 50.0% (ideal 50%), n=" + ai[1].toLocaleString());
+    var vals = [0, 1, 2, 3, 4, 5].map(function (k) {
+      var v = k < 3 ? r.mean[k] : -r.mean[k], se = r.count[k] ? Math.sqrt((1 - r.mean[k] * r.mean[k]) / r.count[k]) : 0;
+      return { v: v, lo: v - se, hi: v + se };
+    });
+    UI.barChart(document.getElementById("ctx-chart"), {
+      height: 240, categories: ["⟨R1⟩", "⟨R2⟩", "⟨R3⟩", MINUS + "⟨C1⟩", MINUS + "⟨C2⟩", MINUS + "⟨C3⟩"],
+      y: { min: 0.5, max: 1, label: "contribution to χ", fmt: function (v) { return v.toFixed(2); }, fmtErr: function (v) { return v.toFixed(3); } },
+      groups: [{ name: "Simulated (±1σ)", color: "var(--quantum)", values: vals }],
+      refs: [{ y: 1, name: "Quantum ideal (each term = 1)", label: "ideal", color: "var(--bob)", dash: true },
+             { y: 4 / 6, name: "Average term at the hidden-variable limit (4/6)", color: "var(--mismatch)", dash: true }],
+      tableHead: ["term", "value", "±1σ", "contexts"],
+      tableRows: vals.map(function (v, k) { return [KSB.contextName(k), v.v.toFixed(4), ((v.hi - v.lo) / 2).toFixed(4), r.count[k]]; })
+    });
+  }
+  UI.onResize(document.getElementById("ctx-chart"), drawProtocol);
+  startRun();
+})();
+</script>
+</body>
+</html>

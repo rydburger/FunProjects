@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidden Linear Function</title>
+<link rel="stylesheet" href="paper.css">
+<style>
+  .board { width: 100%; max-width: 380px; }
+  .board svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
+  .node { cursor: pointer; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+  .kcard { border: 1.5px solid var(--line); border-radius: 10px; padding: 8px; background: var(--bg-panel-2); font: 12px var(--font-mono); }
+  .kcard.ok { border-color: var(--bob); }
+  .kcard.bad { border-color: var(--mismatch); }
+  .kcard svg { width: 100%; height: auto; display: block; margin-bottom: 4px; }
+  .kcard .st { font-weight: 700; }
+  .kcard.ok .st { color: var(--bob); }
+  .kcard.bad .st { color: var(--mismatch); }
+  .stage-strip { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0; font: 11px var(--font-mono); }
+  .stage-strip span { border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; color: var(--ink-dim); }
+  .stage-strip span.on { border-color: var(--quantum); background: var(--quantum-soft); color: var(--ink); }
+  .win-banner { font: 600 15px var(--font-body); margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <span class="eyebrow">Chapter 5 · paper Fig. 4</span>
+    <h1>The hidden linear function: <em>four layers</em> deep</h1>
+    <p>Not a game this time, but a puzzle that pits a shallow quantum circuit against shallow classical ones. You get a grid with some nodes marked <b>S</b> and some links switched on. Hidden in that pattern is a linear function. Find it and you've solved a 2D hidden linear function problem (Bravyi, Gosset &amp; König, 2018). A quantum circuit with just four layers of CZ gates solves it at any size. The paper ran it on up to 105 qubits.</p>
+  </header>
+
+  <section class="card">
+    <h2><span class="num">5.1</span>Find the hidden linear function</h2>
+    <div class="rule-card">For a set x of nodes, score <b>q(x)</b> = (number of S nodes in x) + 2 × (number of active links with both ends in x), mod 4. Call x <b>balanced</b> if every node is linked to an even number of nodes in x, counting itself when it is an S node inside x. On balanced sets q is always 0 or 2, and it is <em>linear</em>: q(x) = 2·(number of your chosen nodes in x) mod 4, for one fixed choice of nodes. <b>Tap nodes to make that choice.</b></div>
+    <div class="controls">
+      <div class="control"><span class="lab">Grid</span><div id="size-seg"></div></div>
+      <div class="control"><button class="ghost" id="new" type="button">New puzzle</button></div>
+      <div class="control"><button class="ghost" id="reveal" type="button">Show an answer</button></div>
+      <div class="control"><button class="primary" id="qrun" type="button">Let the quantum circuit solve it</button></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="board" id="board"></div>
+        <div class="stage-strip" id="stages"></div>
+        <div class="win-banner" id="banner"></div>
+      </div>
+      <div>
+        <p class="small" style="margin:0">Every balanced set is a sum of the sets below, so these are the only checks you need. Each card wants an <b>even</b> or <b>odd</b> number of your chosen nodes (gold) inside its highlighted set.</p>
+        <div class="cards" id="cards"></div>
+        <p class="small" id="count-note" style="margin-top:10px"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">5.2</span>Why four layers is remarkable</h2>
+    <div class="prose">
+      <p>The circuit is fixed: Hadamard on every qubit, S on every S node, CZ on every active link, then Hadamard and measure. A square grid's links split into four sets of non-touching pairs, so all the CZs fit in <b>four layers</b> at any grid size. Every measurement gives a correct answer, chosen uniformly from all of them.</p>
+      <p>A classical circuit built from two-input gates can only pull together 2<sup>d</sup> input bits in d layers. Bravyi, Gosset and König proved that shallow classical circuits fail on large instances. That proof applies only at very large sizes, so the paper compares against a simpler yardstick, log<sub>2</sub>(number of input bits). It scores the noisy chip by <b>effective depth</b>: 4 divided by the fraction of answers that are correct.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">5.3</span>Run it on a noisy chip, n = 9 to 105</h2>
+    <p class="lede">Random puzzles at each size (each node and each link is switched on with probability P), 100 shots each. Gate, idle and readout errors scramble some answers. A scrambled answer is still correct if the scrambling happened to land on another valid answer.</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Puzzles per size</span><div id="ng-seg"></div></div>
+      <div class="control"><span class="lab">P (switched-on probability)</span><div id="pg-seg"></div></div>
+      <div class="control"><button class="primary" id="sweep" type="button">Run the sweep</button></div>
+    </div>
+    <div id="noise"></div>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+    <div id="sweep-chart"></div>
+  </section>
+
+  <footer class="note">The 9- and 16-qubit puzzles in 5.1 run on a full statevector. Bigger ones sample the exact output distribution, uniform over all valid answers, which our tests check against the statevector. The noisy sweep uses exact Pauli-fault propagation with shot sampling (<code>NonLocal.HLF</code>).</footer>
+</div>
+
+<script src="../nonlocal.js"></script>
+<script src="paper-ui.js"></script>
+<script>
+(function () {
+  "use strict";
+  var NL = window.NonLocal, UI = window.PaperUI, HLF = NL.HLF, C = NL.Clifford, SV = NL.SV;
+  UI.nav("hlf");
+  var rnd = NL.rng();
+
+  // ---------- 5.1 puzzle ----------
+  var pz = { n: 16, inst: null, z: null, anim: null, stage: -1, solvedBy: null };
+  function newPuzzle() {
+    if (pz.anim) { clearTimeout(pz.anim); pz.anim = null; }
+    // want at least two checks so the puzzle isn't trivial, but not a wall of cards
+    var empty = new Uint32Array(HLF.words(pz.n));
+    for (var t = 0; t < 400; t++) {
+      pz.inst = HLF.instance(pz.n, 0.5, rnd);
+      var k = pz.inst.kernel.length;
+      if (k >= 2 && k <= 6 && !HLF.isSolution(pz.inst, empty)) break; // choosing nothing must not already win
+    }
+    pz.z = new Uint32Array(pz.inst.W); pz.stage = -1; pz.solvedBy = null;
+    render();
+  }
+  function geom(inst, size) {
+    var pts = inst.lattice.pts, mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+    pts.forEach(function (p) { mnx = Math.min(mnx, p[0]); mxx = Math.max(mxx, p[0]); mny = Math.min(mny, p[1]); mxy = Math.max(mxy, p[1]); });
+    var pad = size * 1.6, sc = size * 3.6, W = (mxx - mnx) * sc + 2 * pad, H = (mxy - mny) * sc + 2 * pad;
+    return { W: W, H: H, x: function (i) { return pad + (pts[i][0] - mnx) * sc; }, y: function (i) { return pad + (pts[i][1] - mny) * sc; } };
+  }
+  var STAGES = ["H", "S", "CZ 1", "CZ 2", "CZ 3", "CZ 4", "H", "measure"];
+  function boardSVG(inst, opts) {
+    var G = geom(inst, opts.r), svg = '<svg viewBox="0 0 ' + G.W + " " + G.H + '"' + (opts.aria ? ' role="img" aria-label="' + opts.aria + '"' : ' aria-hidden="true"') + ">";
+    var activeLayer = opts.stage >= 2 && opts.stage <= 5 ? opts.stage - 2 : -1;
+    inst.lattice.edges.forEach(function (e) {
+      var on = inst.edges.indexOf(e) >= 0;
+      var col = on ? (e.layer === activeLayer ? "var(--alice)" : "var(--quantum)") : "var(--line)";
+      svg += '<line x1="' + G.x(e.a) + '" y1="' + G.y(e.a) + '" x2="' + G.x(e.b) + '" y2="' + G.y(e.b) + '" stroke="' + col + '" stroke-width="' + (on ? opts.r * 0.42 : opts.r * 0.14) + '" stroke-linecap="round"' + (on ? "" : ' stroke-dasharray="' + opts.r * 0.3 + " " + opts.r * 0.3 + '"') + "/>";
+    });
+    for (var i = 0; i < inst.n; i++) {
+      var hl = opts.highlight && HLF.bget(opts.highlight, i), zi = opts.z && HLF.bget(opts.z, i), sNode = inst.diag[i];
+      var fill = zi ? "var(--quantum)" : hl ? "var(--bob-soft)" : "var(--bg-panel)";
+      var stroke = hl ? "var(--bob)" : sNode ? "var(--alice)" : "var(--ink-mute)";
+      var glow = (opts.stage === 0 || opts.stage === 6) || (opts.stage === 1 && sNode);
+      svg += '<g class="' + (opts.clickable ? "node" : "") + '" data-i="' + i + '"' + (opts.clickable ? ' role="button" tabindex="0" aria-pressed="' + (zi ? "true" : "false") + '" aria-label="node ' + (i + 1) + (sNode ? ", S node" : "") + '"' : "") + ">";
+      if (glow) svg += '<circle cx="' + G.x(i) + '" cy="' + G.y(i) + '" r="' + opts.r * 1.35 + '" fill="var(--quantum-soft)"/>';
+      svg += '<circle cx="' + G.x(i) + '" cy="' + G.y(i) + '" r="' + opts.r + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (hl || sNode ? opts.r * 0.22 : opts.r * 0.12) + '"/>';
+      if (sNode && opts.labels) svg += '<text x="' + G.x(i) + '" y="' + (G.y(i) + opts.r * 0.38) + '" text-anchor="middle" style="font:700 ' + opts.r * 1.0 + 'px var(--font-mono);fill:' + (zi ? "#1b1330" : "var(--alice)") + ';pointer-events:none">S</text>';
+      svg += "</g>";
+    }
+    return svg + "</svg>";
+  }
+  function render() {
+    var inst = pz.inst, board = document.getElementById("board");
+    board.innerHTML = boardSVG(inst, { r: 13, z: pz.z, clickable: pz.stage < 0 || pz.stage >= 7, labels: true, stage: pz.stage, aria: "puzzle grid" });
+    Array.prototype.forEach.call(board.querySelectorAll("g.node"), function (gEl) {
+      function toggle() { HLF.bflip(pz.z, +gEl.getAttribute("data-i")); pz.solvedBy = null; render(); }
+      gEl.addEventListener("click", toggle);
+      gEl.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    });
+    var strip = document.getElementById("stages");
+    strip.innerHTML = STAGES.map(function (s, i) { return '<span class="' + (i === pz.stage ? "on" : "") + '">' + s + "</span>"; }).join("");
+    var cards = document.getElementById("cards"), allOk = true, html = "";
+    inst.kernel.forEach(function (v, k) {
+      var need = HLF.q(inst, v) >> 1, have = HLF.bdot(pz.z, v), ok = need === have; if (!ok) allOk = false;
+      html += '<div class="kcard ' + (ok ? "ok" : "bad") + '">' + boardSVG(inst, { r: 9, highlight: v, z: pz.z, labels: false, stage: -1 }) +
+        "Check " + (k + 1) + ": q = " + (2 * need) + " → wants <b>" + (need ? "odd" : "even") + '</b><br><span class="st">' + (ok ? "✓ satisfied" : "✗ not yet") + "</span></div>";
+    });
+    cards.innerHTML = html;
+    var rank = inst.n - inst.kernel.length;
+    document.getElementById("count-note").innerHTML = inst.n + " nodes, " + inst.edges.length + " active links. " + inst.kernel.length + " independent checks, so exactly 2<sup>" + rank + "</sup> = " + Math.pow(2, rank).toLocaleString() + " of the 2<sup>" + inst.n + "</sup> possible choices are correct.";
+    document.getElementById("banner").innerHTML = allOk
+      ? '<span class="ok-text">✓ Solved' + (pz.solvedBy ? " by " + pz.solvedBy : "") + ".</span> That set of nodes is the hidden linear function."
+      : "";
+  }
+  function runQuantum() {
+    if (pz.anim) clearTimeout(pz.anim);
+    pz.z = new Uint32Array(pz.inst.W); pz.stage = 0; pz.solvedBy = null; render();
+    var out;
+    if (pz.inst.n <= 16) {
+      // the real thing: statevector of the 4-layer circuit, one Born-rule shot
+      var s = SV.runCircuit(HLF.circuit(pz.inst)), p = SV.probs(s), x = rnd(), acc = 0, idx = 0;
+      for (idx = 0; idx < p.length; idx++) { acc += p[idx]; if (x < acc) break; }
+      out = new Uint32Array(pz.inst.W); for (var i = 0; i < pz.inst.n; i++) if ((idx >> i) & 1) HLF.bflip(out, i);
+      pz.method = "the 4-layer circuit (statevector, one shot)";
+    } else { out = HLF.idealSample(pz.inst, rnd); pz.method = "the 4-layer circuit (one shot)"; }
+    function next() {
+      pz.stage++;
+      if (pz.stage >= 7) { pz.stage = 7; pz.z = out; pz.solvedBy = pz.method; render(); pz.anim = null; return; }
+      render(); pz.anim = setTimeout(next, 420);
+    }
+    pz.anim = setTimeout(next, 420);
+  }
+  UI.seg(document.getElementById("size-seg"), [{ value: 9, label: "9" }, { value: 16, label: "16" }, { value: 25, label: "25" }, { value: 36, label: "36" }], pz.n, function (v) { pz.n = v; newPuzzle(); });
+  document.getElementById("new").addEventListener("click", newPuzzle);
+  document.getElementById("reveal").addEventListener("click", function () { pz.z = HLF.solve(pz.inst); pz.stage = -1; pz.solvedBy = "Gaussian elimination"; render(); });
+  document.getElementById("qrun").addEventListener("click", runQuantum);
+  newPuzzle();
+
+  // ---------- 5.3 sweep ----------
+  var SIZES = [9, 16, 25, 36, 49, 64, 72, 81, 90, 100, 105];
+  var sw = { ng: 100, pg: 0.5, noise: Object.assign({}, C.PAPER_NOISE), job: null, data: [] };
+  UI.seg(document.getElementById("ng-seg"), [{ value: 100, label: "100" }, { value: 1000, label: "1000 (paper)" }], sw.ng, function (v) { sw.ng = v; });
+  UI.seg(document.getElementById("pg-seg"), [{ value: 0.25, label: "0.25" }, { value: 0.5, label: "0.5 (paper)" }, { value: 0.75, label: "0.75" }], sw.pg, function (v) { sw.pg = v; startSweep(); });
+  UI.noisePanel(document.getElementById("noise"), [
+    { key: "p1", label: "1-qubit gate error", max: 0.02 },
+    { key: "p2", label: "CZ error", max: 0.05 },
+    { key: "readout", label: "Readout error", max: 0.1 },
+    { key: "idle", label: "Idle error / layer", max: 0.02 }
+  ], C.PAPER_NOISE, function (v) { sw.noise = v; startSweep(); });
+  document.getElementById("sweep").addEventListener("click", startSweep);
+  function startSweep() {
+    if (sw.job) sw.job.cancel();
+    sw.data = [];
+    var si = 0, k = 0, acc = [], r = NL.rng(), lastDraw = 0, total = SIZES.length * sw.ng, units = 0;
+    document.getElementById("sweep").disabled = true;
+    sw.job = UI.job(function () {
+      var n = SIZES[si];
+      acc.push(HLF.noisySuccess(HLF.instance(n, sw.pg, r), sw.noise, 100, r));
+      units++;
+      if (++k >= sw.ng) {
+        var m = acc.reduce(function (s, v) { return s + v; }, 0) / acc.length;
+        var sd = Math.sqrt(acc.reduce(function (s, v) { return s + (v - m) * (v - m); }, 0) / Math.max(1, acc.length - 1)), se = sd / Math.sqrt(acc.length);
+        sw.data.push({ n: n, p: m, depth: 4 / m, dse: 4 * se / (m * m) });
+        acc = []; k = 0; si++;
+      }
+      return si >= SIZES.length ? 1 : units / total;
+    }, {
+      onProgress: function (f) {
+        document.getElementById("prog").style.width = (f * 100).toFixed(1) + "%";
+        var now = performance.now(); if (now - lastDraw > 200 || f >= 1) { lastDraw = now; drawSweep(); }
+      },
+      onDone: function () { document.getElementById("sweep").disabled = false; drawSweep(); }
+    });
+  }
+  function drawSweep() {
+    var cls = []; for (var n = 9; n <= 105; n++) cls.push({ x: n, y: Math.log2(HLF.inputCount(n)) });
+    var ymax = Math.max(10, Math.ceil(Math.max.apply(null, sw.data.map(function (d) { return d.depth + d.dse; }).concat([0])) + 0.5));
+    UI.lineChart(document.getElementById("sweep-chart"), {
+      height: 300,
+      x: { min: 0, max: 110, label: "qubits n", fmt: function (v) { return String(v); } },
+      y: { min: 0, max: ymax, label: "effective CZ layers", fmt: function (v) { return v.toFixed(v % 1 ? 2 : 0); }, fmtErr: function (v) { return v.toFixed(2); } },
+      series: [
+        { name: "Simulated chip, 4 ÷ P(correct) (±1σ)", color: "var(--quantum)", kind: "both", points: sw.data.map(function (d) { return { x: d.n, y: d.depth, lo: d.depth - d.dse, hi: d.depth + d.dse }; }) },
+        { name: "Paper, measured (≈6 at n = 105)", color: "var(--alice)", kind: "dots", marker: "diamond", points: [{ x: 105, y: 6 }] }
+      ],
+      refs: [{ points: cls, name: "Classical yardstick log₂(inputs)", label: "log₂(inputs)", color: "var(--mismatch)", dash: true },
+             { y: 4, name: "Ideal quantum: 4 layers", label: "ideal 4", color: "var(--bob)", dash: true }],
+      tableHead: ["n", "P(correct)", "effective layers", "±1σ", "log₂(inputs)"],
+      tableRows: sw.data.map(function (d) { return [d.n, UI.pct(d.p, 2), d.depth.toFixed(3), d.dse.toFixed(3), Math.log2(HLF.inputCount(d.n)).toFixed(2)]; })
+    });
+  }
+  UI.onResize(document.getElementById("sweep-chart"), drawSweep);
+  startSweep();
+})();
+</script>
+</body>
+</html>
