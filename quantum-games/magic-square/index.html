@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Magic Square — a Peres–Mermin pseudo-telepathy game</title>
 <style>
   :root {
@@ -536,6 +540,16 @@
   .mode-tab.active { background: var(--bg-panel); color: var(--ink); box-shadow: var(--shadow); }
   .mode-tab[data-mode="quantum"].active { color: var(--quantum); }
 
+  .device-pick { margin: 4px 0 18px; }
+  .device-pick .cap { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
+  .device-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel-2); }
+  .device-tab { font-family: var(--font-body); font-weight: 600; font-size: 13px; color: var(--ink-dim); background: none; border: none; border-radius: 7px; padding: 8px 14px; cursor: pointer; }
+  .device-tab[aria-pressed="true"] { background: var(--bg-panel); color: var(--quantum); box-shadow: var(--shadow); }
+  p.device-note { font-size: 13.5px !important; color: var(--ink-dim); margin: 8px 0 0 !important; font-family: var(--font-body) !important; }
+  .noise-report { max-width: 56ch; margin: 14px auto 20px; font-size: 13px; color: var(--ink-dim); text-align: left; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 12px; }
+  .noise-report b { color: var(--ink); }
+  .noise-report .hit { color: var(--mismatch); font-family: var(--font-mono); }
+
   .mode-pill {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -889,7 +903,7 @@
   .chapters .spacer { flex: 1; }
   .theme-btn { font: inherit; color: var(--ink-dim); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
   .theme-btn:hover { color: var(--ink); }
-  .next-chapter { margin-top: 18px; font-size: 14px; color: var(--ink-dim); }
+  .start-grid p.next-chapter { margin-top: 18px; font-size: 14px; font-family: var(--font-body); color: var(--ink-dim); }
   .next-chapter a { color: var(--quantum); font-weight: 600; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -945,13 +959,13 @@
               </div>
             </div>
 
-            <p style="font-size:14px; color:var(--ink-dim);">Here you play it straight, as two people scribbling numbers with no communication — the classical version. Physicists have shown that no such pre-agreed strategy can beat 8 wins out of 9 in the long run; the only way past that ceiling is to replace the notepad with an entangled quantum state, which real experiments (including on quantum computers, in 2022) have confirmed actually works.</p>
+            <p style="font-size:14px; color:var(--ink-dim);">Here you play it straight, as two people scribbling numbers with no communication — the classical version. Physicists have shown that no such pre-agreed strategy can beat 8 wins out of 9 in the long run; the only way past that ceiling is to replace the notepad with an entangled quantum state, which real experiments have confirmed actually works: on quantum computers in 2022, and in 2025 on Google's Willow chip, which won 98.30% of 900,000 rounds (<a href="lab.html">see Chapter 2</a>).</p>
           </div>
 
           <div id="mode-panel-quantum" style="display:none;">
             <h2 class="scene-title">Same rules. Two entangled qubits instead of a notepad.</h2>
             <p>Charlie now also hands <strong class="role-a">Alice</strong> and <strong class="role-b">Bob</strong> one qubit each from two entangled pairs he just prepared. Instead of freely picking numbers, each of them <em>builds</em> a short quantum circuit — dragging gates onto their own two qubits — chosen to match their assigned row or column, then reads off what the measurement says.</p>
-            <p>They still can't talk, and Charlie still assigns rows and columns at random. Build the wrong circuit and the numbers are meaningless; build the right one and the win is guaranteed.</p>
+            <p>They still can't talk, and Charlie still assigns rows and columns at random. Build the wrong circuit and the numbers are meaningless; build the right one and, on perfect qubits, the win is guaranteed.</p>
 
             <p><b>The strategy:</b> before they're separated, Alice and Bob agree on nine short circuits each — one per possible row, one per possible column — each one measuring a different pair of quantum observables instead of reading numbers off a table. Whatever row Charlie hands Alice, she builds that row's circuit on her half of the entanglement; whatever column he hands Bob, same for him with his half. Neither knows the other's assignment, and no signal passes between them after the qubits are split — the correlation is already built into the entangled pairs Charlie prepared. Two people who've never compared notes since separating, producing numbers that always agree exactly: it looks like a psychic act. It isn't telepathy — it's linear algebra, and it's exactly the trick the Peres–Mermin square is built to prove no classical notepad can fake.</p>
 
@@ -962,17 +976,26 @@
                 <div class="sub">the ceiling for any pre-agreed strategy</div>
               </div>
               <div class="stat-tile quantum">
-                <div class="cap">This mode</div>
-                <div class="num">9/9</div>
-                <div class="sub">guaranteed, once your circuit is correct</div>
+                <div class="cap" id="q-tile-cap">This mode</div>
+                <div class="num" id="q-tile-num">9/9</div>
+                <div class="sub" id="q-tile-sub">guaranteed, once your circuit is correct</div>
               </div>
             </div>
 
-            <p style="font-size:14px; color:var(--ink-dim);">Every gate you place runs on a real, noiseless statevector simulation — actual complex amplitudes, unitary matrices, and Born-rule measurement — not a scripted outcome. Use Hint to see the correct circuit as a dashed overlay, or Skip to have it filled in for you.</p>
+            <p style="font-size:14px; color:var(--ink-dim);">Every gate you place runs on a real statevector simulation — actual complex amplitudes, unitary matrices, and Born-rule measurement — not a scripted outcome. Use Hint to see the correct circuit as a dashed overlay, or Skip to have it filled in for you.</p>
+
+            <div class="device-pick">
+              <span class="cap">Device</span>
+              <div class="device-tabs" role="group" aria-label="Device">
+                <button class="device-tab" type="button" data-device="perfect" aria-pressed="true">Perfect qubits</button>
+                <button class="device-tab" type="button" data-device="noisy" aria-pressed="false">Noisy chip</button>
+              </div>
+              <p class="device-note" id="device-note"></p>
+            </div>
           </div>
 
           <button class="primary" id="start-btn" type="button">Start Game</button>
-          <p class="next-chapter">Played it? Google Quantum AI ran these exact circuits on a real chip, alongside three more contextuality tasks (<a href="https://arxiv.org/abs/2512.02284" target="_blank" rel="noopener">arXiv:2512.02284</a>). <a href="lab.html">Chapter 2: the magic square on a noisy chip →</a></p>
+          <p class="next-chapter">Played it? Google Quantum AI ran this same strategy on a real chip, alongside three more contextuality tasks (<a href="https://arxiv.org/abs/2512.02284" target="_blank" rel="noopener">arXiv:2512.02284</a>). <a href="lab.html">Chapter 2: the magic square on a noisy chip →</a></p>
         </div>
 
         <div class="preview-panel">
@@ -1165,6 +1188,7 @@
         <span class="badge" id="verdict-badge">—</span>
         <p id="verdict-text"></p>
       </div>
+      <div class="noise-report" id="noise-report" style="display:none;"></div>
       <div class="result-actions">
         <button class="primary" id="play-again-btn" type="button">Play Again</button>
         <button class="secondary" id="back-rules-btn" type="button">Read the rules again</button>
@@ -1176,6 +1200,7 @@
   <footer class="note">Peres–Mermin magic square · play the classical strategy or build the real quantum circuits that beat it</footer>
 </div>
 
+<script src="../nonlocal.js"></script>
 <script src="../engine.js"></script>
 <script src="paper-ui.js"></script>
 <script>PaperUI.nav("game");</script>
@@ -1211,7 +1236,7 @@
     var rate = bucket.round === 0 ? "—" : Math.round((bucket.wins / bucket.round) * 100) + "%";
     document.getElementById("sb-rate").textContent = rate;
     var pill = document.getElementById("mode-pill");
-    pill.textContent = state.mode === "quantum" ? "Quantum" : "Classical";
+    pill.textContent = state.mode === "quantum" ? (state.noisy ? "Quantum · noisy chip" : "Quantum") : "Classical";
     pill.className = "mode-pill" + (state.mode === "quantum" ? " quantum" : "");
   }
 
@@ -1376,7 +1401,17 @@
     if (win) bucket.wins += 1;
     updateScoreboard();
 
-    document.getElementById("quantum-ribbon").style.display = quantum ? "" : "none";
+    var ribbon = document.getElementById("quantum-ribbon");
+    ribbon.style.display = quantum ? "" : "none";
+    ribbon.textContent = state.noisy ? "Quantum strategy · noisy chip" : "Quantum strategy · outcome guaranteed";
+    var report = document.getElementById("noise-report");
+    if (quantum && state.noisy) {
+      report.style.display = "";
+      report.innerHTML = state.noiseLog.length
+        ? "<b>Noise this round:</b> " + state.noiseLog.map(function (e) { return '<span class="hit">' + e + "</span>"; }).join(", ") +
+          ". " + (win ? "None of it touched the shared cell's value, so they still agreed." : "That flipped the value at the shared cell.")
+        : "<b>Noise this round:</b> none. Every gate and readout came through clean.";
+    } else report.style.display = "none";
 
     var grid = document.getElementById("results-square");
     grid.innerHTML = "";
@@ -1392,7 +1427,7 @@
             cell.className += " lose";
             cell.innerHTML =
               '<span class="tag">clash</span>' +
-              '<span class="split"><span class="a-v">' + fmt(aliceIntersect) + '</span><span>' + MINUS + "≠" + '</span><span class="b-v">' + fmt(bobIntersect) + "</span></span>";
+              '<span class="split"><span class="a-v">' + fmt(aliceIntersect) + '</span><span>≠</span><span class="b-v">' + fmt(bobIntersect) + "</span></span>";
           }
         } else if (rr === r) {
           cell.className += " a";
@@ -1418,8 +1453,12 @@
       verdict.className = "verdict win";
       badge.textContent = "Win";
       text.textContent = quantum
-        ? "Alice and Bob both measured " + fmt(aliceIntersect) + " at the shared cell — guaranteed once both circuits matched, not coincidence."
+        ? "Alice and Bob both measured " + fmt(aliceIntersect) + " at the shared cell — " + (state.noisy ? "the entanglement carried it through the noisy chip." : "guaranteed once both circuits matched, not coincidence.")
         : "Alice and Bob both wrote " + fmt(aliceIntersect) + " in the shared cell, with zero communication.";
+    } else if (quantum) {
+      verdict.className = "verdict lose";
+      badge.textContent = "Noise struck";
+      text.textContent = "Alice read " + fmt(aliceIntersect) + ", Bob read " + fmt(bobIntersect) + ". The circuits were right, but an error on the chip flipped one side. With these error rates that happens in about " + ((1 - NOISY_MODEL) * 100).toFixed(1) + "% of rounds.";
     } else {
       verdict.className = "verdict lose";
       badge.textContent = "Classical mismatch";
@@ -1429,7 +1468,9 @@
     var rate = bucket.wins / bucket.round;
     if (quantum) {
       if (bucket.round >= 2) {
-        text.textContent += " " + bucket.wins + "/" + bucket.round + " quantum rounds won so far — no classical notepad strategy can sustain that past 8/9.";
+        text.textContent += " " + bucket.wins + "/" + bucket.round + " quantum rounds won so far" + (state.noisy
+          ? " (expected ≈" + (NOISY_MODEL * 100).toFixed(1) + "% on this chip; Google's measured 98.3%). Over many rounds that still beats the 8/9 classical ceiling."
+          : " — no classical notepad strategy can sustain that past 8/9.");
       }
     } else if (bucket.round >= 9 && rate > 8 / 9 + 1e-9) {
       text.textContent += " Sustaining " + Math.round(rate * 100) + "% over " + bucket.round + " rounds is past the 8/9 classical ceiling — worth double-checking nobody peeked.";
@@ -1539,10 +1580,55 @@
 
   var qState = null; // shared 4-qubit statevector for the current quantum round
 
+  // ---- device: perfect qubits, or the paper's chip error rates ----
+  // On the noisy chip every gate placed (by Charlie, Alice or Bob) may be
+  // followed by a random Pauli error, and each readout may be misreported,
+  // at Google's Willow rates from arXiv:2512.02284 (NonLocal.Magic.GAME_NOISE).
+  var noiseRng = NonLocal.rng();
+  state.noisy = false;
+  state.noiseLog = [];
+  var NOISY_MODEL = (function () { var a = 0; for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) a += NonLocal.Magic.gameWinProb(r, c) / 9; return a; })();
+  function currentNoise() { return state.noisy ? NonLocal.Magic.GAME_NOISE : null; }
+  function applyPlaced(g, qubitMap, who) {
+    NonLocal.Noise.applyQEngineGate(QEngine, qState, g, qubitMap, currentNoise(), noiseRng).forEach(function (h) {
+      state.noiseLog.push(h.pauli + " error on Q" + h.qubit + " after " + who + "'s " + gateName(g));
+    });
+  }
+  function measurePlayer(qubits, who) {
+    var m = NonLocal.Noise.measureQEngine(QEngine, qState, qubits, currentNoise(), noiseRng);
+    m.flips.forEach(function (q) { state.noiseLog.push("readout of Q" + q + " (" + who + ") misreported"); });
+    return m.bits;
+  }
+  function gateName(g) {
+    if (g.role === "controlled") return (g.controls.length > 1 ? "multi-controlled " : "controlled-") + g.gate + (g.adjoint ? "†" : "");
+    if (g.role === "swap") return "SWAP";
+    if (g.role === "cswap") return "controlled-SWAP";
+    return g.gate + (g.adjoint ? "†" : "") + " gate";
+  }
+  function renderDevice() {
+    document.querySelectorAll(".device-tab").forEach(function (b) { b.setAttribute("aria-pressed", String((b.getAttribute("data-device") === "noisy") === state.noisy)); });
+    var pct = (NOISY_MODEL * 100).toFixed(1) + "%";
+    document.getElementById("device-note").innerHTML = state.noisy
+      ? "Each gate you place may pick up a random error (0.05% per single-qubit gate, 0.3% per two-qubit gate) and each readout may be misreported (0.7%). These are the error rates Google reports for its Willow chip. With the correct circuits you'll win about " + pct + " of rounds. Google's chip won 98.30%. <a href=\"lab.html\">More in Chapter 2.</a>"
+      : "Ideal qubits: once the circuits are right, every round is a win.";
+    document.getElementById("q-tile-cap").textContent = state.noisy ? "On the noisy chip" : "This mode";
+    document.getElementById("q-tile-num").textContent = state.noisy ? "≈" + pct : "9/9";
+    document.getElementById("q-tile-sub").textContent = state.noisy ? "still far above 8/9 (Google's chip: 98.3%)" : "guaranteed, once your circuit is correct";
+  }
+  document.querySelectorAll(".device-tab").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var noisy = b.getAttribute("data-device") === "noisy";
+      if (noisy !== state.noisy) { state.noisy = noisy; state.quantum = { round: 0, wins: 0 }; }
+      renderDevice();
+    });
+  });
+  renderDevice();
+
   function newQuantumRound() {
     state.aliceRow = Math.floor(Math.random() * 3);
     state.bobCol = Math.floor(Math.random() * 3);
     qState = QEngine.makeState(4);
+    state.noiseLog = [];
     state.aliceQubits = null;
     state.bobQubits = null;
   }
@@ -1635,7 +1721,7 @@
     charlieApplied = true;
     var gates = CircuitEditor.resolve(charlieEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
     var identity = [0, 1, 2, 3];
-    gates.forEach(function (g) { QEngine.applyGate(qState, g, identity); });
+    gates.forEach(function (g) { applyPlaced(g, identity, "Charlie"); });
 
     CircuitCanvas.renderStatic("charlie-recap-circuit", ["Q0", "Q1", "Q2", "Q3"], gates);
 
@@ -1839,8 +1925,8 @@
     if (aliceCircuitRan || !CircuitEditor.matches(aliceEditor)) return;
     aliceCircuitRan = true;
     var gates = CircuitEditor.resolve(aliceEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
-    gates.forEach(function (g) { QEngine.applyGate(qState, g, state.aliceQubits); });
-    var bits = QEngine.partialMeasureAndCollapse(qState, state.aliceQubits);
+    gates.forEach(function (g) { applyPlaced(g, state.aliceQubits, "Alice"); });
+    var bits = measurePlayer(state.aliceQubits, "Alice");
     var m0 = bits[0] === 0 ? 1 : -1, m1 = bits[1] === 0 ? 1 : -1;
     state.aliceVals = rowValues(state.aliceRow, m0, m1);
 
@@ -1905,8 +1991,8 @@
     if (bobCircuitRan || !CircuitEditor.matches(bobEditor)) return;
     bobCircuitRan = true;
     var gates = CircuitEditor.resolve(bobEditor).gates.slice().sort(function (a, b) { return a.col - b.col; });
-    gates.forEach(function (g) { QEngine.applyGate(qState, g, state.bobQubits); });
-    var bits = QEngine.partialMeasureAndCollapse(qState, state.bobQubits);
+    gates.forEach(function (g) { applyPlaced(g, state.bobQubits, "Bob"); });
+    var bits = measurePlayer(state.bobQubits, "Bob");
     var m0 = bits[0] === 0 ? 1 : -1, m1 = bits[1] === 0 ? 1 : -1;
     state.bobVals = colValues(state.bobCol, m0, m1);
 

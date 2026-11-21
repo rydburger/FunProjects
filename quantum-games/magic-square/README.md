@@ -21,9 +21,16 @@ cross — with no communication allowed.
     circuit their assigned row/column needs, validated against the canonical circuit — either
     gate-for-gate, or by simulated output-state fidelity for any equivalent circuit that isn't a
     literal copy — before they're allowed to run it. Hint and Skip are available at every step.
-  - Every gate runs on a real noiseless statevector simulation (complex amplitudes, unitary
-    matrices, Born-rule measurement) — once the circuits are right, the win is guaranteed, not
-    scripted.
+  - Every gate runs on a real statevector simulation (complex amplitudes, unitary matrices,
+    Born-rule measurement). With **Perfect qubits**, once the circuits are right the win is
+    guaranteed, not scripted.
+  - **Noisy chip** applies the paper's Willow error rates to every gate as placed: 0.05% per
+    single-qubit gate and 0.3% per two-qubit gate, as random Pauli errors on the live state. Each
+    readout may also be misreported (0.7%). Correct circuits then win ≈ 97.7%; Google's chip
+    measured 98.30%. The results screen lists any error that struck and whether it flipped the
+    shared cell. The in-game noise (`NonLocal.Noise.applyQEngineGate` / `measureQEngine`) is
+    tested against the exact model `NonLocal.Magic.gameWinProb` by playing full rounds on
+    `engine.js`'s own statevector.
 
 ## The paper chapters (arXiv:2512.02284)
 

@@ -459,6 +459,27 @@
       return { circuit: C, observables: [ra.bits, cb.bits, cell.bits], ideal: [ra.parity, cb.parity, cell.parity], A: A, B: B };
     }
 
+    // The circuits of the interactive game (index.html), uncompiled: CNOT is
+    // one two-qubit gate there, as the player places it. Physical qubits:
+    // Bell pairs (Q0,Q1) and (Q2,Q3); Alice holds (Q0,Q2), Bob (Q1,Q3).
+    var GAME_COL_CIRCUIT = [[[op("H", 0)]], [[op("H", 1)]], [[op("CX", 0, 1)], [op("H", 0)]]];
+    function gameCircuit(r, c) {
+      var C = Clifford.circuit(4);
+      Clifford.add(C, [op("H", 0), op("H", 2)]);
+      Clifford.add(C, [op("CX", 0, 1), op("CX", 2, 3)]);
+      Clifford.parallel(Clifford.remap(ROW_CIRCUIT[r], [0, 2]), Clifford.remap(GAME_COL_CIRCUIT[c], [1, 3])).forEach(function (m) { Clifford.add(C, m); });
+      C.measured = [0, 1, 2, 3];
+      var a = ROW_SUB[r][c], b = COL_SUB[c][r];
+      return { circuit: C, observables: [symdiff(mapBits(a.bits, [0, 2]), mapBits(b.bits, [1, 3]))], ideal: [a.sign * b.sign > 0 ? 0 : 1] };
+    }
+    // Noise in the game: the paper's gate and readout rates, applied to each
+    // gate as placed. No idling: the game has no clock.
+    var GAME_NOISE = { p1: 5e-4, p2: 3e-3, readout: 7e-3, idle: 0 };
+    function gameWinProb(r, c, noise) {
+      var g = gameCircuit(r, c);
+      return Clifford.noFlipProb1(Clifford.faultTable(Clifford.withNoise(g.circuit, noise || GAME_NOISE), 4, g.observables));
+    }
+
     // Exact win probability of game (r, c) under a noise model.
     function winProb(variation, r, c, noise) {
       var g = variation === 2 ? variationII(r, c) : variationI(r, c);
@@ -479,7 +500,7 @@
       }
       return wins / 9;
     }
-    return { TABLE: TABLE, label: label, ROW_CIRCUIT: ROW_CIRCUIT, COL_CIRCUIT: COL_CIRCUIT, ROW_SUB: ROW_SUB, COL_SUB: COL_SUB, variationI: variationI, variationII: variationII, winProb: winProb, classicalWinRate: classicalWinRate };
+    return { gameCircuit: gameCircuit, gameWinProb: gameWinProb, GAME_NOISE: GAME_NOISE, GAME_COL_CIRCUIT: GAME_COL_CIRCUIT, TABLE: TABLE, label: label, ROW_CIRCUIT: ROW_CIRCUIT, COL_CIRCUIT: COL_CIRCUIT, ROW_SUB: ROW_SUB, COL_SUB: COL_SUB, variationI: variationI, variationII: variationII, winProb: winProb, classicalWinRate: classicalWinRate };
   })();
 
   // =========================================================
@@ -954,6 +975,61 @@
   })();
 
   // =========================================================
+  // Noise: Monte Carlo trajectory helpers for statevector games. After a
+  // gate on `k` qubits, gateFaults() returns the Pauli errors to apply as
+  // [[index into the gate's qubits, "X"|"Y"|"Z"], ...]: depolarizing with
+  // p1 for one qubit, two-qubit depolarizing with p2 otherwise (a gate on
+  // k > 2 qubits, e.g. a Toffoli, is charged k - 1 two-qubit gates on
+  // neighbouring pairs, a stand-in for its decomposition).
+  // readoutFlip() says whether a measured bit is misreported.
+  // =========================================================
+  var Noise = (function () {
+    var P = ["X", "Y", "Z"];
+    function gateFaults(k, noise, r) {
+      var out = [];
+      if (k <= 1) { if (noise.p1 > 0 && r() < noise.p1) out.push([0, P[Math.floor(r() * 3)]]); return out; }
+      for (var i = 0; i + 1 < k; i++) {
+        if (noise.p2 > 0 && r() < noise.p2) {
+          var m = 1 + Math.floor(r() * 15), ea = m >> 2, eb = m & 3;
+          if (ea) out.push([i, P[ea - 1]]);
+          if (eb) out.push([i + 1, P[eb - 1]]);
+        }
+      }
+      return out;
+    }
+    function readoutFlip(noise, r) { return noise.readout > 0 && r() < noise.readout; }
+    // engine.js adapters (QEngine is passed in, so this file stays free of
+    // it). gateQubits lists a placed gate's wires in the editor's format.
+    function gateQubits(g) {
+      if (g.role === "single") return [g.wire];
+      if (g.role === "controlled") return g.controls.concat([g.target]);
+      if (g.role === "swap") return [g.wireA, g.wireB];
+      if (g.role === "cswap") return g.controls.concat([g.wireA, g.wireB]);
+      return [];
+    }
+    // Apply one editor gate to a QEngine state, then any noise it draws.
+    // Returns the faults as [{qubit: physical index, pauli}] for display.
+    function applyQEngineGate(QE, s, g, qubitMap, noise, r) {
+      QE.applyGate(s, g, qubitMap);
+      if (!noise) return [];
+      var wires = gateQubits(g), hits = [];
+      gateFaults(wires.length, noise, r).forEach(function (f) {
+        var phys = qubitMap[wires[f[0]]];
+        QE.applyGate(s, { role: "single", gate: f[1], wire: 0 }, [phys]);
+        hits.push({ qubit: phys, pauli: f[1] });
+      });
+      return hits;
+    }
+    // Measure physical qubits; bits are what the readout reports.
+    function measureQEngine(QE, s, qubits, noise, r) {
+      var truth = QE.partialMeasureAndCollapse(s, qubits), bits = [], flips = [];
+      truth.forEach(function (b, i) { var f = !!noise && readoutFlip(noise, r); bits.push(f ? 1 - b : b); if (f) flips.push(qubits[i]); });
+      return { bits: bits, truth: truth, flips: flips };
+    }
+    return { gateFaults: gateFaults, readoutFlip: readoutFlip, gateQubits: gateQubits, applyQEngineGate: applyQEngineGate, measureQEngine: measureQEngine };
+  })();
+
+  // =========================================================
   // PAPER: the measured data of arXiv:2512.02284, for side-by-side plots.
   // Read out of the PDF's vector paths (marker centres against the axis
   // tick marks) except where noted as digitized from a raster figure. The
@@ -1003,7 +1079,7 @@
     return Math.ceil(Math.log2(HLF.inputCount(n)));
   }
 
-  var NonLocal = { rng: rng, binomial: binomial, popcount: popcount, shuffle: shuffle, anticommutes: anticommutes, lattice: lattice, SV: SV, Clifford: Clifford, Magic: Magic, KSB: KSB, GHZ: GHZ, HLF: HLF, PAPER: PAPER, paperClassicalLayers: paperClassicalLayers };
+  var NonLocal = { rng: rng, binomial: binomial, popcount: popcount, shuffle: shuffle, anticommutes: anticommutes, lattice: lattice, SV: SV, Clifford: Clifford, Magic: Magic, KSB: KSB, GHZ: GHZ, HLF: HLF, Noise: Noise, PAPER: PAPER, paperClassicalLayers: paperClassicalLayers };
   if (typeof module !== "undefined" && module.exports) module.exports = NonLocal;
   if (typeof root !== "undefined" && root) root.NonLocal = NonLocal;
 })(typeof window !== "undefined" ? window : this);
