@@ -50,6 +50,13 @@ test("Y = iXZ and S^2 = Z on a random state", function () {
   for (var k = 0; k < 4; k++) { near(c.re[k], d.re[k], 1e-12); near(c.im[k], d.im[k], 1e-12); }
 });
 
+test("RZ(pi) = Z and RZ(pi/2) = S", function () {
+  var a = randomState(2, r), b = SV.clone(a), c = SV.clone(a), d = SV.clone(a);
+  SV.apply(a, "RZ", [1], Math.PI); SV.apply(b, "Z", [1]);
+  SV.apply(c, "RZ", [0], Math.PI / 2); SV.apply(d, "S", [0]);
+  for (var i = 0; i < 4; i++) { near(a.re[i], b.re[i], 1e-12); near(a.im[i], b.im[i], 1e-12); near(c.re[i], d.re[i], 1e-12); near(c.im[i], d.im[i], 1e-12); }
+});
+
 console.log("Magic square");
 test("Table I: rows multiply to +I, columns to -I", function () {
   for (var r0 = 0; r0 < 3; r0++) {
@@ -164,6 +171,20 @@ test("paper-level device noise: 4 < chi < 6", function () {
   assert.ok(res.chi > 5.3 && res.chi < 5.95, "chi " + res.chi);
 });
 
+test("an ancilla phase error is cancelled by the matching virtual Z", function () {
+  var nz = Object.assign({}, KSB.IDEAL, { phaseErr: 0.27, virtualZ: -0.27 });
+  near(KSB.experiment({ reps: 30, noise: nz, rng: NL.rng(8) }).chi, 6, 1e-9);
+});
+test("net ancilla phase pi flips every reading: chi = -6; pi/2 scrambles: chi ~ 0", function () {
+  near(KSB.experiment({ reps: 30, noise: Object.assign({}, KSB.IDEAL, { phaseErr: 1 }), rng: NL.rng(9) }).chi, -6, 1e-9);
+  assert.ok(Math.abs(KSB.experiment({ reps: 300, noise: Object.assign({}, KSB.IDEAL, { phaseErr: 0.5 }), rng: NL.rng(10) }).chi) < 0.3);
+});
+test("per-Pauli agreement: compatible = 1 for all nine with no noise", function () {
+  var res = KSB.experiment({ reps: 40, noise: KSB.IDEAL, rng: NL.rng(12) });
+  assert.strictEqual(res.perCell.compatible.length, 9);
+  res.perCell.compatible.forEach(function (v, i) { near(v, 1, 1e-12, "cell " + i); assert.ok(res.perCell.nCompatible[i] > 0); });
+});
+
 console.log("GHZ game");
 test("classical optimum 1/2 + 2^-ceil(N/2), brute force N = 2..10", function () {
   for (var N = 2; N <= 10; N++) near(GHZ.classicalOptimumBrute(N), GHZ.classicalBound(N), 1e-12, "N=" + N);
@@ -218,6 +239,21 @@ test("noisy win rate falls with N but stays above the classical bound to 71", fu
     assert.ok(p < prev && p > GHZ.classicalBound(N), "N=" + N + " p=" + p);
     prev = p;
   });
+});
+
+test("GHZ fidelity: 1 without noise", function () {
+  var f = GHZ.fidelity(GHZ.growth(6, NL.rng(1)), C.NO_NOISE, { exhaustive: true });
+  near(f.FX, 1, 1e-12); near(f.FZ, 1, 1e-12);
+});
+test("GHZ fidelity under readout error matches the paper's Eq. S42 exactly", function () {
+  var e = 0.03, N = 7, f = GHZ.fidelity(GHZ.growth(N, NL.rng(2)), { p1: 0, p2: 0, idle: 0, readout: e }, { exhaustive: true });
+  near(f.FX, Math.pow(1 - 2 * e, N), 1e-12);
+  near(f.FZ, Math.pow(1 - e, N) + Math.pow(e, N), 1e-12);
+});
+test("P_w = (1 + F^X)/2 over all games", function () {
+  var N = 6, pat = GHZ.growth(N, NL.rng(3)), noise = C.PAPER_NOISE, pw = 0, n = 0;
+  GHZ.evenInputs(N).forEach(function (x) { var xb = new Uint8Array(N); for (var j = 0; j < N; j++) xb[j] = (x >> j) & 1; pw += GHZ.winProbBits(pat, xb, noise); n++; });
+  near(pw / n, (1 + GHZ.fidelity(pat, noise, { exhaustive: true }).FX) / 2, 1e-12);
 });
 
 console.log("Hidden linear function");
@@ -282,6 +318,36 @@ test("HLF sampler agrees with exact convolution on a small instance", function (
   var obs = inst.kernel.map(function (v) { return HLF.bitsToList(v, inst.n); });
   var ft = C.faultTable(C.withNoise(HLF.circuit(inst), noise), inst.n, obs);
   near(C.sampler(ft).okFraction(100000, NL.rng(11)), C.exactDistribution(ft)[0], 0.006);
+});
+
+console.log("Paper data (arXiv:2512.02284)");
+function mean(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
+test("extracted magic-square points reproduce the printed averages", function () {
+  near(mean(NL.PAPER.magic.fig1D), 0.9830, 0.001);
+  near(mean(NL.PAPER.magic.s3I), 0.9773, 0.0003);
+  near(mean(NL.PAPER.magic.s3II), 0.9355, 0.0003);
+});
+test("extracted KSB terms sum to the printed chi = 5.618", function () { near(mean(NL.PAPER.ksb.fig2B), 5.618, 0.001); });
+test("GHZ and HLF series cover N = 3..71 and n = 9..105", function () {
+  assert.strictEqual(NL.PAPER.ghz.fig3B.length, 69);
+  assert.strictEqual(NL.PAPER.hlf.fig4B.length, 97);
+});
+test("GHZ data sit above the (ceiling) classical bound, as in Fig. 3B", function () {
+  NL.PAPER.ghz.fig3B.forEach(function (p, i) { assert.ok(p > GHZ.classicalBound(i + 3)); });
+});
+test("paper's HLF classical steps equal ceil(log2(edges + nodes)) for square grids", function () {
+  [[3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9], [10, 10]].forEach(function (g) {
+    var n = g[0] * g[1], s = n + 2 * n - g[0] - g[1];
+    assert.strictEqual(NL.paperClassicalLayers(n), Math.ceil(Math.log2(s)), "n=" + n);
+  });
+});
+test("our model tracks the measured GHZ curve within 0.03", function () {
+  var R = NL.rng(77);
+  [10, 30, 50, 71].forEach(function (N) {
+    var a = 0, k = 0;
+    for (var p = 0; p < 6; p++) { var pat = GHZ.growth(N, R); for (var g = 0; g < 5; g++) { a += GHZ.winProbBits(pat, GHZ.randomInputBits(N, R), C.PAPER_NOISE); k++; } }
+    near(a / k, NL.PAPER.ghz.fig3B[N - 3], 0.03, "N=" + N);
+  });
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");

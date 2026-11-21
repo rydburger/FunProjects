@@ -90,8 +90,14 @@
       var mc = 1 << c, mt = 1 << t, d = s.re.length, re = s.re, im = s.im;
       for (var i = 0; i < d; i++) if ((i & mc) && !(i & mt)) { var j = i | mt, tr = re[i]; re[i] = re[j]; re[j] = tr; tr = im[i]; im[i] = im[j]; im[j] = tr; }
     }
-    function apply(s, g, q) {
+    // diag(1, e^{i theta}) on q: a Z rotation up to global phase (Cirq's Z**t has theta = pi t)
+    function rz(s, q, theta) {
+      var m = 1 << q, d = s.re.length, c = Math.cos(theta), sn = Math.sin(theta), re = s.re, im = s.im;
+      for (var i = 0; i < d; i++) if (i & m) { var r0 = re[i]; re[i] = c * r0 - sn * im[i]; im[i] = sn * r0 + c * im[i]; }
+    }
+    function apply(s, g, q, theta) {
       switch (g) {
+        case "RZ": return rz(s, q[0], theta);
         case "H": return h(s, q[0]);
         case "X": return x(s, q[0]);
         case "Y": return y(s, q[0]);
@@ -134,11 +140,16 @@
   // Clifford: circuits as moments, a noise model, exact fault analysis.
   // =========================================================
   var Clifford = (function () {
-    // Representative error rates quoted in the paper's supplement (Fig. S6):
-    // single-qubit 5e-4, CZ 3e-3, readout 7e-3. `idle` is our own simple
-    // stand-in for T1/T2 decay under dynamical decoupling: depolarizing
-    // noise on every already-used qubit that sits out a moment.
-    var PAPER_NOISE = { p1: 5e-4, p2: 3e-3, readout: 7e-3, idle: 3e-4 };
+    // Error rates from the paper's supplement (Fig. S6 caption): single-qubit
+    // Pauli error 5e-4, CZ 3e-3, symmetric readout 7e-3, T1 = 73 us.
+    // Idling follows the paper's T1-with-dynamical-decoupling model (Sec. 5B,
+    // Eqs. S19-S22): populations relax toward 1/2 and coherence decays at
+    // half that rate, which is exactly a Pauli channel with X and Y errors of
+    // equal probability and no Z. Over time t the flip probability is
+    // (1 - e^{-t/T1})/2 ~ t/(2 T1). The moment length (40 ns) is our
+    // assumption; the paper does not quote gate durations.
+    var T1 = 73e-6, MOMENT = 40e-9;
+    var PAPER_NOISE = { p1: 5e-4, p2: 3e-3, readout: 7e-3, idle: (1 - Math.exp(-MOMENT / T1)) / 2 };
     var NO_NOISE = { p1: 0, p2: 0, readout: 0, idle: 0 };
 
     function circuit(n) { return { n: n, moments: [], measured: null }; }
@@ -163,6 +174,7 @@
     //   DEP1 {q:[a], p}       uniform X/Y/Z with total prob p
     //   DEP2 {q:[a,b], p}     uniform over the 15 non-identity 2-qubit Paulis
     //   FLIP {q:[a], p}       readout bit flip (an X right before measuring)
+    //   IDLE {q:[a], p}       X or Y, equally likely (T1 under dynamical decoupling)
     function withNoise(c, noise) {
       noise = noise || NO_NOISE;
       var ops = [], active = new Uint8Array(c.n);
@@ -175,7 +187,7 @@
           if (o.q.length === 2 && noise.p2 > 0) ops.push({ g: "DEP2", q: o.q, p: noise.p2 });
           else if (o.q.length === 1 && !pauli && noise.p1 > 0) ops.push({ g: "DEP1", q: o.q, p: noise.p1 });
         });
-        if (noise.idle > 0) for (var q = 0; q < c.n; q++) if (active[q] && !touched[q]) ops.push({ g: "DEP1", q: [q], p: noise.idle });
+        if (noise.idle > 0) for (var q = 0; q < c.n; q++) if (active[q] && !touched[q]) ops.push({ g: "IDLE", q: [q], p: noise.idle });
       });
       var meas = c.measured || range(c.n);
       if (noise.readout > 0) meas.forEach(function (q) { ops.push({ g: "FLIP", q: [q], p: noise.readout }); });
@@ -213,6 +225,12 @@
           case "FLIP": {
             var pf = new Uint32Array(W); patFor(a, 1, 0, pf);
             if (nonzero(pf)) table.push({ p: o.p, outs: [{ w: 1, pat: pf }] });
+            break;
+          }
+          case "IDLE": {
+            var oi = [];
+            [[1, 0], [1, 1]].forEach(function (e) { var p = new Uint32Array(W); patFor(a, e[0], e[1], p); if (nonzero(p)) oi.push({ w: 1 / 2, pat: p }); });
+            if (oi.length) table.push({ p: o.p, outs: oi });
             break;
           }
           case "DEP1": {
@@ -310,6 +328,7 @@
             case "CX": fx[b] ^= fx[a]; fz[a] ^= fz[b]; break;
             case "FLIP": if (r() < o.p) fx[a] ^= 1; break;
             case "DEP1": if (r() < o.p) { var e = P1[Math.floor(r() * 3)]; fx[a] ^= e[0]; fz[a] ^= e[1]; } break;
+            case "IDLE": if (r() < o.p) { fx[a] ^= 1; if (r() < 0.5) fz[a] ^= 1; } break;
             case "DEP2": if (r() < o.p) { var m = 1 + Math.floor(r() * 15), ea = m >> 2, eb = m & 3; if (ea) { fx[a] ^= P1[ea - 1][0]; fz[a] ^= P1[ea - 1][1]; } if (eb) { fx[b] ^= P1[eb - 1][0]; fz[b] ^= P1[eb - 1][1]; } } break;
           }
         }
@@ -326,7 +345,7 @@
       PAPER_NOISE: PAPER_NOISE, NO_NOISE: NO_NOISE,
       circuit: circuit, add: add, op: op, cxMoments: cxMoments, parallel: parallel, remap: remap,
       withNoise: withNoise, faultTable: faultTable, exactDistribution: exactDistribution,
-      noFlipProb1: noFlipProb1, sampler: sampler, frameSample: frameSample, depth2q: depth2q
+      noFlipProb1: noFlipProb1, sampler: sampler, frameSample: frameSample, depth2q: depth2q, T1: T1, MOMENT: MOMENT
     };
   })();
   var op = Clifford.op;
@@ -402,11 +421,13 @@
       ms.push([op("H", anc)]);
       return ms;
     }
-    // Variation II: every entry measured directly. Entries 0 and 1 go onto
-    // two fresh ancillas by QND; entry 2 is read straight off the data
-    // qubits with the Variation I circuit. Players must now also satisfy
-    // their own product rule, so the referee checks three parities:
-    // [Alice's row rule, Bob's column rule, cell match].
+    // Variation II (supplement Fig. S2): every entry is measured directly.
+    // Each player copies entries 0 and 1 onto two fresh ancillas by QND, then
+    // folds entry 2 onto their second data qubit (the Variation I rotation,
+    // then a CNOT from the first data qubit so Z0Z1 -> Z1) and reads only
+    // that qubit: three readouts per player, as in the paper. Players must
+    // now also satisfy their own product rule, so the referee checks three
+    // parities: [Alice's row rule, Bob's column rule, cell match].
     // Qubits: A0 0, A1 1, B0 2, B1 3, Alice ancillas 4,5, Bob ancillas 6,7.
     function variationII(r, c) {
       var C = Clifford.circuit(8);
@@ -414,17 +435,17 @@
       function playerMoments(entries, data, ancs, readout) {
         var ms = [];
         for (var e = 0; e < 2; e++) ms = ms.concat(qndMoments(entries[e][0], data, ancs[e]));
-        return ms.concat(Clifford.remap(readout, data));
+        return ms.concat(Clifford.remap(readout.concat(Clifford.cxMoments([[0, 1]])), data));
       }
       var rowE = TABLE[r], colE = [TABLE[0][c], TABLE[1][c], TABLE[2][c]];
       var am = playerMoments(rowE, [0, 1], [4, 5], ROW_CIRCUIT[r]);
       var bm = playerMoments(colE, [2, 3], [6, 7], COL_CIRCUIT[c]);
       Clifford.parallel(am, bm).forEach(function (m) { Clifford.add(C, m); });
-      C.measured = [0, 1, 2, 3, 4, 5, 6, 7];
-      // entry value sources: {bits, sign}
+      C.measured = [1, 3, 4, 5, 6, 7];
+      // entry value sources: {bits, sign}; entry 2 now sits on data qubit 1
       function src(entries, sub, e, data, ancs) {
         if (e < 2) return { bits: [ancs[e]], sign: entries[e][1] };
-        return { bits: mapBits(sub[2].bits, data), sign: sub[2].sign };
+        return { bits: [data[1]], sign: sub[2].sign };
       }
       var A = [0, 1, 2].map(function (e) { return src(rowE, ROW_SUB[r], e, [0, 1], [4, 5]); });
       var B = [0, 1, 2].map(function (e) { return src(colE, COL_SUB[c], e, [2, 3], [6, 7]); });
@@ -490,14 +511,20 @@
     }
 
     // The experiment's device: data qubits 0,1 and an ancilla 2 on a tiny
-    // statevector. Each Pauli is mapped onto the ancilla (Hadamard test,
-    // controlled-Paulis compiled to CZ), read out, and the ancilla is reset.
+    // statevector. Each Pauli is mapped onto the ancilla as in Fig. S5A
+    // (reset, H, CZs to the data qubits, with basis changes for X and Y, then
+    // H and measure).
     // Noise: depolarizing after each gate, readout and reset flips, and
-    // depolarizing on the two data qubits while the ancilla is read and reset.
-    var PAPER_DEVICE = { p1: 5e-4, p2: 3e-3, readout: 7e-3, reset: 2e-3, idleMeas: 2e-3 };
-    var IDEAL = { p1: 0, p2: 0, readout: 0, reset: 0, idleMeas: 0 };
+    // T1-type (X/Y) errors on the two data qubits while the ancilla is read
+    // and reset. Plus the coherent effect of Sec. 4B: the measure/reset
+    // cycle's flux excursions leave the ancilla with an extra phase
+    // `phaseErr`, which a virtual Z (`virtualZ`) before the final H can
+    // cancel. Both are in units of pi, like Cirq's Z**t on the x-axis of Fig. S5C.
+    var PAPER_DEVICE = { p1: 5e-4, p2: 3e-3, readout: 7e-3, reset: 2e-3, idleMeas: 2e-3, phaseErr: 0, virtualZ: 0 };
+    var IDEAL = { p1: 0, p2: 0, readout: 0, reset: 0, idleMeas: 0, phaseErr: 0, virtualZ: 0 };
     var PAULIS = ["X", "Y", "Z"];
     function dep1(s, q, p, r) { if (p > 0 && r() < p) SV.apply(s, PAULIS[Math.floor(r() * 3)], [q]); }
+    function idleXY(s, q, p, r) { if (p > 0 && r() < p) SV.apply(s, r() < 0.5 ? "X" : "Y", [q]); }
     function dep2(s, a, b, p, r) {
       if (p > 0 && r() < p) { var m = 1 + Math.floor(r() * 15), ea = m >> 2, eb = m & 3; if (ea) SV.apply(s, PAULIS[ea - 1], [a]); if (eb) SV.apply(s, PAULIS[eb - 1], [b]); }
     }
@@ -511,11 +538,13 @@
         else if (P[i] === "X") { g1(s, "H", t, nz, r); SV.apply(s, "CZ", [anc, t]); dep2(s, anc, t, nz.p2, r); g1(s, "H", t, nz, r); }
         else if (P[i] === "Y") { g1(s, "SDG", t, nz, r); g1(s, "H", t, nz, r); SV.apply(s, "CZ", [anc, t]); dep2(s, anc, t, nz.p2, r); g1(s, "H", t, nz, r); g1(s, "S", t, nz, r); }
       }
+      var phase = (nz.phaseErr || 0) + (nz.virtualZ || 0);
+      if (phase) SV.apply(s, "RZ", [anc], Math.PI * phase);
       g1(s, "H", anc, nz, r);
       var bit = SV.measure(s, anc, r);
       if (bit) SV.apply(s, "X", [anc]);            // reset
       if (nz.reset > 0 && r() < nz.reset) SV.apply(s, "X", [anc]);
-      dep1(s, 0, nz.idleMeas, r); dep1(s, 1, nz.idleMeas, r);
+      idleXY(s, 0, nz.idleMeas, r); idleXY(s, 1, nz.idleMeas, r);
       var reported = bit ^ (nz.readout > 0 && r() < nz.readout ? 1 : 0);
       return entry[1] * (reported ? -1 : 1);
     }
@@ -523,9 +552,12 @@
       var s = SV.make(3);
       return {
         noise: noise,
-        // measure one context; returns its three values in order
+        // Measure one context. Like the paper, the three measurements run
+        // in a random order; values come back in the context's cell order.
         measureContext: function (ctx) {
-          return contextCells(ctx).map(function (rc) { return measurePauli(s, Magic.TABLE[rc[0]][rc[1]], noise, r); });
+          var cells = contextCells(ctx), vals = [0, 0, 0], order = shuffle([0, 1, 2], r);
+          order.forEach(function (i) { vals[i] = measurePauli(s, Magic.TABLE[cells[i][0]][cells[i][1]], noise, r); });
+          return vals;
         },
         reset: function () { s = SV.make(3); }
       };
@@ -535,6 +567,8 @@
       var length = opts.length || 180, done = 0;
       var sum = [0, 0, 0, 0, 0, 0], cnt = [0, 0, 0, 0, 0, 0];
       var agree = { compatible: [0, 0], incompatible: [0, 0] };
+      var perCell = { compatible: [], incompatible: [] };
+      for (var c0 = 0; c0 < 9; c0++) { perCell.compatible.push([0, 0]); perCell.incompatible.push([0, 0]); }
       var dev = device(noise, r);
       function step(nReps) {
         for (var rep = 0; rep < nReps; rep++) {
@@ -543,38 +577,49 @@
           for (var t = 0; t < length; t++) {
             var ctx = Math.floor(r() * 6), vals = dev.measureContext(ctx);
             sum[ctx] += vals[0] * vals[1] * vals[2]; cnt[ctx]++;
-            tr.record(ctx, vals).forEach(function (ev) { var bk = ev.compatible ? agree.compatible : agree.incompatible; bk[1]++; if (ev.agree) bk[0]++; });
+            tr.record(ctx, vals).forEach(function (ev) {
+              if (ev.kind === "other") return;
+              var bk = agree[ev.kind], pc = perCell[ev.kind][ev.cell];
+              bk[1]++; pc[1]++; if (ev.agree) { bk[0]++; pc[0]++; }
+            });
           }
           done++;
         }
       }
       function result() {
         var mean = sum.map(function (s, i) { return cnt[i] ? s / cnt[i] : 0; });
+        function frac(a) { return a[1] ? a[0] / a[1] : NaN; }
         return {
           reps: done, mean: mean, count: cnt.slice(),
           chi: mean[0] + mean[1] + mean[2] - mean[3] - mean[4] - mean[5],
-          pAgreeCompatible: agree.compatible[1] ? agree.compatible[0] / agree.compatible[1] : NaN,
-          pAgreeIncompatible: agree.incompatible[1] ? agree.incompatible[0] / agree.incompatible[1] : NaN,
-          agree: { compatible: agree.compatible.slice(), incompatible: agree.incompatible.slice() }
+          pAgreeCompatible: frac(agree.compatible), pAgreeIncompatible: frac(agree.incompatible),
+          agree: { compatible: agree.compatible.slice(), incompatible: agree.incompatible.slice() },
+          perCell: { compatible: perCell.compatible.map(frac), incompatible: perCell.incompatible.map(frac),
+                     nCompatible: perCell.compatible.map(function (a) { return a[1]; }), nIncompatible: perCell.incompatible.map(function (a) { return a[1]; }) }
         };
       }
       return { step: step, result: result };
     }
-    // Remembers each observable's last reading and whether something
-    // incompatible (anticommuting) has been measured since. record()
-    // returns one event per repeated reading: {cell, compatible, agree}.
+    // Remembers each observable's last reading, which context it came from,
+    // and whether something incompatible (anticommuting) has been measured
+    // since. record() returns one event per repeated reading: {cell, kind,
+    // agree}. Following Sec. 4A, kind is "compatible" only when the Pauli
+    // appears in two consecutive contexts (so everything in between commutes
+    // with it), "incompatible" when an anticommuting Pauli was measured in
+    // between, and "other" for longer all-commuting gaps (not counted).
     var LABELS = [];
     for (var la = 0; la < 3; la++) for (var lb = 0; lb < 3; lb++) LABELS.push(Magic.TABLE[la][lb][0]);
     function tracker() {
-      var last = new Int8Array(9), dirty = new Uint8Array(9);
+      var last = new Int8Array(9), dirty = new Uint8Array(9), lastT = new Int32Array(9).fill(-9), t = -1;
       return {
         last: last, dirty: dirty,
         record: function (ctx, vals) {
+          t++;
           var evs = [];
           contextCells(ctx).forEach(function (rc, i) {
             var id = rc[0] * 3 + rc[1];
-            if (last[id] !== 0) evs.push({ cell: id, compatible: !dirty[id], agree: last[id] === vals[i] });
-            last[id] = vals[i]; dirty[id] = 0;
+            if (last[id] !== 0) evs.push({ cell: id, kind: dirty[id] ? "incompatible" : lastT[id] === t - 1 ? "compatible" : "other", agree: last[id] === vals[i] });
+            last[id] = vals[i]; dirty[id] = 0; lastT[id] = t;
             for (var o = 0; o < 9; o++) if (o !== id && anticommutes(LABELS[o], LABELS[id])) dirty[o] = 1;
           });
           return evs;
@@ -583,8 +628,7 @@
     }
     // Run the paper's protocol: `reps` runs, each a random sequence of
     // `length` contexts, tracking <context products> and the agreement of
-    // repeated readings of one observable, split by whether anything
-    // incompatible was measured in between.
+    // repeated readings of one observable.
     function experiment(opts) { var R = runner(opts); R.step(opts.reps || 1000); return R.result(); }
     return { contextCells: contextCells, contextName: contextName, chiOfAssignment: chiOfAssignment, chiContextual: chiContextual, device: device, experiment: experiment, runner: runner, tracker: tracker, PAPER_DEVICE: PAPER_DEVICE, IDEAL: IDEAL, CLASSICAL_BOUND: 4, QUANTUM_VALUE: 6 };
   })();
@@ -737,7 +781,51 @@
       var g = circuitBits(pattern, xb);
       return Clifford.noFlipProb1(Clifford.faultTable(Clifford.withNoise(g.circuit, noise), pattern.N, g.observables));
     }
+    // GHZ fidelity, Sec. 5A of the supplement: F = (F^X + F^Z)/2, the mean
+    // of the 2^N stabilizer expectations split into X-type (products of X
+    // and Y with an even number of Y: exactly the game observables, so
+    // P_w = (1 + F^X)/2) and Z-type (Z on an even subset of qubits).
+    // Each expectation is exact from the fault table: <S> = 1 - 2 P(flip).
+    function prepCircuit(pattern) {
+      var N = pattern.N, C = Clifford.circuit(N);
+      Clifford.add(C, [op("H", pattern.root)]);
+      pattern.layers.forEach(function (layer) { Clifford.cxMoments(layer).forEach(function (m) { Clifford.add(C, m); }); });
+      return C;
+    }
+    function zStabilizer(pattern, subset, noise) {
+      var C = prepCircuit(pattern);
+      return 2 * Clifford.noFlipProb1(Clifford.faultTable(Clifford.withNoise(C, noise), pattern.N, [subset])) - 1;
+    }
+    function xStabilizer(pattern, xb, noise) { return 2 * winProbBits(pattern, xb, noise) - 1; }
+    function randomEvenSubset(N, r) {
+      var xb = randomInputBits(N, r), out = [];
+      for (var j = 0; j < N; j++) if (xb[j]) out.push(j);
+      return out;
+    }
+    // Monte Carlo over stabilizers (as in the paper's refs. 67-68), or
+    // every stabilizer when `exhaustive` and N is small.
+    function fidelity(pattern, noise, opts) {
+      opts = opts || {};
+      var N = pattern.N, r = opts.rng || rng(), fx = 0, fz = 0, nx = 0, nz = 0;
+      if (opts.exhaustive) {
+        for (var m = 0; m < (1 << N); m++) {
+          if (popcount(m) & 1) continue;
+          var xb = new Uint8Array(N), sub = [];
+          for (var j = 0; j < N; j++) if ((m >> j) & 1) { xb[j] = 1; sub.push(j); }
+          fx += xStabilizer(pattern, xb, noise); nx++;
+          fz += zStabilizer(pattern, sub, noise); nz++;
+        }
+      } else {
+        for (var i = 0; i < (opts.samples || 20); i++) {
+          fx += xStabilizer(pattern, randomInputBits(N, r), noise); nx++;
+          fz += zStabilizer(pattern, randomEvenSubset(N, r), noise); nz++;
+        }
+      }
+      fx /= nx; fz /= nz;
+      return { FX: fx, FZ: fz, F: (fx + fz) / 2 };
+    }
     return {
+      prepCircuit: prepCircuit, zStabilizer: zStabilizer, xStabilizer: xStabilizer, randomEvenSubset: randomEvenSubset, fidelity: fidelity,
       classicalBound: classicalBound, classicalWin: classicalWin, classicalOptimumBrute: classicalOptimumBrute,
       quantumWin: quantumWin, playRound: playRound, evenInputs: evenInputs, target: target, randomInput: randomInput,
       growth: growth, circuit: circuit, circuitBits: circuitBits, randomInputBits: randomInputBits, winProbBits: winProbBits
@@ -865,7 +953,57 @@
     };
   })();
 
-  var NonLocal = { rng: rng, binomial: binomial, popcount: popcount, shuffle: shuffle, anticommutes: anticommutes, lattice: lattice, SV: SV, Clifford: Clifford, Magic: Magic, KSB: KSB, GHZ: GHZ, HLF: HLF };
+  // =========================================================
+  // PAPER: the measured data of arXiv:2512.02284, for side-by-side plots.
+  // Read out of the PDF's vector paths (marker centres against the axis
+  // tick marks) except where noted as digitized from a raster figure. The
+  // tests check each set against the averages the paper prints.
+  // =========================================================
+  var PAPER = {
+    magic: {
+      // Fig. 1D, Plan I, 100k shots per game, games in row-major order
+      // (R1C1, R1C2, ...). Row 1 is a raster panel, read at 600 dpi.
+      fig1D: [0.983, 0.984, 0.970, 0.989, 0.991, 0.981, 0.982, 0.980, 0.984],
+      fig1DAvg: 0.9830,
+      // Fig. S3A, 10k shots per game (vector).
+      s3I: [0.988, 0.988, 0.976, 0.981, 0.985, 0.977, 0.979, 0.969, 0.953],
+      s3II: [0.955, 0.947, 0.931, 0.956, 0.951, 0.929, 0.923, 0.915, 0.913],
+      s3Avg: { 1: 0.9773, 2: 0.9355 },
+      // Fig. S3B: simulated contributions to the loss probability (%), one
+      // mechanism at a time, and the measured loss.
+      budget: { 1: { readout: 1.77, p2: 0.37, p1: 0.29, measured: 2.27 }, 2: { readout: 3.90, p2: 1.75, p1: 0.54, measured: 6.45 } }
+    },
+    ksb: {
+      // Fig. 2B: 6<R1>, 6<R2>, 6<R3>, -6<C1>, -6<C2>, -6<C3> (vector).
+      fig2B: [5.620, 5.662, 5.593, 5.603, 5.648, 5.586],
+      chi: 5.618, chiErr: 0.005, agreeCompatible: 0.9636, agreeIncompatible: 0.500,
+      // Fig. S5C: chi is maximal near this virtual Z (units of pi), read off the plot.
+      calibratedVirtualZ: -0.27
+    },
+    ghz: {
+      // Fig. 3B, N = 3..71: digitized from the raster figure at 600 dpi (+-0.002).
+      fig3BStart: 3,
+      fig3B: [0.961, 0.951, 0.940, 0.934, 0.927, 0.920, 0.915, 0.909, 0.902, 0.895, 0.888, 0.884, 0.878, 0.870, 0.861, 0.855, 0.849, 0.841, 0.835, 0.829, 0.819, 0.814, 0.809, 0.804, 0.799, 0.794, 0.788, 0.782, 0.775, 0.769, 0.766, 0.760, 0.755, 0.748, 0.746, 0.739, 0.737, 0.729, 0.722, 0.716, 0.710, 0.705, 0.700, 0.696, 0.690, 0.684, 0.682, 0.674, 0.672, 0.666, 0.660, 0.658, 0.652, 0.649, 0.644, 0.641, 0.635, 0.634, 0.631, 0.630, 0.629, 0.624, 0.622, 0.621, 0.619, 0.616, 0.613, 0.610, 0.607],
+      // Fig. S6: measured total fidelity first drops below 1/2 here.
+      fidelityBelowHalfAt: 45
+    },
+    hlf: {
+      // Fig. 4B, P_gate = 0.5, n = 9..105, effective CZ layers (vector).
+      fig4BStart: 9,
+      fig4B: [4.120, 4.118, 4.157, 4.168, 4.177, 4.184, 4.198, 4.234, 4.252, 4.251, 4.260, 4.313, 4.287, 4.332, 4.319, 4.327, 4.356, 4.365, 4.373, 4.392, 4.395, 4.391, 4.448, 4.436, 4.467, 4.460, 4.467, 4.507, 4.505, 4.556, 4.583, 4.593, 4.632, 4.622, 4.656, 4.651, 4.739, 4.731, 4.708, 4.780, 4.745, 4.787, 4.821, 4.878, 4.904, 4.959, 4.890, 4.955, 4.985, 4.971, 4.974, 4.973, 5.009, 5.022, 5.033, 5.082, 5.064, 5.093, 5.168, 5.229, 5.244, 5.249, 5.283, 5.409, 5.434, 5.450, 5.578, 5.587, 5.646, 5.593, 5.608, 5.672, 5.712, 5.660, 5.704, 5.722, 5.790, 6.014, 6.074, 6.038, 6.195, 6.205, 6.216, 6.246, 6.250, 6.308, 6.336, 6.328, 6.408, 6.382, 6.538, 6.432, 6.471, 6.632, 6.611, 6.586, 6.548],
+      // Fig. 4B gray segments: the classical lower bound in layers, as
+      // [first n, last n, layers]. Eq. S45: ceil(log2(edges + nodes)) on
+      // the paper's grids.
+      classicalSteps: [[9, 14, 5], [15, 24, 6], [25, 48, 7], [49, 92, 8], [93, 105, 9]]
+    }
+  };
+  function paperClassicalLayers(n) {
+    var st = PAPER.hlf.classicalSteps;
+    for (var i = 0; i < st.length; i++) if (n >= st[i][0] && n <= st[i][1]) return st[i][2];
+    return Math.ceil(Math.log2(HLF.inputCount(n)));
+  }
+
+  var NonLocal = { rng: rng, binomial: binomial, popcount: popcount, shuffle: shuffle, anticommutes: anticommutes, lattice: lattice, SV: SV, Clifford: Clifford, Magic: Magic, KSB: KSB, GHZ: GHZ, HLF: HLF, PAPER: PAPER, paperClassicalLayers: paperClassicalLayers };
   if (typeof module !== "undefined" && module.exports) module.exports = NonLocal;
   if (typeof root !== "undefined" && root) root.NonLocal = NonLocal;
 })(typeof window !== "undefined" ? window : this);

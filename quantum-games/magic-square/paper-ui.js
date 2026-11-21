@@ -175,7 +175,7 @@
       });
       (opts.refs || []).forEach(function (rf) {
         if (!rf.name) return;
-        var v = rf.points ? (rf.points.filter(function (q) { return q.x === best; })[0] || {}).y : rf.y;
+        var v = rf.valueAt ? rf.valueAt(best) : rf.points ? (rf.points.filter(function (q) { return q.x === best; })[0] || {}).y : rf.y;
         if (v != null) html += '<div class="row"><i style="background:' + rf.color + '"></i>' + esc(rf.name) + ": " + esc((Y.fmt || String)(v)) + "</div>";
       });
       tip.show(html, sx(best) / scale, (ev.clientY - rect.top));

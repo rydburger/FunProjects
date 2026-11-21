@@ -58,7 +58,7 @@
     <h2><span class="num">5.2</span>Why four layers is remarkable</h2>
     <div class="prose">
       <p>The circuit is fixed: Hadamard on every qubit, S on every S node, CZ on every active link, then Hadamard and measure. A square grid's links split into four sets of non-touching pairs, so all the CZs fit in <b>four layers</b> at any grid size. Every measurement gives a correct answer, chosen uniformly from all of them.</p>
-      <p>A classical circuit built from two-input gates can only pull together 2<sup>d</sup> input bits in d layers. Bravyi, Gosset and König proved that shallow classical circuits fail on large instances. That proof applies only at very large sizes, so the paper compares against a simpler yardstick, log<sub>2</sub>(number of input bits). It scores the noisy chip by <b>effective depth</b>: 4 divided by the fraction of answers that are correct.</p>
+      <p>A classical circuit built from two-input gates can only pull together 2<sup>d</sup> input bits in d layers. Bravyi, Gosset and König proved that shallow classical circuits fail on large instances. That proof applies only at very large sizes (around n ~ 10<sup>6</sup>), so the paper compares against a simpler yardstick. A function that depends on all s input bits needs at least log<sub>2</sub>(s) layers of two-input gates, rounded up to whole layers. It scores the noisy chip by <b>effective depth</b>: 4 divided by the fraction of answers that are correct.</p>
     </div>
   </section>
 
@@ -69,10 +69,12 @@
       <div class="control"><span class="lab">Puzzles per size</span><div id="ng-seg"></div></div>
       <div class="control"><span class="lab">P (switched-on probability)</span><div id="pg-seg"></div></div>
       <div class="control"><button class="primary" id="sweep" type="button">Run the sweep</button></div>
+      <div class="control"><span class="lab">Overlay</span><div id="bravyi-seg"></div></div>
     </div>
     <div id="noise"></div>
     <div class="progress" aria-hidden="true"><i id="prog"></i></div>
     <div id="sweep-chart"></div>
+    <p class="small">Pink: the paper's measured effective depth (Fig. 4B), read from the PDF's vector data. Red steps: the paper's classical lower bound, &lceil;log<sub>2</sub>(edges + nodes)&rceil; layers (Eq. S45; on square grids these are exactly the gray segments of Fig. 4B). The second overlay adds Fig. S8: Bravyi et al.'s asymptotic bound extrapolated as c·log<sub>2</sub>(n)/16, and the line where the success rate is 7/8. The paper notes that reading a "depth-1 classical circuit" off that crossing (near n &asymp; 35) is an artifact of pushing an asymptotic bound far outside its range. Its Fig. S7 shows P = 0.25 and 0.75 give similar curves, which you can try above.</p>
   </section>
 
   <footer class="note">The 9- and 16-qubit puzzles in 5.1 run on a full statevector. Bigger ones sample the exact output distribution, uniform over all valid answers, which our tests check against the statevector. The noisy sweep uses exact Pauli-fault propagation with shot sampling (<code>NonLocal.HLF</code>).</footer>
@@ -178,14 +180,15 @@
 
   // ---------- 5.3 sweep ----------
   var SIZES = [9, 16, 25, 36, 49, 64, 72, 81, 90, 100, 105];
-  var sw = { ng: 100, pg: 0.5, noise: Object.assign({}, C.PAPER_NOISE), job: null, data: [] };
+  var sw = { ng: 100, pg: 0.5, noise: Object.assign({}, C.PAPER_NOISE), job: null, data: [], bravyi: false };
+  UI.seg(document.getElementById("bravyi-seg"), [{ value: false, label: "Fig. 4B" }, { value: true, label: "+ Bravyi extrapolations (Fig. S8)" }], false, function (v) { sw.bravyi = v; drawSweep(); });
   UI.seg(document.getElementById("ng-seg"), [{ value: 100, label: "100" }, { value: 1000, label: "1000 (paper)" }], sw.ng, function (v) { sw.ng = v; });
   UI.seg(document.getElementById("pg-seg"), [{ value: 0.25, label: "0.25" }, { value: 0.5, label: "0.5 (paper)" }, { value: 0.75, label: "0.75" }], sw.pg, function (v) { sw.pg = v; startSweep(); });
   UI.noisePanel(document.getElementById("noise"), [
     { key: "p1", label: "1-qubit gate error", max: 0.02 },
     { key: "p2", label: "CZ error", max: 0.05 },
     { key: "readout", label: "Readout error", max: 0.1 },
-    { key: "idle", label: "Idle error / layer", max: 0.02 }
+    { key: "idle", label: "Idle (T1) error / layer", max: 0.02 }
   ], C.PAPER_NOISE, function (v) { sw.noise = v; startSweep(); });
   document.getElementById("sweep").addEventListener("click", startSweep);
   function startSweep() {
@@ -212,21 +215,29 @@
       onDone: function () { document.getElementById("sweep").disabled = false; drawSweep(); }
     });
   }
+  var PAPER_PTS = NL.PAPER.hlf.fig4B.map(function (v, i) { return { x: NL.PAPER.hlf.fig4BStart + i, y: v }; });
+  // Fig. 4B gray segments as one stepped path
+  var STEPS = []; NL.PAPER.hlf.classicalSteps.forEach(function (st) { STEPS.push({ x: st[0] - 0.5, y: st[2] }, { x: st[1] + 0.5, y: st[2] }); });
   function drawSweep() {
-    var cls = []; for (var n = 9; n <= 105; n++) cls.push({ x: n, y: Math.log2(HLF.inputCount(n)) });
     var ymax = Math.max(10, Math.ceil(Math.max.apply(null, sw.data.map(function (d) { return d.depth + d.dse; }).concat([0])) + 0.5));
+    var refs = [{ points: PAPER_PTS, name: "Paper, measured (Fig. 4B, P = 0.5)", label: sw.bravyi ? null : "paper", color: "var(--alice)" },
+                { points: STEPS, valueAt: NL.paperClassicalLayers, name: "Paper's classical lower bound ⌈log₂(edges + nodes)⌉", label: "classical bound", color: "var(--mismatch)" },
+                { y: 4, name: "Ideal quantum: 4 layers", label: "ideal 4", color: "var(--bob)", dash: true }];
+    if (sw.bravyi) {
+      [8, 16, 24].forEach(function (c) {
+        var pts = []; for (var n = 9; n <= 105; n++) pts.push({ x: n, y: c * Math.log2(n) / 16 });
+        refs.push({ points: pts, valueAt: function (n) { return c * Math.log2(n) / 16; }, name: c + "·log₂(n)/16", label: "c = " + c, color: "var(--ink-mute)", dash: true });
+      });
+      refs.push({ y: 4 / (7 / 8), name: "Success 7/8 (Bravyi et al. threshold)", label: "7/8", color: "var(--quantum)", dash: true });
+    }
     UI.lineChart(document.getElementById("sweep-chart"), {
       height: 300,
       x: { min: 0, max: 110, label: "qubits n", fmt: function (v) { return String(v); } },
-      y: { min: 0, max: ymax, label: "effective CZ layers", fmt: function (v) { return v.toFixed(v % 1 ? 2 : 0); }, fmtErr: function (v) { return v.toFixed(2); } },
-      series: [
-        { name: "Simulated chip, 4 ÷ P(correct) (±1σ)", color: "var(--quantum)", kind: "both", points: sw.data.map(function (d) { return { x: d.n, y: d.depth, lo: d.depth - d.dse, hi: d.depth + d.dse }; }) },
-        { name: "Paper, measured (≈6 at n = 105)", color: "var(--alice)", kind: "dots", marker: "diamond", points: [{ x: 105, y: 6 }] }
-      ],
-      refs: [{ points: cls, name: "Classical yardstick log₂(inputs)", label: "log₂(inputs)", color: "var(--mismatch)", dash: true },
-             { y: 4, name: "Ideal quantum: 4 layers", label: "ideal 4", color: "var(--bob)", dash: true }],
-      tableHead: ["n", "P(correct)", "effective layers", "±1σ", "log₂(inputs)"],
-      tableRows: sw.data.map(function (d) { return [d.n, UI.pct(d.p, 2), d.depth.toFixed(3), d.dse.toFixed(3), Math.log2(HLF.inputCount(d.n)).toFixed(2)]; })
+      y: { min: sw.bravyi ? 1 : 0, max: ymax, label: "effective CZ layers", fmt: function (v) { return v.toFixed(v % 1 ? 2 : 0); }, fmtErr: function (v) { return v.toFixed(2); } },
+      series: [{ name: "Simulated chip, 4 ÷ P(correct) (±1σ)", color: "var(--quantum)", kind: "both", points: sw.data.map(function (d) { return { x: d.n, y: d.depth, lo: d.depth - d.dse, hi: d.depth + d.dse }; }) }],
+      refs: refs,
+      tableHead: ["n", "P(correct)", "effective layers", "±1σ", "paper", "classical bound"],
+      tableRows: sw.data.map(function (d) { var pp = NL.PAPER.hlf.fig4B[d.n - 9]; return [d.n, UI.pct(d.p, 2), d.depth.toFixed(3), d.dse.toFixed(3), pp != null ? pp.toFixed(2) : "—", NL.paperClassicalLayers(d.n)]; })
     });
   }
   UI.onResize(document.getElementById("sweep-chart"), drawSweep);
