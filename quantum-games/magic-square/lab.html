@@ -15,11 +15,11 @@
   .table1 button.r { border-color: var(--alice); }
   .table1 button.c { border-color: var(--bob); }
   .table1 button.rc { border-color: var(--quantum); background: var(--quantum-soft); }
-  .budget-row { display: grid; grid-template-columns: 130px 1fr 64px; gap: 10px; align-items: center; font-size: 13px; margin: 6px 0; }
+  .budget-row { display: grid; grid-template-columns: 130px 1fr 112px; gap: 10px; align-items: center; font-size: 13px; margin: 6px 0; }
   .budget-row .bar { height: 10px; border-radius: 3px; background: var(--quantum); min-width: 1px; }
-  .budget-row.total .bar { background: var(--mismatch); }
   .budget-row .v { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
-  @media (max-width: 480px) { .budget-row { grid-template-columns: 96px 1fr 56px; } }
+  .budget-row.head { margin-bottom: 2px; }
+  @media (max-width: 480px) { .budget-row { grid-template-columns: 84px 1fr 100px; font-size: 12px; } }
 </style>
 </head>
 <body>
@@ -50,7 +50,7 @@
 
   <section class="card">
     <h2><span class="num">2.2</span>Play all nine games</h2>
-    <p class="lede">Each bar is the measured win rate for one row–column game, from a finite number of shots. The thick tick on each bar is our noise model's exact win probability. Hover over or tap a bar for its numbers, or tap it to show that game's circuit above.</p>
+    <p class="lede">Each bar is the simulated win rate for one row–column game, from a finite number of shots. The dark tick on each bar is our noise model's exact win probability, and the pink tick is what the paper measured for that game (Fig. 1D for Plan I, Fig. S3A for Plan II). Hover over or tap a bar for its numbers, or tap it to show that game's circuit above.</p>
     <div class="controls">
       <div class="control"><span class="lab">Measurement plan</span><div id="var-seg"></div></div>
       <div class="control"><span class="lab">Shots per game</span><div id="shots-seg"></div></div>
@@ -63,10 +63,11 @@
 
   <section class="card">
     <h2><span class="num">2.3</span>Where the losses come from</h2>
-    <p class="lede">The paper's error budget (Fig. S3) adds depolarizing noise after each gate plus readout bit flips, and finds it accounts for the measured loss. Below, each source is switched on alone at the slider values above. The losses add up almost exactly because each one is small.</p>
+    <p class="lede">The paper's error budget (Fig. S3B) adds depolarizing noise after each gate plus readout bit flips, one source at a time, and finds it accounts for the measured loss. Below, our model does the same at the slider values above, next to the paper's numbers. The losses add up almost exactly because each one is small.</p>
     <div id="budget"></div>
+    <p class="small" id="budget-note"></p>
     <div class="rule-card" style="margin-top:14px">
-      <b>Why the two plans differ.</b> In Plan I (the paper's main result) each player measures two observables at once and fills in the third with the product rule, so their own rule can never break. Only the shared cell can go wrong. In Plan II each player measures all three directly, first copying two of them onto fresh ancilla qubits, then reading the data qubits. That means more gates, and the referee now checks <em>three</em> things: Alice's row rule, Bob's column rule and the shared cell. The paper measured 97.73% for Plan I and 93.55% for Plan II in the supplement, and 98.30% for Plan I in the main text.
+      <b>Why the two plans differ.</b> In Plan I (the paper's main result) each player measures two observables at once and fills in the third with the product rule, so their own rule can never break. Only the shared cell can go wrong. In Plan II each player measures all three directly. Two are copied onto fresh ancilla qubits; the third is folded onto the player's second data qubit and read there, so each player reads three qubits. That means more gates and more readouts, and the referee now checks <em>three</em> things: Alice's row rule, Bob's column rule and the shared cell. The paper measured 97.73% for Plan I and 93.55% for Plan II in the supplement, and 98.30% for Plan I in the main text.
     </div>
   </section>
 
@@ -134,34 +135,47 @@
     document.getElementById("tiles").innerHTML =
       tile("q", "Simulated chip", UI.pct(mSim, 2), "average of 9 games, " + st.shots.toLocaleString() + " shots each") +
       tile("", "Noise model, exact", UI.pct(avg(ex), 2), "no shot noise") +
-      tile("p", "Paper, measured", UI.pct(paper.avg, 2), "Plan " + (st.variation === 1 ? "I" : "II") + ", " + paper.note) +
+      tile("p", "Paper, measured", UI.pct(paper.avg, 2), "Plan " + (st.variation === 1 ? "I" : "II") + ", " + paper.note + (st.variation === 1 ? " (97.73% in Fig. S3A)" : "")) +
       tile("c", "Best classical", "88.89%", "8 of 9, the ceiling for any fixed table");
     var lo = Math.min(0.86, Math.floor(Math.min.apply(null, sm.map(function (s) { return s.lo; })) * 50) / 50);
     UI.barChart(document.getElementById("games-chart"), {
       height: 270, categories: GAME_LABELS,
       y: { min: Math.max(0, lo), max: 1, label: "win probability", fmt: function (v) { return (v * 100).toFixed(v > 0.999 ? 0 : 1) + "%"; }, fmtErr: function (v) { return (v * 100).toFixed(2) + "%"; } },
       groups: [{ name: "Simulated, " + st.shots.toLocaleString() + " shots (±1σ)", color: "var(--quantum)", values: sm }],
-      ticks: [{ name: "Model, exact", color: "var(--ink)", values: ex.map(function (v) { return [v]; }) }],
+      ticks: [{ name: "Model, exact", color: "var(--ink)", values: ex.map(function (v) { return [v]; }) },
+              { name: "Paper, measured (" + (st.variation === 1 ? "Fig. 1D" : "Fig. S3A") + ")", color: "var(--alice)", values: paperGames().map(function (v) { return [v]; }) }],
       refs: [
         { y: 8 / 9, name: "Best classical (8/9)", label: "classical 8/9", color: "var(--mismatch)", dash: true },
         { y: paper.avg, name: "Paper average", label: "paper " + UI.pct(paper.avg, 2), color: "var(--alice)", dash: true }
       ],
       onClick: function (i) { st.sel = [Math.floor(i / 3), i % 3]; renderTable(); renderCircuit(); document.getElementById("table1").scrollIntoView({ behavior: "smooth", block: "center" }); },
-      tableHead: ["game", "simulated", "±1σ", "model exact"],
-      tableRows: GAME_LABELS.map(function (g, i) { return [g, UI.pct(sm[i].v, 3), UI.pct((sm[i].hi - sm[i].lo) / 2, 3), UI.pct(ex[i], 3)]; })
+      tableHead: ["game", "simulated", "±1σ", "model exact", "paper"],
+      tableRows: GAME_LABELS.map(function (g, i) { return [g, UI.pct(sm[i].v, 3), UI.pct((sm[i].hi - sm[i].lo) / 2, 3), UI.pct(ex[i], 3), UI.pct(paperGames()[i], 1)]; })
     });
   }
+  function paperGames() { return st.variation === 1 ? NL.PAPER.magic.fig1D : NL.PAPER.magic.s3II; }
   function tile(cls, cap, val, sub) { return '<div class="tile ' + cls + '"><div class="cap">' + cap + '</div><div class="val">' + val + '</div><div class="sub">' + sub + "</div></div>"; }
 
   function budget() {
-    var sources = [["p1", "1-qubit gates"], ["p2", "CZ gates"], ["readout", "Readout"], ["idle", "Idling"]];
+    var sources = [["p1", "1-qubit gates"], ["p2", "CZ gates"], ["readout", "Readout"], ["idle", "Idling (T1)"]];
+    var pb = NL.PAPER.magic.budget[st.variation];
     function lossWith(nz) { var s = 0; for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) s += 1 - Magic.winProb(st.variation, r, c, nz); return s / 9; }
-    var rows = sources.map(function (src) { var nz = Object.assign({}, C.NO_NOISE); nz[src[0]] = st.noise[src[0]]; return { name: src[1], loss: lossWith(nz) }; });
-    var total = lossWith(st.noise), max = Math.max(total, 1e-9);
-    var html = rows.map(function (r) { return row(r.name, r.loss, max, ""); }).join("");
-    html += row("All together", total, max, " total");
+    var rows = sources.map(function (src) { var nz = Object.assign({}, C.NO_NOISE); nz[src[0]] = st.noise[src[0]]; return { name: src[1], loss: lossWith(nz), paper: pb[src[0]] != null ? pb[src[0]] / 100 : null }; });
+    var total = lossWith(st.noise), paperSum = (pb.p1 + pb.p2 + pb.readout) / 100;
+    var max = Math.max(total, paperSum, pb.measured / 100, 1e-9);
+    var html = '<div class="budget-row head"><span></span><span class="small">our model (gold) · paper Fig. S3B (pink)</span><span class="v small">ours / paper</span></div>';
+    html += rows.map(function (r) { return row(r.name, r.loss, r.paper, ""); }).join("");
+    html += row("All together", total, paperSum, " total");
+    html += row("Measured on chip", null, pb.measured / 100, " total");
     document.getElementById("budget").innerHTML = html;
-    function row(name, v, mx, cls) { return '<div class="budget-row' + cls + '"><span>' + name + '</span><span style="display:block"><span class="bar" style="display:block;width:' + (v / mx * 100).toFixed(1) + '%"></span></span><span class="v">' + UI.pct(v, 2) + "</span></div>"; }
+    document.getElementById("budget-note").innerHTML = "The paper's budget has no idling term: it notes that T1 decay was not included, and its measured loss sits only slightly above its simulated total. Our Plan " + (st.variation === 1 ? "I" : "II") +
+      " circuits follow the paper's structure (Fig. S2) but not its compilation: the paper merges runs of single-qubit gates into one operation, so its circuits have fewer, shorter layers. That is why our idling row" + (st.variation === 2 ? " is large for Plan II" : " is non-zero") + "." +
+      " Paper's measured loss: " + pb.measured.toFixed(2) + "% (Fig. S3A average, " + UI.pct(NL.PAPER.magic.s3Avg[st.variation], 2) + " win).";
+    function bar(v, color) { return v == null ? "" : '<span class="bar" style="display:block;width:' + (v / max * 100).toFixed(1) + '%;background:' + color + '"></span>'; }
+    function row(name, v, pv, cls) {
+      return '<div class="budget-row' + cls + '"><span>' + name + '</span><span style="display:flex;flex-direction:column;gap:3px">' + bar(v, "var(--quantum)") + bar(pv, "var(--alice)") +
+        '</span><span class="v">' + (v == null ? "—" : UI.pct(v, 2)) + " / " + (pv == null ? "—" : UI.pct(pv, 2)) + "</span></div>";
+    }
   }
 
   // ---- controls ----
@@ -180,7 +194,7 @@
     { key: "p1", label: "1-qubit gate error", max: 0.02 },
     { key: "p2", label: "CZ error", max: 0.05 },
     { key: "readout", label: "Readout error", max: 0.1 },
-    { key: "idle", label: "Idle error / layer", max: 0.02 }
+    { key: "idle", label: "Idle (T1) error / layer", max: 0.02 }
   ], C.PAPER_NOISE, function (v) { st.noise = v; run(); });
 
   renderTable(); renderCircuit(); run();

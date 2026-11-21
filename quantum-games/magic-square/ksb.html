@@ -79,7 +79,7 @@
 
   <section class="card">
     <h2><span class="num">3.3</span>The paper's protocol</h2>
-    <p class="lede">Each run measures a random sequence of 180 contexts, and the run is repeated. The paper used 1000 runs and found <b>&chi; = 5.618 &plusmn; 0.005</b>, well above the hidden-variable limit of 4. As a sanity check it also asked how often one observable reads the same value twice. That should happen every time when only compatible things were measured in between, and half the time otherwise.</p>
+    <p class="lede">Each run measures a random sequence of 180 contexts, with the three measurements inside each context in random order, and the run is repeated. The paper used 1000 runs and found <b>&chi; = 5.618 &plusmn; 0.005</b>, well above the hidden-variable limit of 4. As a sanity check it also asked how often one observable reads the same value twice. When it appears in two consecutive contexts, so only compatible things were measured in between, that should happen every time. When something incompatible came in between, it should happen half the time (supplement Fig. S4).</p>
     <div class="controls">
       <div class="control"><span class="lab">Runs</span><div id="reps-seg"></div></div>
       <div class="control"><button class="primary" id="run" type="button">Run the protocol</button></div>
@@ -88,6 +88,24 @@
     <div class="progress" aria-hidden="true"><i id="prog"></i></div>
     <div class="tiles" id="tiles"></div>
     <div id="ctx-chart"></div>
+    <div class="two-col">
+      <div><p class="small" style="margin:8px 0 0"><b>Same value twice, compatible</b> (per observable)</p><div id="agree-c"></div></div>
+      <div><p class="small" style="margin:8px 0 0"><b>Same value twice, incompatible</b> (per observable)</p><div id="agree-i"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3.4</span>Calibrating the compensation phase</h2>
+    <p class="lede">A hardware wrinkle from the supplement (Sec. 4B, Fig. S5). Each Pauli is copied onto the ancilla's phase, and the ancilla is then read and reset. The reset makes the qubit's frequency jump, which leaves an extra, unknown phase on the ancilla in the next measurement. A phase of &pi; flips every reading, and &pi;/2 makes them coin flips. The fix is a <em>virtual Z</em> rotation before the final Hadamard, tuned to cancel the extra phase. Set the hardware's hidden phase, then sweep the virtual Z the way the experimenters did. Angles are in units of &pi;, like the plot in the paper.</p>
+    <div class="controls">
+      <div class="control"><label for="phase-in">Hidden phase on the chip (&times;&pi;)</label>
+        <div class="range-row"><input type="range" id="phase-in" min="-1" max="1" step="0.01" value="0.27"><output id="phase-out" for="phase-in">0.27</output></div></div>
+      <div class="control"><button class="primary" id="cal" type="button">Sweep the virtual Z</button></div>
+    </div>
+    <div class="progress" aria-hidden="true"><i id="cal-prog"></i></div>
+    <div class="tiles" id="cal-tiles"></div>
+    <div id="cal-chart"></div>
+    <p class="small">Each point: 40 runs of 180 contexts at the paper-level noise above. The peak sits where the virtual Z cancels the hidden phase. The flat shoulders near &chi; = 0 are where the net phase is close to &plusmn;&pi;/2: each reading is then nearly random, and the product of three cancels out.</p>
   </section>
 
   <footer class="note">Statevector simulation of two data qubits and one ancilla with Pauli noise trajectories (<code>quantum-games/nonlocal.js</code>, <code>NonLocal.KSB</code>).</footer>
@@ -247,22 +265,82 @@
       tile("c", "Hidden variables", "&le; 4", "noncontextual bound; quantum ideal = 6") +
       tile("", "Agree, compatible", UI.pct(r.pAgreeCompatible, 2), "paper 96.36% (ideal 100%), n=" + ac[1].toLocaleString()) +
       tile("", "Agree, incompatible", UI.pct(r.pAgreeIncompatible, 2), "paper 50.0% (ideal 50%), n=" + ai[1].toLocaleString());
+    // Fig. 2B convention: 6<R_i> and -6<C_i>, so the six bars average to chi
     var vals = [0, 1, 2, 3, 4, 5].map(function (k) {
-      var v = k < 3 ? r.mean[k] : -r.mean[k], se = r.count[k] ? Math.sqrt((1 - r.mean[k] * r.mean[k]) / r.count[k]) : 0;
+      var v = 6 * (k < 3 ? r.mean[k] : -r.mean[k]), se = r.count[k] ? 6 * Math.sqrt((1 - r.mean[k] * r.mean[k]) / r.count[k]) : 0;
       return { v: v, lo: v - se, hi: v + se };
     });
+    var cats = ["6⟨R1⟩", "6⟨R2⟩", "6⟨R3⟩", MINUS + "6⟨C1⟩", MINUS + "6⟨C2⟩", MINUS + "6⟨C3⟩"];
     UI.barChart(document.getElementById("ctx-chart"), {
-      height: 240, categories: ["⟨R1⟩", "⟨R2⟩", "⟨R3⟩", MINUS + "⟨C1⟩", MINUS + "⟨C2⟩", MINUS + "⟨C3⟩"],
-      y: { min: 0.5, max: 1, label: "contribution to χ", fmt: function (v) { return v.toFixed(2); }, fmtErr: function (v) { return v.toFixed(3); } },
+      height: 240, categories: cats,
+      y: { min: 3.5, max: 6.2, label: "6 × context term", fmt: function (v) { return v.toFixed(2); }, fmtErr: function (v) { return v.toFixed(3); } },
       groups: [{ name: "Simulated (±1σ)", color: "var(--quantum)", values: vals }],
-      refs: [{ y: 1, name: "Quantum ideal (each term = 1)", label: "ideal", color: "var(--bob)", dash: true },
-             { y: 4 / 6, name: "Average term at the hidden-variable limit (4/6)", color: "var(--mismatch)", dash: true }],
-      tableHead: ["term", "value", "±1σ", "contexts"],
-      tableRows: vals.map(function (v, k) { return [KSB.contextName(k), v.v.toFixed(4), ((v.hi - v.lo) / 2).toFixed(4), r.count[k]]; })
+      ticks: [{ name: "Paper, measured (Fig. 2B)", color: "var(--alice)", values: NL.PAPER.ksb.fig2B.map(function (v) { return [v]; }) }],
+      refs: [{ y: 6, name: "Quantum limit (χ = 6)", label: "quantum limit", color: "var(--bob)", dash: true },
+             { y: 4, name: "Hidden-variable limit (χ = 4)", label: "classical limit", color: "var(--mismatch)", dash: true }],
+      tableHead: ["term", "simulated", "±1σ", "paper", "contexts"],
+      tableRows: vals.map(function (v, k) { return [cats[k], v.v.toFixed(3), ((v.hi - v.lo) / 2).toFixed(3), NL.PAPER.ksb.fig2B[k].toFixed(3), r.count[k]]; })
     });
+    var LAB = []; for (var a = 0; a < 3; a++) for (var b = 0; b < 3; b++) LAB.push(Magic.label(Magic.TABLE[a][b]));
+    function agreeChart(id, arr, ns, lo, hi, ref, refName) {
+      UI.barChart(document.getElementById(id), {
+        height: 190, categories: LAB,
+        y: { min: lo, max: hi, label: "P(agree)", fmt: function (v) { return (v * 100).toFixed(1) + "%"; }, fmtErr: function (v) { return (v * 100).toFixed(2) + "%"; } },
+        groups: [{ name: "Simulated (±1σ)", color: "var(--quantum)", values: arr.map(function (p, i) { var se = ns[i] ? Math.sqrt(p * (1 - p) / ns[i]) : 0; return { v: p, lo: p - se, hi: p + se }; }) }],
+        refs: [{ y: ref, name: refName, color: "var(--alice)", dash: true }],
+        tableHead: ["observable", "P(agree)", "n"], tableRows: arr.map(function (p, i) { return [LAB[i], UI.pct(p, 2), ns[i]]; })
+      });
+    }
+    agreeChart("agree-c", r.perCell.compatible, r.perCell.nCompatible, 0.9, 1.0, NL.PAPER.ksb.agreeCompatible, "Paper average 96.36%");
+    agreeChart("agree-i", r.perCell.incompatible, r.perCell.nIncompatible, 0.45, 0.55, 0.5, "Paper average 50.0% (ideal)");
   }
   UI.onResize(document.getElementById("ctx-chart"), drawProtocol);
   startRun();
+
+  // ---------- 3.4 compensation-phase calibration ----------
+  var cal = { job: null, pts: [], phase: 0.27 };
+  var phIn = document.getElementById("phase-in");
+  phIn.addEventListener("input", function () { cal.phase = +phIn.value; document.getElementById("phase-out").textContent = cal.phase.toFixed(2); });
+  phIn.addEventListener("change", startCal);
+  document.getElementById("cal").addEventListener("click", startCal);
+  var VZ = []; for (var vi = -20; vi <= 20; vi++) VZ.push(vi / 20);
+  function startCal() {
+    if (cal.job) cal.job.cancel();
+    cal.pts = [];
+    var i = 0, rr = NL.rng(), lastDraw = 0, REPS = 40, R = null;
+    document.getElementById("cal").disabled = true;
+    cal.job = UI.job(function () {
+      if (!R) R = KSB.runner({ noise: Object.assign({}, pr.noise, { phaseErr: cal.phase, virtualZ: VZ[i] }), length: 180, rng: rr });
+      R.step(1);
+      var res = R.result();
+      if (res.reps >= REPS) { cal.pts.push({ x: VZ[i], y: res.chi }); R = null; i++; }
+      return i >= VZ.length ? 1 : (i + res.reps / REPS) / VZ.length;
+    }, {
+      onProgress: function (f) {
+        document.getElementById("cal-prog").style.width = (f * 100).toFixed(1) + "%";
+        var now = performance.now(); if (now - lastDraw > 150 || f >= 1) { lastDraw = now; drawCal(); }
+      },
+      onDone: function () { document.getElementById("cal").disabled = false; drawCal(); }
+    });
+  }
+  function drawCal() {
+    var best = cal.pts.reduce(function (b, p) { return !b || p.y > b.y ? p : b; }, null);
+    document.getElementById("cal-tiles").innerHTML =
+      tile("q", "Best virtual Z (sweep)", best ? (best.x >= 0 ? "+" : MINUS) + Math.abs(best.x).toFixed(2) + "π" : "—", best ? "χ = " + best.y.toFixed(2) + " there" : "") +
+      tile("", "Exact cancellation", (-cal.phase >= 0 ? "+" : MINUS) + Math.abs(cal.phase).toFixed(2) + "π", "minus the hidden phase") +
+      tile("p", "Paper's calibrated value", "≈ " + MINUS + Math.abs(NL.PAPER.ksb.calibratedVirtualZ).toFixed(2) + "π", "read off Fig. S5C");
+    UI.lineChart(document.getElementById("cal-chart"), {
+      height: 260,
+      x: { min: -1, max: 1, label: "virtual Z (units of π)", fmt: function (v) { return v.toFixed(2); }, ticks: [-1, -0.5, 0, 0.5, 1] },
+      y: { min: -6.5, max: 6.5, label: "χ", fmt: function (v) { return v.toFixed(2); } },
+      series: [{ name: "Simulated χ", color: "var(--quantum)", kind: "both", points: cal.pts }],
+      refs: [{ y: 4, name: "Hidden-variable limit", label: "classical bound", color: "var(--mismatch)", dash: true },
+             { y: 6, name: "Quantum limit", color: "var(--bob)", dash: true }],
+      tableHead: ["virtual Z (×π)", "χ"], tableRows: cal.pts.map(function (p) { return [p.x.toFixed(2), p.y.toFixed(3)]; })
+    });
+  }
+  UI.onResize(document.getElementById("cal-chart"), drawCal);
+  startCal();
 })();
 </script>
 </body>

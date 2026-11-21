@@ -35,34 +35,75 @@ them together.
 | Page | Paper | What you do |
 |---|---|---|
 | `index.html` | Fig. 1A–C | The original game (classical and build-the-circuit quantum modes). |
-| `lab.html` | Fig. 1D, S2, S3 | All nine games on a simulated noisy chip: Plan I (measure two, infer one) vs. Plan II (ancilla QND for all three), shots, noise sliders, an error budget. Model ≈ 97.5% / 91.3% vs. paper 97.7–98.3% / 93.6%. |
-| `ksb.html` | Fig. 2, S4 | Kochen–Specker–Bell inequality χ ≤ 4. Fill a hidden-variable table (max 4) or a context-dependent one (6). Measure contexts one at a time on a 2-qubit + ancilla device. Run the 180-context × 1000-run protocol. Model χ ≈ 5.5 vs. paper 5.618; P_agree 96.5% / 50.0% vs. 96.4% / 50.0%. |
-| `ghz.html` | Fig. 3, S6 | N-player GHZ parity game: build classical (best ½ + 2^−⌈N/2⌉) or quantum (X/Y/Z per bit) strategies for 3–8 players on a statevector. Grow GHZ states on a 72-qubit lattice, then sweep N = 2…71. |
-| `hlf.html` | Fig. 4, S7 | 2D hidden linear function as a puzzle (tap nodes to satisfy the kernel checks, or let the 4-layer circuit solve it in one shot). Effective depth vs. n = 9…105 against the log₂(inputs) yardstick. Model ≈ 5.4 vs. paper ≈ 6 at n = 105. |
+| `lab.html` | Fig. 1D, S2, S3 | All nine games on a simulated noisy chip. Plan I (measure two, infer one) or Plan II (two ancillas plus the third Pauli folded onto one data qubit, three readouts per player as in Fig. S2). Shots, noise sliders, the paper's per-game points, and an error budget next to the paper's Fig. S3B. |
+| `ksb.html` | Fig. 2, S4, S5 | Kochen–Specker–Bell inequality χ ≤ 4: hidden-variable tables (max 4) vs. context-dependent ones (6), and measuring contexts one at a time. The 180-context × 1000-run protocol (random order within each context) plotted as 6⟨R⟩, −6⟨C⟩ against Fig. 2B, with per-Pauli agreement for consecutive-compatible and incompatible repeats (Fig. S4). The ancilla compensation-phase calibration: sweep a virtual Z against a hidden phase (Fig. S5C). |
+| `ghz.html` | Fig. 3, S6 | N-player GHZ parity game: classical (best ½ + 2^−⌈N/2⌉) or quantum (X/Y/Z per bit) strategies for 3–8 players, GHZ growth on a 72-qubit lattice, and a sweep of N = 2…71 against the measured Fig. 3B curve (σ = SD over patterns / √patterns). GHZ fidelity Fˣ, Fᶻ and F against the ½ genuine-entanglement line (Fig. S6). |
+| `hlf.html` | Fig. 4, S7, S8 | 2D hidden linear function as a puzzle (or one shot of the 4-layer circuit). Effective depth for n = 9…105 against the measured Fig. 4B curve, the paper's stepped classical bound ⌈log₂(edges + nodes)⌉, and optionally the Bravyi c·log₂(n)/16 extrapolations and the 7/8 line (Fig. S8). P = 0.25 / 0.5 / 0.75 (Fig. S7). |
 
 Shared files: `paper.css` (tokens and components), `paper-ui.js` (chapter nav, theme toggle, SVG
 charts with hover and data tables, circuit drawer, noise sliders, time-sliced job runner). All game
 logic lives in DOM-free [`../nonlocal.js`](../nonlocal.js), tested by `tests/nonlocal.test.js`.
 
-**One correction to the paper's text:** the classical GHZ bound is ½ + 2^−⌈N/2⌉ (ceiling). Our
-brute-force test confirms this for N = 2…10. With a floor, N = 3 would give 100%, but Mermin's
-3-player game is famously capped at 75%.
+### The paper's data (`NonLocal.PAPER`)
 
-**Noise model.** Depolarizing noise after every gate (1q 0.05%, CZ 0.3%), readout flips 0.7%: these
-are the representative rates in the paper's Fig. S6. On top of that, our own idle term stands in
-for T1 under dynamical decoupling (0.03% per moment for each already-used qubit). KSB also has
-ancilla reset errors and data errors during each readout. Every page has sliders and presets.
+The measured points are taken from the PDF itself. Most figures are vector graphics, so their
+values come straight from the marker paths, measured against the axis tick marks: Fig. 1D rows 2–3,
+S3A, 2B and 4B, plus the classical steps of Fig. 4B. Two panels are raster images, digitized at
+600 dpi (±0.002): Fig. 3B and Fig. 1D row 1. The tests check each set against the numbers the paper
+prints: averages 0.9830 / 0.9773 / 0.9355 for the magic square, and χ = 5.618 for KSB. They also
+check that the Fig. 4B steps equal ⌈log₂(edges + nodes)⌉ on square grids.
+
+### Model vs. paper
+
+| | our model | paper |
+|---|---|---|
+| Magic square, Plan I / II | 97.5% / 91.7% | 98.30% (Fig. 1D), 97.73% / 93.55% (Fig. S3) |
+| Plan II loss budget: 1q / CZ / readout | 0.79 / 1.83 / 4.12% | 0.54 / 1.75 / 3.90% |
+| KSB χ; P_agree compatible / incompatible | 5.52; 96.5% / 50.0% | 5.618; 96.36% / 50.0% |
+| GHZ win rate at N = 10 / 30 / 50 / 71 | 0.91 / 0.76 / 0.66 / 0.60 | 0.909 / 0.782 / 0.674 / 0.607 |
+| GHZ fidelity below ½ at | N ≈ 43 | N = 45 |
+| GHZ Fˣ / Fᶻ / F at N = 70 | 0.22 / 0.41 / 0.32 | ≈ 0.21 / 0.44 / 0.32 |
+| HLF effective depth at n = 50 / 105 | 4.6 / 5.4 | 4.8 / 6.5 |
+
+Known differences:
+- **Compilation.** Our circuits keep every single-qubit gate as its own layer; the paper merges
+  them. This costs us some extra idling, most visibly in Plan II.
+- **HLF at large n.** Our model is too optimistic there: it lacks whatever extra errors the
+  105-qubit device has.
+- **Readout.** Readout is symmetric at 0.7%, as in the paper's own GHZ analysis (Eq. S41). Fig. S1
+  shows e₀ ≈ 0.3% and e₁ ≈ 1%.
+
+**The classical GHZ bound** is ½ + 2^−⌈N/2⌉. The main text prints ⌊N/2⌋, but its own Fig. 3B
+classical line (0.75, 0.625, 0.5625, …) uses the ceiling. So does a brute-force check over every
+strategy in our tests: with a floor, 3 classical players would win 100% instead of 75%.
+
+**Noise model.** These rates come from the paper's Fig. S6 caption:
+- 1q Pauli error 0.05%, CZ 0.3%, symmetric readout 0.7%.
+- Idling follows the paper's T1-with-dynamical-decoupling model (Eqs. S19–S22), which is exactly a
+  Pauli channel with X and Y errors only. Its rate is (1 − e^(−t/T1))/2 per moment, with T1 = 73 µs
+  and an assumed 40 ns moment.
+
+KSB adds a few device terms:
+- ancilla reset errors (0.2%),
+- the same X/Y errors on the data qubits during each readout (0.2%),
+- the coherent ancilla phase of Sec. 4B (calibrated away, except in 3.4).
 
 **Performance.** The pages stay smooth at paper scale because nothing big is ever a statevector.
 Every circuit is Clifford, all noise is Pauli, and every score is a parity of final measurements.
 So `Clifford.faultTable` back-propagates the scoring parities once through the circuit, which gives
 each fault's flip pattern. Independent faults then combine exactly, by XOR-convolution or the
-closed form ½(1 + ∏(1 − 2q)). That costs O(circuit size): a 71-qubit GHZ game takes well under a
-millisecond. HLF samples shots from the same fault table with geometric skipping. Statevectors are
-used only where they are tiny: KSB (3 qubits), the 3–8-player GHZ table, and the 9- and 16-node
-HLF puzzles. Sweeps run in ~12 ms slices (`PaperUI.job`). The paper-scale runs (GHZ 70 × 20 × 50,
-HLF 11 × 1000 × 100, KSB 1000 × 180) finish in under 3 s in headless Chromium, with no main-thread
-task over 50 ms.
+closed form ½(1 + ∏(1 − 2q)). That costs O(circuit size): a 71-qubit GHZ game or stabilizer takes
+well under a millisecond. HLF samples shots from the same fault table with geometric skipping.
+Statevectors are used only where they are tiny:
+- KSB: 3 qubits, which is where the non-Clifford compensation phase lives.
+- The 3–8-player GHZ table.
+- The 9- and 16-node HLF puzzles.
+
+Sweeps run in ~12 ms slices (`PaperUI.job`). The paper-scale runs finish in under 3 s in headless
+Chromium, with no main-thread task over 50 ms:
+- GHZ: 70 sizes × 50 patterns × 20 games, plus fidelity.
+- HLF: 11 sizes × 1000 puzzles × 100 shots.
+- KSB: 1000 × 180 contexts, plus a 41-point calibration sweep.
 
 ## Under the hood
 
