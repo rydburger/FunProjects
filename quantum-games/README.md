@@ -7,7 +7,10 @@ self-contained folder — open its `index.html` in any browser, nothing to build
 
 - [`magic-square/`](magic-square/) — the Peres–Mermin magic square, a quantum "pseudo-telepathy"
   game. Classical and quantum modes; the quantum mode has you build the actual entangling circuits
-  by hand.
+  by hand. Chapters 2–5 (`lab.html`, `ksb.html`, `ghz.html`, `hlf.html`) implement every task
+  from Google Quantum AI's contextuality paper ([arXiv:2512.02284](https://arxiv.org/abs/2512.02284)):
+  the magic square on a noisy chip, the Kochen–Specker–Bell inequality, the N-player GHZ game, and
+  the 2D hidden linear function.
 - [`qec-zoo-tycoon/`](qec-zoo-tycoon/) — Error Correction Zoo Tycoon: run a quantum-startup
   zoo where the animals are error-correcting codes and the zookeepers are decoders. `index.html` is
   the park (build enclosures, buy animals, hire keepers, keep the funding flowing);
@@ -35,5 +38,10 @@ error-correction games on stabilizer codes.
 paradigm (phenomenological noise; circuit-level noise is scaffolded), detector error models, and
 decoders that read them (single-shot lookup, sliding-window minimum-weight matching).
 
-Tests: `node quantum-games/tests/stabilizer.test.js`, `detectors.test.js`, and
+[`nonlocal.js`](nonlocal.js) holds the logic for the arXiv:2512.02284 chapters: a tiny in-place
+statevector, Clifford circuits with a Pauli noise model, exact fault analysis by back-propagating
+scoring parities, and the magic-square, KSB, GHZ and HLF tasks (`window.NonLocal`, `require()` in
+Node).
+
+Tests: `node quantum-games/tests/nonlocal.test.js`, `stabilizer.test.js`, `detectors.test.js`, and
 `zoo-tycoon.test.js` for the game logic built on them.

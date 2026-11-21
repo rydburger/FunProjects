@@ -25,6 +25,45 @@ cross — with no communication allowed.
     matrices, Born-rule measurement) — once the circuits are right, the win is guaranteed, not
     scripted.
 
+## The paper chapters (arXiv:2512.02284)
+
+Chapters 2–5 implement every task in Kumar et al., *Quantum–classical separation in
+bounded-resource tasks arising from measurement contextuality* (Google Quantum AI,
+[arXiv:2512.02284](https://arxiv.org/abs/2512.02284)). A chapter bar at the top of every page links
+them together.
+
+| Page | Paper | What you do |
+|---|---|---|
+| `index.html` | Fig. 1A–C | The original game (classical and build-the-circuit quantum modes). |
+| `lab.html` | Fig. 1D, S2, S3 | All nine games on a simulated noisy chip: Plan I (measure two, infer one) vs. Plan II (ancilla QND for all three), shots, noise sliders, an error budget. Model ≈ 97.5% / 91.3% vs. paper 97.7–98.3% / 93.6%. |
+| `ksb.html` | Fig. 2, S4 | Kochen–Specker–Bell inequality χ ≤ 4. Fill a hidden-variable table (max 4) or a context-dependent one (6). Measure contexts one at a time on a 2-qubit + ancilla device. Run the 180-context × 1000-run protocol. Model χ ≈ 5.5 vs. paper 5.618; P_agree 96.5% / 50.0% vs. 96.4% / 50.0%. |
+| `ghz.html` | Fig. 3, S6 | N-player GHZ parity game: build classical (best ½ + 2^−⌈N/2⌉) or quantum (X/Y/Z per bit) strategies for 3–8 players on a statevector. Grow GHZ states on a 72-qubit lattice, then sweep N = 2…71. |
+| `hlf.html` | Fig. 4, S7 | 2D hidden linear function as a puzzle (tap nodes to satisfy the kernel checks, or let the 4-layer circuit solve it in one shot). Effective depth vs. n = 9…105 against the log₂(inputs) yardstick. Model ≈ 5.4 vs. paper ≈ 6 at n = 105. |
+
+Shared files: `paper.css` (tokens and components), `paper-ui.js` (chapter nav, theme toggle, SVG
+charts with hover and data tables, circuit drawer, noise sliders, time-sliced job runner). All game
+logic lives in DOM-free [`../nonlocal.js`](../nonlocal.js), tested by `tests/nonlocal.test.js`.
+
+**One correction to the paper's text:** the classical GHZ bound is ½ + 2^−⌈N/2⌉ (ceiling). Our
+brute-force test confirms this for N = 2…10. With a floor, N = 3 would give 100%, but Mermin's
+3-player game is famously capped at 75%.
+
+**Noise model.** Depolarizing noise after every gate (1q 0.05%, CZ 0.3%), readout flips 0.7%: these
+are the representative rates in the paper's Fig. S6. On top of that, our own idle term stands in
+for T1 under dynamical decoupling (0.03% per moment for each already-used qubit). KSB also has
+ancilla reset errors and data errors during each readout. Every page has sliders and presets.
+
+**Performance.** The pages stay smooth at paper scale because nothing big is ever a statevector.
+Every circuit is Clifford, all noise is Pauli, and every score is a parity of final measurements.
+So `Clifford.faultTable` back-propagates the scoring parities once through the circuit, which gives
+each fault's flip pattern. Independent faults then combine exactly, by XOR-convolution or the
+closed form ½(1 + ∏(1 − 2q)). That costs O(circuit size): a 71-qubit GHZ game takes well under a
+millisecond. HLF samples shots from the same fault table with geometric skipping. Statevectors are
+used only where they are tiny: KSB (3 qubits), the 3–8-player GHZ table, and the 9- and 16-node
+HLF puzzles. Sweeps run in ~12 ms slices (`PaperUI.job`). The paper-scale runs (GHZ 70 × 20 × 50,
+HLF 11 × 1000 × 100, KSB 1000 × 180) finish in under 3 s in headless Chromium, with no main-thread
+task over 50 ms.
+
 ## Under the hood
 
 The quantum machinery is written as three standalone, reusable JS namespaces (exposed on

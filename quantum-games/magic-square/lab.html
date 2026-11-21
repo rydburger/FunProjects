@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Square Lab</title>
+<link rel="stylesheet" href="paper.css">
+<style>
+  .table1 { display: grid; grid-template-columns: auto repeat(3, minmax(64px, 1fr)); gap: 6px; max-width: 420px; font-family: var(--font-mono); }
+  .table1 .hd { font-size: 11px; color: var(--ink-dim); text-align: center; align-self: center; }
+  .table1 button {
+    font: 600 14px var(--font-mono); color: var(--ink); background: var(--bg-panel-2); border: 1.5px solid var(--line);
+    border-radius: 8px; padding: 12px 4px; cursor: pointer;
+  }
+  .table1 button.r { border-color: var(--alice); }
+  .table1 button.c { border-color: var(--bob); }
+  .table1 button.rc { border-color: var(--quantum); background: var(--quantum-soft); }
+  .budget-row { display: grid; grid-template-columns: 130px 1fr 64px; gap: 10px; align-items: center; font-size: 13px; margin: 6px 0; }
+  .budget-row .bar { height: 10px; border-radius: 3px; background: var(--quantum); min-width: 1px; }
+  .budget-row.total .bar { background: var(--mismatch); }
+  .budget-row .v { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) { .budget-row { grid-template-columns: 96px 1fr 56px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <span class="eyebrow">Chapter 2 · paper Fig. 1 and Fig. S3</span>
+    <h1>The magic square on a <em>noisy chip</em></h1>
+    <p>On a perfect device the quantum strategy wins every game. The paper ran all nine row–column games on a Willow superconducting processor, 100,000 shots each, and won <b>98.30%</b> of them. Here the same circuits run on a simulated chip with the error rates the paper reports, and you can turn each error source up or down.</p>
+  </header>
+
+  <section class="card">
+    <h2><span class="num">2.1</span>The strategy, as circuits</h2>
+    <p class="lede">Alice and Bob share two Bell pairs: Alice holds the first qubit of each, Bob the second. The table says which two-qubit Pauli each cell measures. Rows multiply to +1 and columns to −1, as the game requires. Pick a cell to see the full circuit for that game.</p>
+    <div class="two-col">
+      <div>
+        <div class="table1" id="table1"></div>
+        <p class="small" style="margin-top:10px">Alice measures her row, Bob his column. Both read the shared cell, so they always agree.</p>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="control"><span class="lab">Measurement plan</span><div id="var-seg-a"></div></div>
+        </div>
+        <div id="circuit"></div>
+        <p class="small" id="circuit-caption"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2.2</span>Play all nine games</h2>
+    <p class="lede">Each bar is the measured win rate for one row–column game, from a finite number of shots. The thick tick on each bar is our noise model's exact win probability. Hover over or tap a bar for its numbers, or tap it to show that game's circuit above.</p>
+    <div class="controls">
+      <div class="control"><span class="lab">Measurement plan</span><div id="var-seg"></div></div>
+      <div class="control"><span class="lab">Shots per game</span><div id="shots-seg"></div></div>
+      <div class="control"><button class="ghost" id="rerun" type="button">Run again</button></div>
+    </div>
+    <div id="noise"></div>
+    <div class="tiles" id="tiles"></div>
+    <div id="games-chart"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2.3</span>Where the losses come from</h2>
+    <p class="lede">The paper's error budget (Fig. S3) adds depolarizing noise after each gate plus readout bit flips, and finds it accounts for the measured loss. Below, each source is switched on alone at the slider values above. The losses add up almost exactly because each one is small.</p>
+    <div id="budget"></div>
+    <div class="rule-card" style="margin-top:14px">
+      <b>Why the two plans differ.</b> In Plan I (the paper's main result) each player measures two observables at once and fills in the third with the product rule, so their own rule can never break. Only the shared cell can go wrong. In Plan II each player measures all three directly, first copying two of them onto fresh ancilla qubits, then reading the data qubits. That means more gates, and the referee now checks <em>three</em> things: Alice's row rule, Bob's column rule and the shared cell. The paper measured 97.73% for Plan I and 93.55% for Plan II in the supplement, and 98.30% for Plan I in the main text.
+    </div>
+  </section>
+
+  <footer class="note">Exact noisy win rates come from back-propagating each game's scoring parity through the Clifford circuit (see <code>quantum-games/nonlocal.js</code>). Shot noise is sampled on top.</footer>
+</div>
+
+<script src="../nonlocal.js"></script>
+<script src="paper-ui.js"></script>
+<script>
+(function () {
+  "use strict";
+  var NL = window.NonLocal, UI = window.PaperUI, Magic = NL.Magic, C = NL.Clifford;
+  UI.nav("lab");
+
+  var PAPER = { 1: { avg: 0.9830, note: "main text" }, 2: { avg: 0.9355, note: "supplement" } };
+  var st = { variation: 1, shots: 100000, sel: [2, 2], noise: Object.assign({}, C.PAPER_NOISE), rng: NL.rng() };
+  var GAME_LABELS = [];
+  for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) GAME_LABELS.push("R" + (r + 1) + "C" + (c + 1));
+
+  // ---- Table I ----
+  function renderTable() {
+    var el = document.getElementById("table1");
+    el.innerHTML = '<span></span><span class="hd">C1</span><span class="hd">C2</span><span class="hd">C3</span>';
+    for (var r = 0; r < 3; r++) {
+      el.appendChild(UI.h("span", { class: "hd" }, "R" + (r + 1)));
+      for (var c = 0; c < 3; c++) {
+        var cls = r === st.sel[0] && c === st.sel[1] ? "rc" : r === st.sel[0] ? "r" : c === st.sel[1] ? "c" : "";
+        var b = UI.h("button", { type: "button", class: cls, "aria-label": "Row " + (r + 1) + " column " + (c + 1) + ": " + Magic.label(Magic.TABLE[r][c]) }, Magic.label(Magic.TABLE[r][c]));
+        (function (rr, cc) { b.addEventListener("click", function () { st.sel = [rr, cc]; renderTable(); renderCircuit(); }); })(r, c);
+        el.appendChild(b);
+      }
+    }
+  }
+  function renderCircuit() {
+    var r = st.sel[0], c = st.sel[1];
+    var g = st.variation === 2 ? Magic.variationII(r, c) : Magic.variationI(r, c);
+    var labels = st.variation === 2 ? ["A1", "A2", "B1", "B2", "a₁", "a₂", "b₁", "b₂"] : ["A1", "A2", "B1", "B2"];
+    UI.drawCircuit(document.getElementById("circuit"), g.circuit, labels, { rowH: 26 });
+    var rowE = Magic.TABLE[r].map(Magic.label).join(", "), colE = [0, 1, 2].map(function (k) { return Magic.label(Magic.TABLE[k][c]); }).join(", ");
+    var nz = C.withNoise(g.circuit, C.NO_NOISE).filter(function (o) { return o.q.length === 2; }).length;
+    document.getElementById("circuit-caption").innerHTML =
+      "Row " + (r + 1) + " = {" + rowE + "}, column " + (c + 1) + " = {" + colE + "}. " +
+      "First column: H then CNOT (compiled to H·CZ·H, the chip's native gate) makes the two Bell pairs (A1,B1) and (A2,B2). " +
+      (st.variation === 2 ? "Each player then copies two entries onto ancillas (H, controlled-Paulis, H) before reading the data qubits. " : "Each player then rotates their two qubits so a Z readout gives two of their entries. ") +
+      nz + " CZ gates in total.";
+  }
+
+  // ---- nine games ----
+  var lastRun = null;
+  function run() {
+    var exact = [], sampled = [];
+    for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) {
+      var p = Magic.winProb(st.variation, r, c, st.noise);
+      var k = NL.binomial(st.shots, p, st.rng), ph = k / st.shots, se = Math.sqrt(Math.max(ph * (1 - ph), 1e-12) / st.shots);
+      exact.push(p); sampled.push({ v: ph, lo: ph - se, hi: ph + se });
+    }
+    lastRun = { exact: exact, sampled: sampled };
+    drawGames();
+    budget();
+  }
+  function avg(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
+  function drawGames() {
+    var ex = lastRun.exact, sm = lastRun.sampled, mSim = avg(sm.map(function (s) { return s.v; }));
+    var paper = PAPER[st.variation];
+    document.getElementById("tiles").innerHTML =
+      tile("q", "Simulated chip", UI.pct(mSim, 2), "average of 9 games, " + st.shots.toLocaleString() + " shots each") +
+      tile("", "Noise model, exact", UI.pct(avg(ex), 2), "no shot noise") +
+      tile("p", "Paper, measured", UI.pct(paper.avg, 2), "Plan " + (st.variation === 1 ? "I" : "II") + ", " + paper.note) +
+      tile("c", "Best classical", "88.89%", "8 of 9, the ceiling for any fixed table");
+    var lo = Math.min(0.86, Math.floor(Math.min.apply(null, sm.map(function (s) { return s.lo; })) * 50) / 50);
+    UI.barChart(document.getElementById("games-chart"), {
+      height: 270, categories: GAME_LABELS,
+      y: { min: Math.max(0, lo), max: 1, label: "win probability", fmt: function (v) { return (v * 100).toFixed(v > 0.999 ? 0 : 1) + "%"; }, fmtErr: function (v) { return (v * 100).toFixed(2) + "%"; } },
+      groups: [{ name: "Simulated, " + st.shots.toLocaleString() + " shots (±1σ)", color: "var(--quantum)", values: sm }],
+      ticks: [{ name: "Model, exact", color: "var(--ink)", values: ex.map(function (v) { return [v]; }) }],
+      refs: [
+        { y: 8 / 9, name: "Best classical (8/9)", label: "classical 8/9", color: "var(--mismatch)", dash: true },
+        { y: paper.avg, name: "Paper average", label: "paper " + UI.pct(paper.avg, 2), color: "var(--alice)", dash: true }
+      ],
+      onClick: function (i) { st.sel = [Math.floor(i / 3), i % 3]; renderTable(); renderCircuit(); document.getElementById("table1").scrollIntoView({ behavior: "smooth", block: "center" }); },
+      tableHead: ["game", "simulated", "±1σ", "model exact"],
+      tableRows: GAME_LABELS.map(function (g, i) { return [g, UI.pct(sm[i].v, 3), UI.pct((sm[i].hi - sm[i].lo) / 2, 3), UI.pct(ex[i], 3)]; })
+    });
+  }
+  function tile(cls, cap, val, sub) { return '<div class="tile ' + cls + '"><div class="cap">' + cap + '</div><div class="val">' + val + '</div><div class="sub">' + sub + "</div></div>"; }
+
+  function budget() {
+    var sources = [["p1", "1-qubit gates"], ["p2", "CZ gates"], ["readout", "Readout"], ["idle", "Idling"]];
+    function lossWith(nz) { var s = 0; for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) s += 1 - Magic.winProb(st.variation, r, c, nz); return s / 9; }
+    var rows = sources.map(function (src) { var nz = Object.assign({}, C.NO_NOISE); nz[src[0]] = st.noise[src[0]]; return { name: src[1], loss: lossWith(nz) }; });
+    var total = lossWith(st.noise), max = Math.max(total, 1e-9);
+    var html = rows.map(function (r) { return row(r.name, r.loss, max, ""); }).join("");
+    html += row("All together", total, max, " total");
+    document.getElementById("budget").innerHTML = html;
+    function row(name, v, mx, cls) { return '<div class="budget-row' + cls + '"><span>' + name + '</span><span style="display:block"><span class="bar" style="display:block;width:' + (v / mx * 100).toFixed(1) + '%"></span></span><span class="v">' + UI.pct(v, 2) + "</span></div>"; }
+  }
+
+  // ---- controls ----
+  function setVariation(v) {
+    st.variation = v; segA.sync(v); segB.sync(v); renderCircuit(); run();
+  }
+  function mirroredSeg(id) {
+    var el = document.getElementById(id), opts = [{ value: 1, label: "I · measure 2, infer 1" }, { value: 2, label: "II · measure all 3" }];
+    UI.seg(el, opts, st.variation, setVariation);
+    return { sync: function (v) { Array.prototype.forEach.call(el.children, function (b, i) { b.setAttribute("aria-pressed", String(opts[i].value === v)); }); } };
+  }
+  var segA = mirroredSeg("var-seg-a"), segB = mirroredSeg("var-seg");
+  UI.seg(document.getElementById("shots-seg"), [{ value: 1000, label: "1k" }, { value: 10000, label: "10k" }, { value: 100000, label: "100k" }], st.shots, function (v) { st.shots = v; run(); });
+  document.getElementById("rerun").addEventListener("click", run);
+  UI.noisePanel(document.getElementById("noise"), [
+    { key: "p1", label: "1-qubit gate error", max: 0.02 },
+    { key: "p2", label: "CZ error", max: 0.05 },
+    { key: "readout", label: "Readout error", max: 0.1 },
+    { key: "idle", label: "Idle error / layer", max: 0.02 }
+  ], C.PAPER_NOISE, function (v) { st.noise = v; run(); });
+
+  renderTable(); renderCircuit(); run();
+  UI.onResize(document.getElementById("games-chart"), drawGames);
+})();
+</script>
+</body>
+</html>
