@@ -1,5 +1,7 @@
 # The Magic Square — Peres–Mermin pseudo-telepathy game
 
+Working on this folder? Start with [`STATUS.md`](STATUS.md) (handoff: status, design decisions, open items).
+
 Open `index.html` in any browser (Chrome preferred), nothing to build or install. It loads the
 shared [`../engine.js`](../engine.js) module for its quantum circuit machinery — keep both files
 together.

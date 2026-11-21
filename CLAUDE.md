@@ -15,7 +15,9 @@ step. Open an `index.html` directly.
   Clifford circuits + Pauli noise with exact fault analysis, magic square Plans I/II, KSB, GHZ, HLF.
 - `quantum-games/magic-square/`: Peres–Mermin magic square game (`index.html`) plus chapters 2–5
   implementing arXiv:2512.02284 (`lab.html`, `ksb.html`, `ghz.html`, `hlf.html`, sharing
-  `paper.css` and `paper-ui.js`). See its README for numbers, the noise model and performance notes.
+  `paper.css` and `paper-ui.js`). **Read `quantum-games/magic-square/STATUS.md` before working on it.**
+  It has the PR history, architecture, design decisions, how the paper's data was extracted,
+  model-vs-paper numbers, open items and the UI testing recipe.
 - `quantum-games/qec-zoo-tycoon/`: Error Correction Zoo Tycoon. v0 is complete; v1 is done through M7 (habitat workshop),
   plus the funding update (AMO-scale economy, construction, rounds to an IPO, investors, staff wellbeing),
   the second playtest update (shaped plots, NISQ-grade lab, a real funding ladder) and the third
