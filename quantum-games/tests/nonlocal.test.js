@@ -127,6 +127,49 @@ test("paper-level noise lands near the measured 98%", function () {
   assert.ok(avg2 < avg && avg2 > 8 / 9, "variation II " + avg2);
 });
 
+console.log("Interactive game (index.html) on a noisy chip");
+test("the game's own circuits win all 9 games with no noise", function () {
+  for (var rr = 0; rr < 3; rr++) for (var cc = 0; cc < 3; cc++) {
+    var g = Magic.gameCircuit(rr, cc), s = SV.runCircuit(g.circuit);
+    near(SV.parityProb(s, g.observables[0], g.ideal[0]), 1, 1e-9, "game " + rr + cc);
+  }
+});
+test("gateFaults: rates and uniform Paulis", function () {
+  var R = NL.rng(21), n = 200000, nz = { p1: 0.1, p2: 0.2, readout: 0 }, c1 = 0, c2 = 0, kinds = {};
+  for (var i = 0; i < n; i++) {
+    var f1 = NL.Noise.gateFaults(1, nz, R); if (f1.length) { c1++; kinds[f1[0][1]] = (kinds[f1[0][1]] || 0) + 1; }
+    if (NL.Noise.gateFaults(2, nz, R).length) c2++;
+  }
+  near(c1 / n, 0.1, 0.003); near(c2 / n, 0.2, 0.004);
+  ["X", "Y", "Z"].forEach(function (k) { near(kinds[k] / c1, 1 / 3, 0.01, k); });
+});
+test("noisy game on engine.js's statevector matches the exact model", function () {
+  global.window = global.window || {};
+  require("../engine.js");
+  var QE = global.window.QEngine, R = NL.rng(31), nz = { p1: 0.02, p2: 0.06, readout: 0.04, idle: 0 };
+  var H = { role: "single", gate: "H" }, rounds = 6000;
+  function g1(gate, w) { return { role: "single", gate: gate, wire: w }; }
+  // canonical circuits as the editor resolves them (local wires 0,1)
+  var ROWS = [[], [g1("H", 0), g1("H", 1)], [{ role: "controlled", controls: [0], target: 1, gate: "Z" }, g1("H", 0), g1("H", 1)]];
+  var COLS = [[g1("H", 0)], [g1("H", 1)], [{ role: "controlled", controls: [0], target: 1, gate: "X" }, g1("H", 0)]];
+  [[0, 0], [2, 2], [1, 2]].forEach(function (rc) {
+    var wins = 0;
+    for (var t = 0; t < rounds; t++) {
+      var s = QE.makeState(4), id = [0, 1, 2, 3];
+      [g1("H", 0), g1("H", 2), { role: "controlled", controls: [0], target: 1, gate: "X" }, { role: "controlled", controls: [2], target: 3, gate: "X" }]
+        .forEach(function (g) { NL.Noise.applyQEngineGate(QE, s, g, id, nz, R); });
+      ROWS[rc[0]].forEach(function (g) { NL.Noise.applyQEngineGate(QE, s, g, [0, 2], nz, R); });
+      COLS[rc[1]].forEach(function (g) { NL.Noise.applyQEngineGate(QE, s, g, [1, 3], nz, R); });
+      var a = NL.Noise.measureQEngine(QE, s, [0, 2], nz, R).bits, b = NL.Noise.measureQEngine(QE, s, [1, 3], nz, R).bits;
+      var asub = Magic.ROW_SUB[rc[0]][rc[1]], bsub = Magic.COL_SUB[rc[1]][rc[0]];
+      var av = asub.sign * asub.bits.reduce(function (p, w) { return p * (a[w] ? -1 : 1); }, 1);
+      var bv = bsub.sign * bsub.bits.reduce(function (p, w) { return p * (b[w] ? -1 : 1); }, 1);
+      if (av === bv) wins++;
+    }
+    near(wins / rounds, Magic.gameWinProb(rc[0], rc[1], nz), 0.015, "game " + rc);
+  });
+});
+
 console.log("Exact fault analysis vs. forward Pauli-frame sampling");
 test("k=3 distribution (Variation II, heavy noise) matches Monte Carlo", function () {
   var g = Magic.variationII(2, 2), noise = { p1: 0.02, p2: 0.06, readout: 0.04, idle: 0.01 };
